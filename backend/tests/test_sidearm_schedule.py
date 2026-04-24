@@ -103,6 +103,127 @@ async def test_discover_schedule_events_can_target_season(monkeypatch) -> None:
     assert events[0].season == "2025"
 
 
+async def test_discover_schedule_events_can_target_academic_year(
+    monkeypatch,
+) -> None:
+    html = (FIXTURE_DIR / "mens_basketball_schedule_2025_26.html").read_text(
+        encoding="utf-8"
+    )
+    seen_urls: list[str] = []
+
+    async def fake_fetch_schedule(url: str) -> str:
+        seen_urls.append(url)
+        return html
+
+    monkeypatch.setattr(
+        "app.services.sidearm_schedule.fetch_schedule",
+        fake_fetch_schedule,
+    )
+
+    events = await discover_schedule_events("mens-basketball", season="2025-26")
+
+    assert seen_urls == [
+        "https://govandals.com/sports/mens-basketball/schedule/2025-26"
+    ]
+    assert events[0].season == "2025-26"
+    assert events[0].event_date == date(2025, 11, 3)
+    assert events[1].event_date == date(2026, 1, 15)
+
+
+@pytest.mark.parametrize(
+    (
+        "sport_slug",
+        "fixture_name",
+        "schedule_url",
+        "expected_event_id",
+        "expected_season",
+        "expected_date",
+        "expected_result",
+        "expected_score",
+        "expected_boxscore_url",
+    ),
+    [
+        (
+            "mens-basketball",
+            "mens_basketball_schedule_2025_26.html",
+            "https://govandals.com/sports/mens-basketball/schedule/2025-26",
+            "10050",
+            "2025-26",
+            date(2026, 1, 15),
+            "L",
+            (68, 76),
+            "https://govandals.com/sports/mens-basketball/stats/2025-26/"
+            "idaho-state/boxscore/10050",
+        ),
+        (
+            "womens-basketball",
+            "womens_basketball_schedule_2025_26.html",
+            "https://govandals.com/sports/womens-basketball/schedule/2025-26",
+            "9968",
+            "2025-26",
+            date(2026, 1, 15),
+            "W",
+            (81, 61),
+            "https://govandals.com/sports/womens-basketball/stats/2025-26/"
+            "idaho-state/boxscore/9968",
+        ),
+        (
+            "womens-soccer",
+            "womens_soccer_schedule_2025.html",
+            "https://govandals.com/sports/womens-soccer/schedule/2025",
+            "9126",
+            "2025",
+            date(2025, 9, 25),
+            "T",
+            (0, 0),
+            "https://govandals.com/sports/womens-soccer/stats/2025/"
+            "idaho-state/boxscore/9126",
+        ),
+        (
+            "womens-volleyball",
+            "womens_volleyball_schedule_2025.html",
+            "https://govandals.com/sports/womens-volleyball/schedule/2025",
+            "9105",
+            "2025",
+            date(2025, 10, 9),
+            "L",
+            (1, 3),
+            "https://govandals.com/sports/womens-volleyball/stats/2025/"
+            "idaho-state/boxscore/9105",
+        ),
+    ],
+)
+def test_parse_release_one_sport_schedule_fixtures(
+    sport_slug: str,
+    fixture_name: str,
+    schedule_url: str,
+    expected_event_id: str,
+    expected_season: str,
+    expected_date: date,
+    expected_result: str,
+    expected_score: tuple[int, int],
+    expected_boxscore_url: str,
+) -> None:
+    registry = get_source_registry()
+    sport = registry.require_sport(sport_slug)
+    html = (FIXTURE_DIR / fixture_name).read_text(encoding="utf-8")
+
+    events = parse_schedule(html, sport=sport, schedule_url=schedule_url)
+    event = next(
+        parsed for parsed in events if parsed.source_event_id == expected_event_id
+    )
+
+    assert event.season == expected_season
+    assert event.opponent_name == "Idaho State"
+    assert event.event_status == "final"
+    assert event.event_date == expected_date
+    assert event.conference_name == "Big Sky"
+    assert event.conference_event is True
+    assert event.result_status == expected_result
+    assert (event.team_score, event.opponent_score) == expected_score
+    assert event.boxscore_url == expected_boxscore_url
+
+
 async def test_discover_schedule_events_rejects_invalid_season() -> None:
     with pytest.raises(ValueError, match="Season must be a four-digit year"):
         await discover_schedule_events("football", season="latest")

@@ -67,8 +67,10 @@ async def discover_schedule_events(
     sport = registry.require_sport(sport_slug)
     schedule_path = sport.source_patterns.schedule_url.rstrip("/")
     if season:
-        if not re.fullmatch(r"20\d{2}", season):
-            raise ValueError("Season must be a four-digit year")
+        if not re.fullmatch(r"20\d{2}(?:-\d{2})?", season):
+            raise ValueError(
+                "Season must be a four-digit year or academic year like 2025-26"
+            )
         schedule_path = f"{schedule_path}/{season}"
 
     schedule_url = urljoin(str(registry.base_url), schedule_path)
@@ -127,20 +129,23 @@ def _attr(tag: Tag, name: str) -> str | None:
 
 
 def _extract_season(soup: BeautifulSoup, schedule_url: str) -> str | None:
-    url_match = re.search(r"/schedule/(\d{4})", schedule_url)
+    url_match = re.search(r"/schedule/(20\d{2}(?:-\d{2})?)", schedule_url)
     if url_match:
         return url_match.group(1)
 
     selected = soup.select_one("#sidearm-schedule-select-season option[selected]")
     if selected:
         value = selected.get("value") or selected.get_text(" ", strip=True)
-        match = re.search(r"(\d{4})", str(value))
+        match = re.search(r"(20\d{2}(?:-\d{2})?)", str(value))
         if match:
             return match.group(1)
 
     title = soup.find("title")
     if title:
-        match = re.search(r"\b(20\d{2})\b", title.get_text(" ", strip=True))
+        match = re.search(
+            r"\b(20\d{2}(?:-\d{2})?)\b",
+            title.get_text(" ", strip=True),
+        )
         if match:
             return match.group(1)
 
@@ -190,7 +195,17 @@ def _event_date(date_text: str | None, season: str | None) -> date | None:
     if month is None:
         return None
 
-    return date(int(season), month, int(match.group(2)))
+    return date(_season_year_for_month(season, month), month, int(match.group(2)))
+
+
+def _season_year_for_month(season: str, month: int) -> int:
+    start_year = int(season[:4])
+    if "-" not in season:
+        return start_year
+
+    # Academic-year schedules use fall months in the first calendar year and
+    # winter/spring months in the following calendar year.
+    return start_year + 1 if month <= 8 else start_year
 
 
 def _opponent_name(row: Tag) -> str | None:
