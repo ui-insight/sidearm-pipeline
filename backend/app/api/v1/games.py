@@ -27,6 +27,7 @@ from app.schemas.content import GeneratedContentRead
 from app.schemas.game import GameDetail, GameSummary, IngestRequest
 from app.services.content_generator import generate_coverage
 from app.services.sidearm_scraper import ParsedBoxscore, scrape_boxscore
+from app.services.source_registry import SportSource, get_source_registry
 
 router = APIRouter()
 PARSER_VERSION = "sidearm-html-v1"
@@ -56,13 +57,14 @@ async def ingest_game(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to fetch Sidearm page: {exc}",
         ) from exc
+    registry_entry = _registry_entry_for(parsed)
 
     game = await _load_existing_game(db, parsed)
     if game is None:
-        game = _build_game(parsed)
+        game = _build_game(parsed, registry_entry)
         db.add(game)
     else:
-        _refresh_game(game, parsed)
+        _refresh_game(game, parsed, registry_entry)
 
     await db.commit()
     await db.refresh(
@@ -210,7 +212,10 @@ async def _load_existing_game(db: AsyncSession, parsed: ParsedBoxscore) -> Game 
     )
 
 
-def _build_game(parsed: ParsedBoxscore) -> Game:
+def _build_game(
+    parsed: ParsedBoxscore,
+    registry_entry: SportSource | None = None,
+) -> Game:
     now = datetime.now(UTC)
     source_event_id = _source_event_id(parsed.source_url)
     source = EventSource(
@@ -226,11 +231,11 @@ def _build_game(parsed: ParsedBoxscore) -> Game:
         source_system="sidearm",
         source_event_id=source_event_id,
         sport=parsed.sport,
-        sport_name=_sport_name(parsed.sport),
-        gender=_sport_gender(parsed.sport),
+        sport_name=_sport_name(parsed.sport, registry_entry),
+        gender=_sport_gender(parsed.sport, registry_entry),
         season=parsed.season,
         game_date=parsed.game_date,
-        event_shape=_event_shape(parsed.sport),
+        event_shape=_event_shape(parsed.sport, registry_entry),
         event_status=_event_status(parsed),
         publish_status="draft",
         home_team=parsed.home_team,
@@ -270,7 +275,11 @@ def _build_game(parsed: ParsedBoxscore) -> Game:
     return game
 
 
-def _refresh_game(game: Game, parsed: ParsedBoxscore) -> None:
+def _refresh_game(
+    game: Game,
+    parsed: ParsedBoxscore,
+    registry_entry: SportSource | None = None,
+) -> None:
     """Refresh normalized event data while preserving identity and history."""
     now = datetime.now(UTC)
     previous_status = game.event_status
@@ -281,11 +290,11 @@ def _refresh_game(game: Game, parsed: ParsedBoxscore) -> None:
     game.source_system = "sidearm"
     game.source_event_id = source_event_id
     game.sport = parsed.sport
-    game.sport_name = _sport_name(parsed.sport)
-    game.gender = _sport_gender(parsed.sport)
+    game.sport_name = _sport_name(parsed.sport, registry_entry)
+    game.gender = _sport_gender(parsed.sport, registry_entry)
     game.season = parsed.season
     game.game_date = parsed.game_date
-    game.event_shape = _event_shape(parsed.sport)
+    game.event_shape = _event_shape(parsed.sport, registry_entry)
     game.event_status = _event_status(parsed)
     game.home_team = parsed.home_team
     game.away_team = parsed.away_team
@@ -386,7 +395,19 @@ def _event_status(parsed: ParsedBoxscore) -> str:
     return "unknown"
 
 
-def _event_shape(sport_slug: str | None) -> str:
+def _registry_entry_for(parsed: ParsedBoxscore) -> SportSource | None:
+    if not parsed.sport:
+        return None
+    return get_source_registry().get_sport(parsed.sport)
+
+
+def _event_shape(
+    sport_slug: str | None,
+    registry_entry: SportSource | None = None,
+) -> str:
+    if registry_entry is not None:
+        return registry_entry.event_shape
+
     sport = sport_slug or ""
     if sport in {"mens-tennis", "womens-tennis"}:
         return "team_match"
@@ -399,14 +420,26 @@ def _event_shape(sport_slug: str | None) -> str:
     return "team_contest"
 
 
-def _sport_name(sport_slug: str | None) -> str | None:
+def _sport_name(
+    sport_slug: str | None,
+    registry_entry: SportSource | None = None,
+) -> str | None:
+    if registry_entry is not None:
+        return registry_entry.sport_name
+
     if not sport_slug:
         return None
     cleaned = sport_slug.replace("mens-", "").replace("womens-", "")
     return cleaned.replace("-", " ").title()
 
 
-def _sport_gender(sport_slug: str | None) -> str | None:
+def _sport_gender(
+    sport_slug: str | None,
+    registry_entry: SportSource | None = None,
+) -> str | None:
+    if registry_entry is not None:
+        return registry_entry.gender
+
     if not sport_slug:
         return None
     if sport_slug.startswith("mens-"):
