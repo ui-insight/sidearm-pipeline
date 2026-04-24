@@ -4,6 +4,9 @@ import { gamesApi } from "../api/games";
 import { ApiError } from "../api/client";
 import type { GameSummary } from "../types/game";
 
+const SAMPLE_BOXSCORE_URL =
+  "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467";
+
 function formatScore(game: GameSummary): string {
   if (game.away_score === null || game.home_score === null) return "—";
   return `${game.away_score} – ${game.home_score}`;
@@ -102,6 +105,19 @@ function HomePage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-3">
             Ingest a boxscore
           </h2>
+          <div className="mb-4 flex flex-col gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-gray-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Need a test URL? Use the 2025 Idaho vs UC Davis football
+              boxscore.
+            </span>
+            <button
+              type="button"
+              onClick={() => setUrl(SAMPLE_BOXSCORE_URL)}
+              className="self-start rounded-md border border-yellow-400 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-yellow-100 sm:self-auto"
+            >
+              Use sample boxscore
+            </button>
+          </div>
           <form onSubmit={handleIngest} className="flex flex-col sm:flex-row gap-3">
             <input
               type="url"

@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "../src/pages/HomePage";
 
 beforeEach(() => {
@@ -13,6 +14,17 @@ beforeEach(() => {
       }),
     ),
   );
+  vi.stubGlobal("localStorage", {
+    clear: vi.fn(),
+    getItem: vi.fn(() => null),
+    removeItem: vi.fn(),
+    setItem: vi.fn(),
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("HomePage", () => {
@@ -29,5 +41,22 @@ describe("HomePage", () => {
     expect(
       await screen.findByText(/No games yet/i),
     ).toBeInTheDocument();
+  });
+
+  it("fills the ingest form with the sample boxscore", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use sample boxscore" }),
+    );
+
+    expect(screen.getByPlaceholderText(/govandals\.com/i)).toHaveValue(
+      "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467",
+    );
   });
 });
