@@ -34,6 +34,9 @@ Implemented:
   `GET /api/v1/sources/{sport_slug}/schedule`
 - reusable schedule and boxscore parser fixtures for every Release 1 sport,
   including academic-year basketball seasons and volleyball set scoring
+- durable ingest run history for manual boxscore ingestion, exposed at
+  `GET /api/v1/ingest-runs` with status, timing, source context, response
+  status, retryability, and error detail
 
 Issue status:
 
@@ -47,9 +50,10 @@ Issue status:
 | [#15](https://github.com/ui-insight/sidearm-pipeline/issues/15) | Complete | Raw source snapshots, parser version, content hash, and fetch metadata are persisted. |
 | [#16](https://github.com/ui-insight/sidearm-pipeline/issues/16) | Complete | Repeated boxscore ingestion preserves event identity and refreshes related stats. |
 | [#17](https://github.com/ui-insight/sidearm-pipeline/issues/17) | Complete | Migration and repeated-ingest regression tests are in place. |
+| [#19](https://github.com/ui-insight/sidearm-pipeline/issues/19) | Complete | Manual boxscore ingests now create durable `ingest_runs` records and expose recent history through the API. |
 
 Recommended GitHub action: close #12, #13, #14, #15, #16, and #17. Keep #10
-and #11 open as active follow-up work.
+and #11 open as active follow-up work. Close #19 once this branch is merged.
 
 ## Current Baseline
 
@@ -61,6 +65,7 @@ The current scaffold provides:
   generated-content tables
 - internal React views for listing ingested games and inspecting a single game
 - registry-driven schedule discovery preview for Release 1 sports
+- persisted ingest attempt history for manual boxscore ingests
 - optional AI coverage generation from stored game data
 
 That means the project proves the basic scrape-store-display loop and has the
