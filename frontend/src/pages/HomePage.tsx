@@ -50,8 +50,12 @@ function HomePage() {
   const [selectedSeason, setSelectedSeason] = useState(DEFAULT_SEASON);
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleImporting, setScheduleImporting] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleImportMessage, setScheduleImportMessage] = useState<string | null>(
+    null,
+  );
   const selectedSportOption =
     SPORT_OPTIONS.find((sport) => sport.slug === selectedSport) ??
     SPORT_OPTIONS[0]!;
@@ -127,6 +131,7 @@ function HomePage() {
     setScheduleLoading(true);
     setScheduleLoaded(false);
     setScheduleError(null);
+    setScheduleImportMessage(null);
     try {
       const events = await sourcesApi.schedule(selectedSport, selectedSeason);
       setScheduleEvents(events);
@@ -146,10 +151,41 @@ function HomePage() {
     }
   }
 
+  async function importSchedule() {
+    setScheduleImporting(true);
+    setScheduleError(null);
+    setScheduleImportMessage(null);
+    try {
+      const importedGames = await sourcesApi.importSchedule(
+        selectedSport,
+        selectedSeason,
+      );
+      setScheduleImportMessage(
+        `Imported ${importedGames.length} schedule event${
+          importedGames.length === 1 ? "" : "s"
+        }.`,
+      );
+      await refresh();
+    } catch (err) {
+      const detail =
+        err instanceof ApiError
+          ? typeof err.data === "object" && err.data && "detail" in err.data
+            ? String(err.data.detail)
+            : err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to import schedule";
+      setScheduleError(detail);
+    } finally {
+      setScheduleImporting(false);
+    }
+  }
+
   function resetScheduleSelection() {
     setScheduleEvents([]);
     setScheduleLoaded(false);
     setScheduleError(null);
+    setScheduleImportMessage(null);
   }
 
   async function handleDelete(id: number) {
@@ -274,19 +310,35 @@ function HomePage() {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadSchedule}
-              disabled={scheduleLoading}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
-            >
-              {scheduleLoading ? "Loading…" : "Load schedule"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={loadSchedule}
+                disabled={scheduleLoading || scheduleImporting}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+              >
+                {scheduleLoading ? "Loading…" : "Load schedule"}
+              </button>
+              <button
+                type="button"
+                onClick={importSchedule}
+                disabled={scheduleLoading || scheduleImporting}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {scheduleImporting ? "Importing…" : "Import schedule"}
+              </button>
+            </div>
           </div>
 
           {scheduleError && (
             <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
               {scheduleError}
+            </p>
+          )}
+
+          {scheduleImportMessage && (
+            <p className="mb-4 text-sm text-green-800 bg-green-50 border border-green-200 rounded px-3 py-2">
+              {scheduleImportMessage}
             </p>
           )}
 
