@@ -256,6 +256,8 @@ class IngestRun(Base):
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     duration_ms: Mapped[int | None] = mapped_column(Integer)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1)
     http_status: Mapped[int | None] = mapped_column(Integer)
     retryable: Mapped[bool] = mapped_column(Boolean, default=False)
     error_type: Mapped[str | None] = mapped_column(String(128))

@@ -8,6 +8,7 @@ stored in a normalized schema.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Iterable
@@ -16,13 +17,14 @@ from dataclasses import dataclass, field
 import httpx
 from bs4 import BeautifulSoup, Tag
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 VandalsStatsPipeline/0.1"
 )
-REQUEST_TIMEOUT = 20.0
 
 PLAYER_CATEGORY_KEYWORDS = {
     "passing": "passing",
@@ -39,6 +41,43 @@ PLAYER_CATEGORY_KEYWORDS = {
     "returns": "returns",
     "interception": "interceptions",
 }
+
+
+@dataclass(frozen=True)
+class FetchRetryPolicy:
+    """Timeout and retry settings for one Sidearm fetch operation."""
+
+    timeout_seconds: float
+    max_attempts: int
+    backoff_seconds: float
+
+
+@dataclass(frozen=True)
+class FetchResult:
+    """Fetched response body plus retry metadata."""
+
+    html: str
+    attempt_count: int
+    max_attempts: int
+    retryable_failures: int
+
+
+class SidearmFetchError(httpx.HTTPError):
+    """Fetch failure annotated with retry metadata."""
+
+    def __init__(
+        self,
+        original_error: httpx.HTTPError,
+        *,
+        attempt_count: int,
+        max_attempts: int,
+        retryable: bool,
+    ) -> None:
+        super().__init__(str(original_error))
+        self.original_error = original_error
+        self.attempt_count = attempt_count
+        self.max_attempts = max_attempts
+        self.retryable = retryable
 
 
 @dataclass
@@ -64,18 +103,125 @@ class ParsedBoxscore:
     player_stats: list[dict] = field(default_factory=list)
     scoring_plays: list[dict] = field(default_factory=list)
     raw_html: str = ""
+    fetch_attempt_count: int = 1
+    fetch_max_attempts: int = 1
+    fetch_retryable_failures: int = 0
 
 
-async def fetch_boxscore(url: str) -> str:
+def current_fetch_retry_policy() -> FetchRetryPolicy:
+    """Build the current Sidearm fetch policy from application settings."""
+    return FetchRetryPolicy(
+        timeout_seconds=settings.SIDEARM_REQUEST_TIMEOUT_SECONDS,
+        max_attempts=settings.SIDEARM_FETCH_MAX_ATTEMPTS,
+        backoff_seconds=settings.SIDEARM_FETCH_BACKOFF_SECONDS,
+    )
+
+
+async def fetch_boxscore(url: str, timeout_seconds: float | None = None) -> str:
     """Fetch the boxscore HTML."""
+    timeout = timeout_seconds or settings.SIDEARM_REQUEST_TIMEOUT_SECONDS
     async with httpx.AsyncClient(
-        timeout=REQUEST_TIMEOUT,
+        timeout=timeout,
         follow_redirects=True,
         headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*"},
     ) as client:
         response = await client.get(url)
         response.raise_for_status()
         return response.text
+
+
+async def fetch_boxscore_with_retries(
+    url: str,
+    policy: FetchRetryPolicy | None = None,
+) -> FetchResult:
+    """Fetch a boxscore with retry/backoff for transient source failures."""
+    retry_policy = policy or current_fetch_retry_policy()
+    retryable_failures = 0
+
+    for attempt in range(1, retry_policy.max_attempts + 1):
+        try:
+            html = await fetch_boxscore(
+                url,
+                timeout_seconds=retry_policy.timeout_seconds,
+            )
+        except httpx.HTTPError as exc:
+            retryable = is_retryable_fetch_error(exc)
+            if retryable:
+                retryable_failures += 1
+
+            if not retryable or attempt >= retry_policy.max_attempts:
+                raise SidearmFetchError(
+                    exc,
+                    attempt_count=attempt,
+                    max_attempts=retry_policy.max_attempts,
+                    retryable=retryable,
+                ) from exc
+
+            sleep_seconds = retry_policy.backoff_seconds * (2 ** (attempt - 1))
+            if sleep_seconds > 0:
+                await asyncio.sleep(sleep_seconds)
+        else:
+            return FetchResult(
+                html=html,
+                attempt_count=attempt,
+                max_attempts=retry_policy.max_attempts,
+                retryable_failures=retryable_failures,
+            )
+
+    raise RuntimeError("Sidearm fetch retry loop exited unexpectedly")
+
+
+def http_status_from_fetch_error(exc: httpx.HTTPError) -> int | None:
+    """Return an HTTP status code from raw or retry-wrapped httpx errors."""
+    original = exc.original_error if isinstance(exc, SidearmFetchError) else exc
+    if isinstance(original, httpx.HTTPStatusError):
+        return original.response.status_code
+    return None
+
+
+def is_retryable_fetch_error(exc: httpx.HTTPError) -> bool:
+    """Return whether an HTTP/network failure should be retried."""
+    if isinstance(exc, SidearmFetchError):
+        return exc.retryable
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        return status_code == 408 or status_code == 429 or status_code >= 500
+    return isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.NetworkError,
+            httpx.PoolTimeout,
+            httpx.ReadError,
+            httpx.ReadTimeout,
+            httpx.RemoteProtocolError,
+            httpx.TimeoutException,
+            httpx.WriteError,
+            httpx.WriteTimeout,
+        ),
+    )
+
+
+def fetch_attempt_count(exc: httpx.HTTPError) -> int:
+    """Return attempts used by a failed Sidearm fetch."""
+    if isinstance(exc, SidearmFetchError):
+        return exc.attempt_count
+    return 1
+
+
+def fetch_max_attempts(exc: httpx.HTTPError) -> int:
+    """Return max attempts configured for a failed Sidearm fetch."""
+    if isinstance(exc, SidearmFetchError):
+        return exc.max_attempts
+    return current_fetch_retry_policy().max_attempts
+
+
+def original_fetch_error_type(exc: httpx.HTTPError) -> str:
+    """Return the underlying fetch error class name."""
+    if isinstance(exc, SidearmFetchError):
+        return type(exc.original_error).__name__
+    return type(exc).__name__
 
 
 def parse_boxscore(url: str, html: str) -> ParsedBoxscore:
@@ -391,13 +537,20 @@ def _host_team_from_title(title: str) -> str | None:
     return None
 
 
-async def scrape_boxscore(url: str) -> ParsedBoxscore:
+async def scrape_boxscore(
+    url: str,
+    policy: FetchRetryPolicy | None = None,
+) -> ParsedBoxscore:
     """High-level entry point: fetch + parse."""
-    html = await fetch_boxscore(url)
-    parsed = parse_boxscore(url, html)
+    fetch_result = await fetch_boxscore_with_retries(url, policy=policy)
+    parsed = parse_boxscore(url, fetch_result.html)
+    parsed.fetch_attempt_count = fetch_result.attempt_count
+    parsed.fetch_max_attempts = fetch_result.max_attempts
+    parsed.fetch_retryable_failures = fetch_result.retryable_failures
     logger.info(
-        "Scraped boxscore url=%s team_stats=%d player_groups=%d scoring=%d",
+        "Scraped boxscore url=%s attempts=%d team_stats=%d player_groups=%d scoring=%d",
         url,
+        parsed.fetch_attempt_count,
         len(parsed.team_stats),
         len(parsed.player_stats),
         len(parsed.scoring_plays),

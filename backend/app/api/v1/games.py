@@ -27,7 +27,15 @@ from app.models.game import (
 from app.schemas.content import GeneratedContentRead
 from app.schemas.game import GameDetail, GameSummary, IngestRequest
 from app.services.content_generator import generate_coverage
-from app.services.sidearm_scraper import ParsedBoxscore, scrape_boxscore
+from app.services.sidearm_scraper import (
+    ParsedBoxscore,
+    fetch_attempt_count,
+    fetch_max_attempts,
+    http_status_from_fetch_error,
+    is_retryable_fetch_error,
+    original_fetch_error_type,
+    scrape_boxscore,
+)
 from app.services.source_registry import SportSource, get_source_registry
 
 router = APIRouter()
@@ -113,11 +121,14 @@ def _finish_successful_ingest_run(
     ingest_run.status = "succeeded"
     ingest_run.finished_at = finished_at
     ingest_run.duration_ms = _duration_ms(started_at, finished_at)
+    ingest_run.attempt_count = parsed.fetch_attempt_count
+    ingest_run.max_attempts = parsed.fetch_max_attempts
     ingest_run.http_status = 200
     ingest_run.retryable = False
     ingest_run.run_metadata = {
         "canonical_uid": _canonical_uid(parsed),
         "event_status": _event_status(parsed),
+        "retryable_failures": parsed.fetch_retryable_failures,
         "parser_version": PARSER_VERSION,
         "publish_status": game.publish_status,
         "request_url": ingest_run.source_url,
@@ -133,13 +144,18 @@ def _finish_failed_ingest_run(
     ingest_run.status = "failed"
     ingest_run.finished_at = finished_at
     ingest_run.duration_ms = _duration_ms(started_at, finished_at)
-    ingest_run.http_status = _http_status(exc)
-    ingest_run.retryable = _is_retryable_http_error(exc)
-    ingest_run.error_type = type(exc).__name__
+    ingest_run.attempt_count = fetch_attempt_count(exc)
+    ingest_run.max_attempts = fetch_max_attempts(exc)
+    ingest_run.http_status = http_status_from_fetch_error(exc)
+    ingest_run.retryable = is_retryable_fetch_error(exc)
+    ingest_run.error_type = original_fetch_error_type(exc)
     ingest_run.error_message = str(exc)
     ingest_run.run_metadata = {
         "request_url": ingest_run.source_url,
         "failure_phase": "fetch_boxscore",
+        "retry_exhausted": (
+            ingest_run.retryable and ingest_run.attempt_count >= ingest_run.max_attempts
+        ),
     }
 
 
@@ -451,33 +467,6 @@ def _content_hash(raw_body: str) -> str:
 
 def _duration_ms(started_at: datetime, finished_at: datetime) -> int:
     return max(0, int((finished_at - started_at).total_seconds() * 1000))
-
-
-def _http_status(exc: httpx.HTTPError) -> int | None:
-    if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code
-    return None
-
-
-def _is_retryable_http_error(exc: httpx.HTTPError) -> bool:
-    if isinstance(exc, httpx.HTTPStatusError):
-        status_code = exc.response.status_code
-        return status_code == 408 or status_code == 429 or status_code >= 500
-    return isinstance(
-        exc,
-        (
-            httpx.ConnectError,
-            httpx.ConnectTimeout,
-            httpx.NetworkError,
-            httpx.PoolTimeout,
-            httpx.ReadError,
-            httpx.ReadTimeout,
-            httpx.RemoteProtocolError,
-            httpx.TimeoutException,
-            httpx.WriteError,
-            httpx.WriteTimeout,
-        ),
-    )
 
 
 def _event_status(parsed: ParsedBoxscore) -> str:
