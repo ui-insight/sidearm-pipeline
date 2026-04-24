@@ -88,7 +88,9 @@ def parse_boxscore(url: str, html: str) -> ParsedBoxscore:
 
     for table in tables:
         heading_lower = table.heading.lower()
-        if _is_scoring_summary(heading_lower):
+        if _is_score_by_period(heading_lower):
+            _ingest_score_by_period(table, result)
+        elif _is_scoring_summary(heading_lower):
             _ingest_scoring_summary(table, result)
         elif _is_team_stats(heading_lower):
             result.team_stats.extend(_team_stat_rows(table))
@@ -141,14 +143,7 @@ def _nearest_heading(table: Tag) -> str:
     if caption and caption.get_text(strip=True):
         return caption.get_text(strip=True)
 
-    for ancestor in table.parents:
-        if not isinstance(ancestor, Tag):
-            continue
-        heading = ancestor.find(["h1", "h2", "h3", "h4", "h5"])
-        if heading and heading.get_text(strip=True):
-            return heading.get_text(" ", strip=True)
-
-    previous = table.find_previous(["h1", "h2", "h3", "h4", "h5", "caption"])
+    previous = table.find_previous(["h1", "h2", "h3", "h4", "h5"])
     if previous:
         return previous.get_text(" ", strip=True)
 
@@ -196,6 +191,10 @@ def _is_scoring_summary(heading: str) -> bool:
     return "scoring summary" in heading or heading.strip() == "scoring"
 
 
+def _is_score_by_period(heading: str) -> bool:
+    return "team score by" in heading
+
+
 def _is_team_stats(heading: str) -> bool:
     return "team stat" in heading
 
@@ -218,6 +217,50 @@ def _team_stat_rows(table: ParsedTable) -> Iterable[dict]:
             "away_value": row[2],
             "sort_order": index,
         }
+
+
+def _ingest_score_by_period(table: ParsedTable, result: ParsedBoxscore) -> None:
+    """Extract final event scores from Sidearm's shared score-by-period table."""
+    if len(table.rows) < 2:
+        return
+
+    away_row = table.rows[0]
+    home_row = table.rows[1]
+    if len(away_row) < 3 or len(home_row) < 3:
+        return
+
+    final_index = _final_score_column_index(table.columns)
+    if final_index is not None:
+        result.away_score = _safe_int(_cell_at(away_row, final_index))
+        result.home_score = _safe_int(_cell_at(home_row, final_index))
+        return
+
+    away_period_scores = [_safe_int(value) for value in away_row[1:]]
+    home_period_scores = [_safe_int(value) for value in home_row[1:]]
+    paired_scores = [
+        (away, home)
+        for away, home in zip(away_period_scores, home_period_scores, strict=False)
+        if away is not None and home is not None
+    ]
+    if not paired_scores:
+        return
+
+    result.away_score = sum(1 for away, home in paired_scores if away > home)
+    result.home_score = sum(1 for away, home in paired_scores if home > away)
+
+
+def _final_score_column_index(columns: list[str]) -> int | None:
+    for index, column in enumerate(columns):
+        normalized = column.lower()
+        if "total" in normalized or normalized in {"f", "final"}:
+            return index
+    return None
+
+
+def _cell_at(row: list[str], index: int) -> str | None:
+    if index >= len(row):
+        return None
+    return row[index]
 
 
 def _ingest_scoring_summary(table: ParsedTable, result: ParsedBoxscore) -> None:
@@ -341,7 +384,10 @@ def _host_team_from_title(title: str) -> str | None:
     """Extract the host/school name from the trailing "- <School> Athletics" suffix."""
     match = re.search(r"-\s*([A-Z][^-]+?)\s+Athletics\b", title)
     if match:
-        return match.group(1).strip()
+        host = match.group(1).strip()
+        if host == "University of Idaho":
+            return "Idaho"
+        return host
     return None
 
 

@@ -39,17 +39,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
-
       - name: Install pip-audit
         run: pip install pip-audit
 
       - name: Run pip-audit
-        run: pip-audit --format json --output pip-audit-results.json || true
+        run: pip-audit -r backend/requirements.txt --format json --output pip-audit-results.json || true
 
       - name: Display audit results
-        run: pip-audit
+        run: pip-audit -r backend/requirements.txt
 
       - name: Upload Python audit artifact
         if: always()

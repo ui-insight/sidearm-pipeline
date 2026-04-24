@@ -13,20 +13,60 @@ Build a trusted data pipeline that:
 3. exposes website-ready APIs and feeds for the athletics site
 4. supports operational review, reprocessing, and publish confidence
 
+## Implementation Status
+
+Last updated: April 24, 2026.
+
+Implemented:
+
+- canonical event metadata on the existing `games` table, including stable
+  `canonical_uid`, source identity, lifecycle status, publish status, sport
+  shape, venue/location placeholders, and freshness timestamps
+- raw source lineage through `event_sources`, `source_snapshots`, parser version
+  metadata, content hashes, and event status history
+- idempotent boxscore ingestion that refreshes the same canonical event instead
+  of deleting and recreating records
+- Alembic baseline migration and regression tests for repeated ingest identity
+  preservation
+- Release 1 Sidearm source registry for football, men's basketball, women's
+  basketball, women's soccer, and women's volleyball
+- schedule discovery preview endpoint at
+  `GET /api/v1/sources/{sport_slug}/schedule`
+- reusable schedule and boxscore parser fixtures for every Release 1 sport,
+  including academic-year basketball seasons and volleyball set scoring
+
+Issue status:
+
+| Issue | Status | Notes |
+| --- | --- | --- |
+| [#10](https://github.com/ui-insight/sidearm-pipeline/issues/10) | Mostly complete | Release 1 sport inventory and source patterns are in the registry; leave open until ownership notes or additional source quirks are accepted. |
+| [#11](https://github.com/ui-insight/sidearm-pipeline/issues/11) | Partial | Source types are classified in the registry, but live-versus-final behavior still needs sport-by-sport documentation. |
+| [#12](https://github.com/ui-insight/sidearm-pipeline/issues/12) | Complete | Registry JSON, typed loader, tests, docs, and ingestion consumption are implemented. |
+| [#13](https://github.com/ui-insight/sidearm-pipeline/issues/13) | Complete | Representative schedule and boxscore fixtures cover every Release 1 sport. |
+| [#14](https://github.com/ui-insight/sidearm-pipeline/issues/14) | Complete | Canonical event schema and status vocabulary are documented and implemented. |
+| [#15](https://github.com/ui-insight/sidearm-pipeline/issues/15) | Complete | Raw source snapshots, parser version, content hash, and fetch metadata are persisted. |
+| [#16](https://github.com/ui-insight/sidearm-pipeline/issues/16) | Complete | Repeated boxscore ingestion preserves event identity and refreshes related stats. |
+| [#17](https://github.com/ui-insight/sidearm-pipeline/issues/17) | Complete | Migration and repeated-ingest regression tests are in place. |
+
+Recommended GitHub action: close #12, #13, #14, #15, #16, and #17. Keep #10
+and #11 open as active follow-up work.
+
 ## Current Baseline
 
-The current scaffold already provides a starting point:
+The current scaffold provides:
 
 - manual ingestion of a Sidearm boxscore URL
 - parsing of game metadata, team stats, player stat groups, and scoring plays
-- persistence in PostgreSQL through the `games`, `team_stats`, `player_stat_groups`,
-  and `scoring_plays` tables
+- persistence in PostgreSQL through canonical event, source lineage, stats, and
+  generated-content tables
 - internal React views for listing ingested games and inspecting a single game
+- registry-driven schedule discovery preview for Release 1 sports
 - optional AI coverage generation from stored game data
 
-That means the project already proves the basic scrape-store-display loop, but it
-does not yet provide live refresh orchestration, canonical event identity,
-website syndication contracts, or publishing operations.
+That means the project proves the basic scrape-store-display loop and has the
+first canonical event foundation. It does not yet provide persisted schedule
+discovery, live refresh orchestration, website syndication contracts, or
+publishing operations.
 
 ## Target State
 
