@@ -32,6 +32,7 @@ nav:
     - Overview: architecture/overview.md
     - Data Model: architecture/data-model.md
     - Athletic Event Model: architecture/athletic-event-model.md
+    - Source Registry: architecture/source-registry.md
     - Core Functionality Roadmap: architecture/core-functionality-roadmap.md
     - Epic Drafts: architecture/epic-drafts.md
   - Deployment:
