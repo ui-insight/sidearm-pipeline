@@ -2,6 +2,10 @@
 
 <!-- Brief description of the changes and motivation -->
 
+## Issue Linkage
+
+<!-- If this PR fully resolves an issue, include a closing keyword such as "Closes #19". If it only contributes partial work, write "Related to #19" and explain what remains. -->
+
 ## Changes
 
 <!-- List the key changes. What files/modules were affected? -->
@@ -15,6 +19,7 @@
 - [ ] `npm run build` passes (if frontend changed)
 - [ ] `cd e2e && npm test` passes (if E2E coverage changed or browser flows changed)
 - [ ] Tested locally (backend and/or frontend as appropriate)
+- [ ] If this PR fully resolves an issue, the PR description includes `Closes #NN`, `Fixes #NN`, or `Resolves #NN`
 
 ## Agent Context (if AI-assisted)
 

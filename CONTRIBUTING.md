@@ -24,6 +24,10 @@ contributing to this project.
 8. Commit with a descriptive message
 9. Push and create a pull request
 
+When a pull request fully resolves an open issue, its description must include a
+GitHub closing keyword such as `Closes #19`, `Fixes #19`, or `Resolves #19`.
+Use `Related to #19` for partial work and briefly note what remains.
+
 Pull requests that touch `frontend/**`, `e2e/**`, or the E2E workflow also run
 the GitHub Actions Playwright smoke test automatically.
 

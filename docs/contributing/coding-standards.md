@@ -89,6 +89,9 @@
 
 ### Pull Requests
 - Use the PR template
+- If a PR fully resolves an issue, include `Closes #NN`, `Fixes #NN`, or
+  `Resolves #NN` in the PR description so GitHub closes it on merge
+- For partial work, use `Related to #NN` and summarize what remains
 - All CI checks must pass before merge
 - At least one review for non-trivial changes
 - If docs, governance, or template setup changed, run `python scripts/check_template_docs.py`
