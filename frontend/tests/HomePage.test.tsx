@@ -163,4 +163,68 @@ describe("HomePage", () => {
       expect.anything(),
     );
   });
+
+  it("imports a selected schedule and refreshes the game list", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation(async (input, init) => {
+      const endpoint = String(input);
+      if (
+        endpoint === "/api/v1/sources/football/schedule/import?season=2025" &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse([
+          {
+            id: 1,
+            source_url: SAMPLE_BOXSCORE_URL,
+            canonical_uid: "sidearm:football:2025:8467",
+            source_system: "sidearm",
+            source_event_id: "8467",
+            sport: "football",
+            sport_name: "Football",
+            gender: null,
+            season: "2025",
+            game_date: "2025-11-08",
+            event_shape: "team_contest",
+            event_status: "final",
+            publish_status: "draft",
+            home_team: "Idaho",
+            away_team: "UC Davis",
+            home_score: 14,
+            away_score: 28,
+            title: "Idaho vs UC Davis",
+            start_at: null,
+            end_at: null,
+            timezone: null,
+            location_name: "Moscow, Idaho",
+            venue_name: "P1FCU Kibbie Dome",
+            home_away_neutral: "home",
+            conference_event: true,
+            exhibition: false,
+            first_seen_at: null,
+            last_seen_at: null,
+            last_successful_ingest_at: null,
+            ingested_at: "2026-04-24T12:00:00Z",
+          },
+        ]);
+      }
+
+      return jsonResponse([]);
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Import schedule" }));
+
+    expect(
+      await screen.findByText("Imported 1 schedule event."),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sources/football/schedule/import?season=2025",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
 });
