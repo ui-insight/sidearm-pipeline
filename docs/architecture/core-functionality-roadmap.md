@@ -37,6 +37,8 @@ Implemented:
 - durable ingest run history for manual boxscore ingestion, exposed at
   `GET /api/v1/ingest-runs` with status, timing, source context, response
   status, retryability, and error detail
+- configurable Sidearm fetch timeout and retry policy with exponential backoff
+  for transient network errors and retryable HTTP responses
 
 Issue status:
 
@@ -51,9 +53,10 @@ Issue status:
 | [#16](https://github.com/ui-insight/sidearm-pipeline/issues/16) | Complete | Repeated boxscore ingestion preserves event identity and refreshes related stats. |
 | [#17](https://github.com/ui-insight/sidearm-pipeline/issues/17) | Complete | Migration and repeated-ingest regression tests are in place. |
 | [#19](https://github.com/ui-insight/sidearm-pipeline/issues/19) | Complete | Manual boxscore ingests now create durable `ingest_runs` records and expose recent history through the API. |
+| [#20](https://github.com/ui-insight/sidearm-pipeline/issues/20) | Complete | Sidearm fetches now use configurable timeout, retry attempts, exponential backoff, and persisted attempt metadata. |
 
 Recommended GitHub action: close #12, #13, #14, #15, #16, and #17. Keep #10
-and #11 open as active follow-up work. Close #19 once this branch is merged.
+and #11 open as active follow-up work. Close #20 once this branch is merged.
 
 ## Current Baseline
 

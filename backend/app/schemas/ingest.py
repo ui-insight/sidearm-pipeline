@@ -23,6 +23,8 @@ class IngestRunRead(BaseModel):
     started_at: datetime
     finished_at: datetime | None = None
     duration_ms: int | None = None
+    attempt_count: int = 1
+    max_attempts: int = 1
     http_status: int | None = None
     retryable: bool = False
     error_type: str | None = None
