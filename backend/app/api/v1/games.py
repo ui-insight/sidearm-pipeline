@@ -18,6 +18,7 @@ from app.models.game import (
     EventSource,
     EventStatusHistory,
     Game,
+    IngestRun,
     PlayerStatGroup,
     ScoringPlay,
     SourceSnapshot,
@@ -49,10 +50,24 @@ async def ingest_game(
     is updated in place and a new source snapshot is retained.
     """
     url = str(payload.url)
+    started_at = datetime.now(UTC)
+    ingest_run = IngestRun(
+        trigger_type="manual",
+        source_system="sidearm",
+        source_type="boxscore_html",
+        source_url=url,
+        status="running",
+        started_at=started_at,
+        run_metadata={"request_url": url},
+    )
+    db.add(ingest_run)
+    await db.flush()
 
     try:
         parsed = await scrape_boxscore(url)
     except httpx.HTTPError as exc:
+        _finish_failed_ingest_run(ingest_run, started_at, exc)
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to fetch Sidearm page: {exc}",
@@ -66,6 +81,7 @@ async def ingest_game(
     else:
         _refresh_game(game, parsed, registry_entry)
 
+    _finish_successful_ingest_run(ingest_run, game, parsed, started_at)
     await db.commit()
     await db.refresh(
         game,
@@ -81,6 +97,50 @@ async def ingest_game(
     )
 
     return GameDetail.model_validate(game)
+
+
+def _finish_successful_ingest_run(
+    ingest_run: IngestRun,
+    game: Game,
+    parsed: ParsedBoxscore,
+    started_at: datetime,
+) -> None:
+    finished_at = datetime.now(UTC)
+    ingest_run.game = game
+    ingest_run.source_event_id = _source_event_id(parsed.source_url)
+    ingest_run.sport = parsed.sport
+    ingest_run.season = parsed.season
+    ingest_run.status = "succeeded"
+    ingest_run.finished_at = finished_at
+    ingest_run.duration_ms = _duration_ms(started_at, finished_at)
+    ingest_run.http_status = 200
+    ingest_run.retryable = False
+    ingest_run.run_metadata = {
+        "canonical_uid": _canonical_uid(parsed),
+        "event_status": _event_status(parsed),
+        "parser_version": PARSER_VERSION,
+        "publish_status": game.publish_status,
+        "request_url": ingest_run.source_url,
+    }
+
+
+def _finish_failed_ingest_run(
+    ingest_run: IngestRun,
+    started_at: datetime,
+    exc: httpx.HTTPError,
+) -> None:
+    finished_at = datetime.now(UTC)
+    ingest_run.status = "failed"
+    ingest_run.finished_at = finished_at
+    ingest_run.duration_ms = _duration_ms(started_at, finished_at)
+    ingest_run.http_status = _http_status(exc)
+    ingest_run.retryable = _is_retryable_http_error(exc)
+    ingest_run.error_type = type(exc).__name__
+    ingest_run.error_message = str(exc)
+    ingest_run.run_metadata = {
+        "request_url": ingest_run.source_url,
+        "failure_phase": "fetch_boxscore",
+    }
 
 
 @router.get(
@@ -387,6 +447,37 @@ def _source_event_id(source_url: str) -> str | None:
 
 def _content_hash(raw_body: str) -> str:
     return hashlib.sha256(raw_body.encode("utf-8")).hexdigest()
+
+
+def _duration_ms(started_at: datetime, finished_at: datetime) -> int:
+    return max(0, int((finished_at - started_at).total_seconds() * 1000))
+
+
+def _http_status(exc: httpx.HTTPError) -> int | None:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code
+    return None
+
+
+def _is_retryable_http_error(exc: httpx.HTTPError) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        return status_code == 408 or status_code == 429 or status_code >= 500
+    return isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.NetworkError,
+            httpx.PoolTimeout,
+            httpx.ReadError,
+            httpx.ReadTimeout,
+            httpx.RemoteProtocolError,
+            httpx.TimeoutException,
+            httpx.WriteError,
+            httpx.WriteTimeout,
+        ),
+    )
 
 
 def _event_status(parsed: ParsedBoxscore) -> str:

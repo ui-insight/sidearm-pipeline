@@ -5,12 +5,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1 import games, sources
+from app.api.v1 import games, ingest_runs, sources
 from app.db.engine import get_db
 from app.schemas.health import HealthResponse, ReadinessResponse
 
 api_router = APIRouter()
 api_router.include_router(games.router, prefix="/games", tags=["games"])
+api_router.include_router(
+    ingest_runs.router,
+    prefix="/ingest-runs",
+    tags=["ingest-runs"],
+)
 api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
 
 
