@@ -130,4 +130,37 @@ describe("HomePage", () => {
       JSON.stringify({ url: SAMPLE_BOXSCORE_URL }),
     );
   });
+
+  it("uses academic-year seasons for basketball schedules", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation(async (input) => {
+      const endpoint = String(input);
+      if (
+        endpoint === "/api/v1/sources/mens-basketball/schedule?season=2025-26"
+      ) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse([]);
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await user.selectOptions(
+      screen.getByLabelText("Sport"),
+      "mens-basketball",
+    );
+    expect(screen.getByLabelText("Season")).toHaveValue("2025-26");
+
+    await user.click(screen.getByRole("button", { name: "Load schedule" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sources/mens-basketball/schedule?season=2025-26",
+      expect.anything(),
+    );
+  });
 });
