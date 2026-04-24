@@ -84,6 +84,30 @@ async def test_discover_schedule_events_uses_registry_and_fetcher(monkeypatch) -
     assert [event.source_event_id for event in events] == ["8460", "8467", "10652"]
 
 
+async def test_discover_schedule_events_can_target_season(monkeypatch) -> None:
+    html = (FIXTURE_DIR / "football_schedule_2025.html").read_text(encoding="utf-8")
+    seen_urls: list[str] = []
+
+    async def fake_fetch_schedule(url: str) -> str:
+        seen_urls.append(url)
+        return html
+
+    monkeypatch.setattr(
+        "app.services.sidearm_schedule.fetch_schedule",
+        fake_fetch_schedule,
+    )
+
+    events = await discover_schedule_events("football", season="2025")
+
+    assert seen_urls == ["https://govandals.com/sports/football/schedule/2025"]
+    assert events[0].season == "2025"
+
+
+async def test_discover_schedule_events_rejects_invalid_season() -> None:
+    with pytest.raises(ValueError, match="Season must be a four-digit year"):
+        await discover_schedule_events("football", season="latest")
+
+
 async def test_discover_schedule_events_rejects_unregistered_sport() -> None:
     with pytest.raises(KeyError, match="No source registry entry"):
         await discover_schedule_events("baseball")

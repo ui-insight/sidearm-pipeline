@@ -58,11 +58,20 @@ async def fetch_schedule(url: str) -> str:
         return response.text
 
 
-async def discover_schedule_events(sport_slug: str) -> list[ParsedScheduleEvent]:
+async def discover_schedule_events(
+    sport_slug: str,
+    season: str | None = None,
+) -> list[ParsedScheduleEvent]:
     """Fetch and parse the configured schedule page for one registered sport."""
     registry = get_source_registry()
     sport = registry.require_sport(sport_slug)
-    schedule_url = urljoin(str(registry.base_url), sport.source_patterns.schedule_url)
+    schedule_path = sport.source_patterns.schedule_url.rstrip("/")
+    if season:
+        if not re.fullmatch(r"20\d{2}", season):
+            raise ValueError("Season must be a four-digit year")
+        schedule_path = f"{schedule_path}/{season}"
+
+    schedule_url = urljoin(str(registry.base_url), schedule_path)
     html = await fetch_schedule(schedule_url)
     return parse_schedule(html, sport=sport, schedule_url=schedule_url)
 

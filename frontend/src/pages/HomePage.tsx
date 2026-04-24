@@ -1,23 +1,54 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { gamesApi } from "../api/games";
+import { sourcesApi } from "../api/sources";
 import { ApiError } from "../api/client";
 import type { GameSummary } from "../types/game";
+import type { ScheduleEvent } from "../types/schedule";
 
 const SAMPLE_BOXSCORE_URL =
   "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467";
+
+const SPORT_OPTIONS = [
+  { slug: "football", label: "Football" },
+  { slug: "mens-basketball", label: "Men's Basketball" },
+  { slug: "womens-basketball", label: "Women's Basketball" },
+  { slug: "womens-soccer", label: "Women's Soccer" },
+  { slug: "womens-volleyball", label: "Women's Volleyball" },
+];
+const DEFAULT_SPORT_SLUG = "football";
+const SEASON_OPTIONS = ["2025", "2026"];
+const DEFAULT_SEASON = "2025";
 
 function formatScore(game: GameSummary): string {
   if (game.away_score === null || game.home_score === null) return "—";
   return `${game.away_score} – ${game.home_score}`;
 }
 
+function formatScheduleScore(event: ScheduleEvent): string | null {
+  if (event.team_score === null || event.opponent_score === null) return null;
+  return `${event.team_score} – ${event.opponent_score}`;
+}
+
+function formatStatus(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
 function HomePage() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ingestingBoxscoreUrl, setIngestingBoxscoreUrl] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [listLoading, setListLoading] = useState(true);
+  const [selectedSport, setSelectedSport] = useState(DEFAULT_SPORT_SLUG);
+  const [selectedSeason, setSelectedSeason] = useState(DEFAULT_SEASON);
+  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setListLoading(true);
@@ -58,10 +89,16 @@ function HomePage() {
 
   async function handleIngest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await ingestBoxscore(url.trim());
+  }
+
+  async function ingestBoxscore(boxscoreUrl: string) {
+    if (!boxscoreUrl) return;
     setError(null);
     setLoading(true);
+    setIngestingBoxscoreUrl(boxscoreUrl);
     try {
-      await gamesApi.ingest(url.trim());
+      await gamesApi.ingest(boxscoreUrl);
       setUrl("");
       await refresh();
     } catch (err) {
@@ -76,7 +113,37 @@ function HomePage() {
       setError(detail);
     } finally {
       setLoading(false);
+      setIngestingBoxscoreUrl(null);
     }
+  }
+
+  async function loadSchedule() {
+    setScheduleLoading(true);
+    setScheduleLoaded(false);
+    setScheduleError(null);
+    try {
+      const events = await sourcesApi.schedule(selectedSport, selectedSeason);
+      setScheduleEvents(events);
+      setScheduleLoaded(true);
+    } catch (err) {
+      const detail =
+        err instanceof ApiError
+          ? typeof err.data === "object" && err.data && "detail" in err.data
+            ? String(err.data.detail)
+            : err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to load schedule";
+      setScheduleError(detail);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  function resetScheduleSelection() {
+    setScheduleEvents([]);
+    setScheduleLoaded(false);
+    setScheduleError(null);
   }
 
   async function handleDelete(id: number) {
@@ -139,6 +206,134 @@ function HomePage() {
             <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
               {error}
             </p>
+          )}
+        </section>
+
+        <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Discover schedule
+              </h2>
+              <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,16rem)_8rem]">
+                <div>
+                  <label
+                    htmlFor="sport-source"
+                    className="block text-xs font-medium uppercase text-gray-500"
+                  >
+                    Sport
+                  </label>
+                  <select
+                    id="sport-source"
+                    value={selectedSport}
+                    onChange={(event) => {
+                      setSelectedSport(event.target.value);
+                      resetScheduleSelection();
+                    }}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  >
+                    {SPORT_OPTIONS.map((sport) => (
+                      <option key={sport.slug} value={sport.slug}>
+                        {sport.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="schedule-season"
+                    className="block text-xs font-medium uppercase text-gray-500"
+                  >
+                    Season
+                  </label>
+                  <select
+                    id="schedule-season"
+                    value={selectedSeason}
+                    onChange={(event) => {
+                      setSelectedSeason(event.target.value);
+                      resetScheduleSelection();
+                    }}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  >
+                    {SEASON_OPTIONS.map((season) => (
+                      <option key={season} value={season}>
+                        {season}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadSchedule}
+              disabled={scheduleLoading}
+              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+            >
+              {scheduleLoading ? "Loading…" : "Load schedule"}
+            </button>
+          </div>
+
+          {scheduleError && (
+            <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {scheduleError}
+            </p>
+          )}
+
+          {scheduleLoaded && scheduleEvents.length === 0 && (
+            <p className="text-sm text-gray-500">No schedule events found.</p>
+          )}
+
+          {scheduleEvents.length > 0 && (
+            <ul className="divide-y divide-gray-100 border-t border-gray-100">
+              {scheduleEvents.map((event) => {
+                const score = formatScheduleScore(event);
+                return (
+                  <li
+                    key={`${event.sport_slug}-${event.source_event_id ?? event.opponent_name}`}
+                    className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium text-gray-900">
+                          {event.opponent_name ?? "Opponent TBD"}
+                        </p>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs uppercase text-gray-600">
+                          {formatStatus(event.event_status)}
+                        </span>
+                        {score && (
+                          <span className="font-mono text-xs text-gray-700">
+                            {score}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {event.event_date ?? event.date_text ?? "Date TBD"}
+                        {event.home_away_neutral &&
+                          ` · ${event.home_away_neutral}`}
+                        {event.location_name && ` · ${event.location_name}`}
+                      </p>
+                    </div>
+                    {event.boxscore_url ? (
+                      <button
+                        type="button"
+                        onClick={() => ingestBoxscore(event.boxscore_url ?? "")}
+                        disabled={loading}
+                        className="self-start rounded-md bg-yellow-500 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-yellow-600 disabled:opacity-50 sm:self-auto"
+                      >
+                        {ingestingBoxscoreUrl === event.boxscore_url
+                          ? "Ingesting…"
+                          : "Ingest boxscore"}
+                      </button>
+                    ) : (
+                      <span className="self-start rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400 sm:self-auto">
+                        No boxscore
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </section>
 

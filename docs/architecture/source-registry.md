@@ -63,6 +63,10 @@ It currently extracts Sidearm game id, opponent, home/away/neutral marker,
 date/time text, result status, scores, location, venue, conference marker, and
 known source URLs such as boxscore, recap, live stats, and gamefile links.
 
+Pass `?season=YYYY` to preview a historical Sidearm schedule URL such as
+`/sports/football/schedule/2025`. This is useful for finding completed events
+that already expose final boxscore links.
+
 ## Next Uses
 
 The next ingestion slice should use the registry to:
