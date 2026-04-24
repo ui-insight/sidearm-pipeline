@@ -10,14 +10,17 @@ const SAMPLE_BOXSCORE_URL =
   "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467";
 
 const SPORT_OPTIONS = [
-  { slug: "football", label: "Football" },
-  { slug: "mens-basketball", label: "Men's Basketball" },
-  { slug: "womens-basketball", label: "Women's Basketball" },
-  { slug: "womens-soccer", label: "Women's Soccer" },
-  { slug: "womens-volleyball", label: "Women's Volleyball" },
+  { slug: "football", label: "Football", seasons: ["2025", "2026"] },
+  { slug: "mens-basketball", label: "Men's Basketball", seasons: ["2025-26"] },
+  {
+    slug: "womens-basketball",
+    label: "Women's Basketball",
+    seasons: ["2025-26"],
+  },
+  { slug: "womens-soccer", label: "Women's Soccer", seasons: ["2025"] },
+  { slug: "womens-volleyball", label: "Women's Volleyball", seasons: ["2025"] },
 ];
 const DEFAULT_SPORT_SLUG = "football";
-const SEASON_OPTIONS = ["2025", "2026"];
 const DEFAULT_SEASON = "2025";
 
 function formatScore(game: GameSummary): string {
@@ -49,6 +52,9 @@ function HomePage() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const selectedSportOption =
+    SPORT_OPTIONS.find((sport) => sport.slug === selectedSport) ??
+    SPORT_OPTIONS[0]!;
 
   const refresh = useCallback(async () => {
     setListLoading(true);
@@ -227,7 +233,11 @@ function HomePage() {
                     id="sport-source"
                     value={selectedSport}
                     onChange={(event) => {
+                      const sport = SPORT_OPTIONS.find(
+                        (option) => option.slug === event.target.value,
+                      );
                       setSelectedSport(event.target.value);
+                      setSelectedSeason(sport?.seasons[0] ?? DEFAULT_SEASON);
                       resetScheduleSelection();
                     }}
                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-500"
@@ -255,7 +265,7 @@ function HomePage() {
                     }}
                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   >
-                    {SEASON_OPTIONS.map((season) => (
+                    {selectedSportOption.seasons.map((season) => (
                       <option key={season} value={season}>
                         {season}
                       </option>

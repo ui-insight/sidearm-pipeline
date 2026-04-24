@@ -32,8 +32,8 @@ Implemented:
   basketball, women's soccer, and women's volleyball
 - schedule discovery preview endpoint at
   `GET /api/v1/sources/{sport_slug}/schedule`
-- a reusable schedule parser with a football fixture covering final and
-  upcoming event rows
+- reusable schedule and boxscore parser fixtures for every Release 1 sport,
+  including academic-year basketball seasons and volleyball set scoring
 
 Issue status:
 
@@ -42,14 +42,14 @@ Issue status:
 | [#10](https://github.com/ui-insight/sidearm-pipeline/issues/10) | Mostly complete | Release 1 sport inventory and source patterns are in the registry; leave open until ownership notes or additional source quirks are accepted. |
 | [#11](https://github.com/ui-insight/sidearm-pipeline/issues/11) | Partial | Source types are classified in the registry, but live-versus-final behavior still needs sport-by-sport documentation. |
 | [#12](https://github.com/ui-insight/sidearm-pipeline/issues/12) | Complete | Registry JSON, typed loader, tests, docs, and ingestion consumption are implemented. |
-| [#13](https://github.com/ui-insight/sidearm-pipeline/issues/13) | Partial | One football schedule fixture exists; representative boxscore/schedule fixtures are still needed for every Release 1 sport. |
+| [#13](https://github.com/ui-insight/sidearm-pipeline/issues/13) | Complete | Representative schedule and boxscore fixtures cover every Release 1 sport. |
 | [#14](https://github.com/ui-insight/sidearm-pipeline/issues/14) | Complete | Canonical event schema and status vocabulary are documented and implemented. |
 | [#15](https://github.com/ui-insight/sidearm-pipeline/issues/15) | Complete | Raw source snapshots, parser version, content hash, and fetch metadata are persisted. |
 | [#16](https://github.com/ui-insight/sidearm-pipeline/issues/16) | Complete | Repeated boxscore ingestion preserves event identity and refreshes related stats. |
 | [#17](https://github.com/ui-insight/sidearm-pipeline/issues/17) | Complete | Migration and repeated-ingest regression tests are in place. |
 
-Recommended GitHub action: close #12, #14, #15, #16, and #17. Keep #10, #11,
-and #13 open as active follow-up work.
+Recommended GitHub action: close #12, #13, #14, #15, #16, and #17. Keep #10
+and #11 open as active follow-up work.
 
 ## Current Baseline
 

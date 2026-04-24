@@ -114,7 +114,9 @@ async def test_preview_schedule_discovery_rejects_invalid_season(
         sport_slug: str,
         season: str | None = None,
     ) -> list[ParsedScheduleEvent]:
-        raise ValueError("Season must be a four-digit year")
+        raise ValueError(
+            "Season must be a four-digit year or academic year like 2025-26"
+        )
 
     monkeypatch.setattr(
         "app.api.v1.sources.discover_schedule_events",
@@ -124,7 +126,9 @@ async def test_preview_schedule_discovery_rejects_invalid_season(
     response = await client.get("/api/v1/sources/football/schedule?season=latest")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Season must be a four-digit year"
+    assert response.json()["detail"] == (
+        "Season must be a four-digit year or academic year like 2025-26"
+    )
 
 
 async def test_preview_schedule_discovery_rejects_unknown_sport(
