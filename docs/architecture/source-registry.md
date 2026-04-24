@@ -49,11 +49,26 @@ Use `registry.require_sport(sport_slug)` when ingestion must fail clearly for an
 unsupported sport. Use `registry.get_sport(sport_slug)` when discovery logic can
 skip unsupported sports.
 
+## Schedule Discovery Preview
+
+The backend exposes a read-only preview endpoint:
+
+```text
+GET /api/v1/sources/{sport_slug}/schedule
+```
+
+The endpoint fetches the configured Sidearm schedule page, parses rendered
+schedule rows, and returns discovered events without writing to the database.
+It currently extracts Sidearm game id, opponent, home/away/neutral marker,
+date/time text, result status, scores, location, venue, conference marker, and
+known source URLs such as boxscore, recap, live stats, and gamefile links.
+
 ## Next Uses
 
 The next ingestion slice should use the registry to:
 
-- reject unsupported sport slugs before fetching unknown sources
-- determine parser strategy from the sport entry
-- seed schedule discovery from `schedule_url`
+- persist discovered schedule events as canonical event records
+- associate schedule, boxscore, recap, live-stat, and gamefile URLs in
+  `event_sources`
+- enqueue final boxscore ingestion for completed events with boxscore links
 - record source type and polling expectations in future ingest job records
