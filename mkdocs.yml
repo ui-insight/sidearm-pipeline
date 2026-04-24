@@ -1,0 +1,72 @@
+site_name: "Vandals Stats Pipeline Documentation"
+site_description: "Documentation for Vandals Stats Pipeline"
+repo_url: https://github.com/ui-insight/sidearm-pipeline
+repo_name: ui-insight/sidearm-pipeline
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Data Model: architecture/data-model.md
+    - Athletic Event Model: architecture/athletic-event-model.md
+    - Core Functionality Roadmap: architecture/core-functionality-roadmap.md
+    - Epic Drafts: architecture/epic-drafts.md
+  - Deployment:
+    - Quick Start: deployment/quickstart.md
+    - Production: deployment/production.md
+    - Production Readiness: deployment/production-readiness.md
+    - Configuration: deployment/configuration.md
+  - Security:
+    - Overview: security/overview.md
+    - Rate Limiting: security/rate-limiting.md
+    - Institutional Review: security/institutional-review.md
+  - Governance:
+    - Overview: governance/data-governance.md
+    - Data Classification: governance/data-classification.md
+    - Module Ownership: governance/module-ownership.md
+    - Schema Versioning: governance/schema-versioning.md
+    - Data Lineage: governance/data-lineage.md
+  - Contributing:
+    - Getting Started: contributing/getting-started.md
+    - Coding Standards: contributing/coding-standards.md
+    - Agent Coordination: contributing/agent-coordination.md
+  - Architecture Decisions:
+    - Overview: adr/index.md
+    - "ADR-001: Template Customization": adr/001-template-customization.md
+    - "ADR-002: Tailwind Only": adr/002-tailwind-only.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - tables
+  - toc:
+      permalink: true

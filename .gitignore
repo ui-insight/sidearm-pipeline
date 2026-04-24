@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+frontend/dist/
+*.js.map
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local AI assistant settings
+.claude/settings.local.json
+.claude/launch.json
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+.cache/
+
+# Docker
+docker-compose.override.yml
+
+# Uploads
+uploads/
+
+# MkDocs build
+site/
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes

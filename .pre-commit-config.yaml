@@ -1,0 +1,53 @@
+minimum_pre_commit_version: "3.7.0"
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: local
+    hooks:
+      - id: backend-ruff-check
+        name: backend-ruff-check
+        entry: backend/.venv/bin/ruff check
+        language: system
+        files: ^backend/.*\.py$
+        types_or:
+          - python
+
+      - id: backend-ruff-format-check
+        name: backend-ruff-format-check
+        entry: backend/.venv/bin/ruff format --check
+        language: system
+        files: ^backend/.*\.py$
+        types_or:
+          - python
+
+      - id: private-key-material
+        name: private-key-material
+        entry: bash
+        language: system
+        args:
+          - scripts/check_private_key_material.sh
+
+      - id: frontend-eslint
+        name: frontend-eslint
+        entry: bash
+        language: system
+        args:
+          - -lc
+          - cd frontend && npm run lint
+        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false
+        stages:
+          - pre-push
+
+      - id: template-docs-check
+        name: template-docs-check
+        entry: python3
+        language: system
+        args:
+          - scripts/check_template_docs.py
+        files: ^(README\.md|CONTRIBUTING\.md|SECURITY\.md|CLAUDE\.md|AGENTS\.md|mkdocs\.yml|docs/.*)$
+        pass_filenames: false
+        stages:
+          - pre-push

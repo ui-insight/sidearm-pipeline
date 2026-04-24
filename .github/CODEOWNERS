@@ -1,0 +1,30 @@
+# Sidearm Pipeline Code Ownership
+#
+# The default entries below keep docs, CI, and security-sensitive paths
+# under explicit maintainer review until more specific path owners are assigned.
+
+# Default owner
+* @ui-insight
+
+# Backend bootstrap and shared infrastructure
+/backend/app/config.py                @ui-insight
+/backend/app/db/                      @ui-insight
+/backend/app/main.py                  @ui-insight
+
+# Frontend shell and shared API client
+/frontend/src/api/                    @ui-insight
+/frontend/src/App.tsx                 @ui-insight
+
+# Documentation and governance
+/docs/                                @ui-insight
+/mkdocs.yml                           @ui-insight
+/README.md                            @ui-insight
+/CONTRIBUTING.md                      @ui-insight
+/AGENTS.md                            @ui-insight
+/CLAUDE.md                            @ui-insight
+
+# CI/CD and security-sensitive paths
+/.github/                             @ui-insight
+/SECURITY.md                          @ui-insight
+/.github/workflows/security-scan.yml  @ui-insight
+/.github/workflows/sbom.yml           @ui-insight

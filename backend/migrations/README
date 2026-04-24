@@ -1,0 +1,4 @@
+Async Alembic environment for the template backend.
+
+The template standardizes on PostgreSQL via `asyncpg` for local and deployed
+app environments. Unit tests may still use isolated in-memory SQLite fixtures.

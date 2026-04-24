@@ -1,0 +1,92 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "backend/pyproject.toml"
+      - "backend/requirements.txt"
+      - "frontend/**"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - ".github/workflows/security-scan.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "backend/pyproject.toml"
+      - "backend/requirements.txt"
+      - "frontend/**"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - ".github/workflows/security-scan.yml"
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-audit:
+    name: Python Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit --format json --output pip-audit-results.json || true
+
+      - name: Display audit results
+        run: pip-audit
+
+      - name: Upload Python audit artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pip-audit-results
+          path: pip-audit-results.json
+          retention-days: 30
+
+  npm-audit:
+    name: JavaScript Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Capture npm audit results
+        working-directory: frontend
+        run: npm audit --omit=dev --json > ../npm-audit-results.json || true
+
+      - name: Upload JavaScript audit artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-audit-results
+          path: npm-audit-results.json
+          retention-days: 30
+
+      - name: Run npm audit (strict)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
