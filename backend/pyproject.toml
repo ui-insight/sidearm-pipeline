@@ -24,7 +24,7 @@ dependencies = [
     "alembic>=1.13.0",
     "httpx>=0.27.0",
     "beautifulsoup4>=4.12.3",
-    "lxml>=5.0.0",
+    "lxml>=6.1.0",
     "anthropic>=0.88.0",
 ]
 

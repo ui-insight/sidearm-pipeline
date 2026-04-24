@@ -1,0 +1,144 @@
+{
+  "version": "1.0.0",
+  "source_system": "sidearm",
+  "base_url": "https://govandals.com",
+  "sports": [
+    {
+      "sport_slug": "football",
+      "sport_name": "Football",
+      "gender": null,
+      "release_scope": "release_1",
+      "event_shape": "team_contest",
+      "parser_strategy": "sidearm_boxscore_html",
+      "source_patterns": {
+        "schedule_url": "/sports/football/schedule",
+        "boxscore_url_pattern": "/sports/football/stats/{season}/{opponent_slug}/boxscore/{source_event_id}"
+      },
+      "supported_source_types": [
+        "schedule_html",
+        "boxscore_html",
+        "recap_html",
+        "gamebook_pdf",
+        "live_stats"
+      ],
+      "polling_policy": {
+        "final_only": true,
+        "pregame_seconds": 3600,
+        "live_seconds": 60,
+        "postgame_seconds": 300
+      },
+      "notes": [
+        "Primary Release 1 football support targets final boxscore HTML first.",
+        "Football boxscores may include period scoring, attendance, duration, and scoring summaries."
+      ]
+    },
+    {
+      "sport_slug": "mens-basketball",
+      "sport_name": "Basketball",
+      "gender": "men",
+      "release_scope": "release_1",
+      "event_shape": "team_contest",
+      "parser_strategy": "sidearm_boxscore_html",
+      "source_patterns": {
+        "schedule_url": "/sports/mens-basketball/schedule",
+        "boxscore_url_pattern": "/sports/mens-basketball/stats/{season}/{opponent_slug}/boxscore/{source_event_id}"
+      },
+      "supported_source_types": [
+        "schedule_html",
+        "boxscore_html",
+        "recap_html",
+        "live_stats"
+      ],
+      "polling_policy": {
+        "final_only": true,
+        "pregame_seconds": 3600,
+        "live_seconds": 60,
+        "postgame_seconds": 300
+      },
+      "notes": [
+        "Neutral-site classics and tournaments may need parent event grouping after Release 1."
+      ]
+    },
+    {
+      "sport_slug": "womens-basketball",
+      "sport_name": "Basketball",
+      "gender": "women",
+      "release_scope": "release_1",
+      "event_shape": "team_contest",
+      "parser_strategy": "sidearm_boxscore_html",
+      "source_patterns": {
+        "schedule_url": "/sports/womens-basketball/schedule",
+        "boxscore_url_pattern": "/sports/womens-basketball/stats/{season}/{opponent_slug}/boxscore/{source_event_id}"
+      },
+      "supported_source_types": [
+        "schedule_html",
+        "boxscore_html",
+        "recap_html",
+        "live_stats"
+      ],
+      "polling_policy": {
+        "final_only": true,
+        "pregame_seconds": 3600,
+        "live_seconds": 60,
+        "postgame_seconds": 300
+      },
+      "notes": [
+        "Use the same final-boxscore parser strategy as men's basketball unless fixtures show a structural difference."
+      ]
+    },
+    {
+      "sport_slug": "womens-soccer",
+      "sport_name": "Soccer",
+      "gender": "women",
+      "release_scope": "release_1",
+      "event_shape": "team_contest",
+      "parser_strategy": "sidearm_boxscore_html",
+      "source_patterns": {
+        "schedule_url": "/sports/womens-soccer/schedule",
+        "boxscore_url_pattern": "/sports/womens-soccer/stats/{season}/{opponent_slug}/boxscore/{source_event_id}"
+      },
+      "supported_source_types": [
+        "schedule_html",
+        "boxscore_html",
+        "recap_html",
+        "live_stats"
+      ],
+      "polling_policy": {
+        "final_only": true,
+        "pregame_seconds": 3600,
+        "live_seconds": 90,
+        "postgame_seconds": 300
+      },
+      "notes": [
+        "Release 1 assumes Idaho sponsors women's soccer only."
+      ]
+    },
+    {
+      "sport_slug": "womens-volleyball",
+      "sport_name": "Volleyball",
+      "gender": "women",
+      "release_scope": "release_1",
+      "event_shape": "team_contest",
+      "parser_strategy": "sidearm_boxscore_html",
+      "source_patterns": {
+        "schedule_url": "/sports/womens-volleyball/schedule",
+        "boxscore_url_pattern": "/sports/womens-volleyball/stats/{season}/{opponent_slug}/boxscore/{source_event_id}"
+      },
+      "supported_source_types": [
+        "schedule_html",
+        "boxscore_html",
+        "recap_html",
+        "live_stats"
+      ],
+      "polling_policy": {
+        "final_only": true,
+        "pregame_seconds": 3600,
+        "live_seconds": 90,
+        "postgame_seconds": 300
+      },
+      "notes": [
+        "Volleyball final display should account for set-by-set scoring rather than football-style periods."
+      ]
+    }
+  ]
+}
