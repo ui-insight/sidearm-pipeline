@@ -2,6 +2,9 @@
 
 > Sidearm boxscore ingestion pipeline for University of Idaho athletics
 
+**New here?** Start with the [Onboarding doc](docs/onboarding.md) — it
+points you through the existing files in the order they make sense.
+
 ## Project Overview
 
 Vandals Stats Pipeline ingests public Sidearm boxscore data, normalizes it in

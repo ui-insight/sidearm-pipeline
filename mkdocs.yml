@@ -28,6 +28,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Onboarding: onboarding.md
+  - Glossary: glossary.md
   - Background:
     - "POC Project Options (PRP bootcamp)": background/poc-project-options.md
   - Architecture:
