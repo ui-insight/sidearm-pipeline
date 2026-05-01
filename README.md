@@ -229,6 +229,9 @@ CI also generates dependency audit artifacts and SBOMs from the GitHub Actions w
 
 ---
 
-## Acknowledgments
+## Resources
 
-- Part of the [UI-Insight](https://github.com/ui-insight) initiative
+External tools, skill collections, and references this project builds on
+are catalogued in [docs/resources.md](docs/resources.md) — MindRouter, the
+`mattpocock/skills` collection, and the `pbakaus/impeccable` design-language
+skill family.
