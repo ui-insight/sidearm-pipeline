@@ -70,6 +70,21 @@ def test_rate_limit_exempt_paths_reject_non_paths() -> None:
         settings.rate_limit_exempt_paths_list
 
 
+def test_sidearm_fetch_policy_settings_validate() -> None:
+    settings = build_settings(
+        SIDEARM_REQUEST_TIMEOUT_SECONDS=5,
+        SIDEARM_FETCH_MAX_ATTEMPTS=2,
+        SIDEARM_FETCH_BACKOFF_SECONDS=0,
+    )
+
+    assert settings.SIDEARM_REQUEST_TIMEOUT_SECONDS == 5
+    assert settings.SIDEARM_FETCH_MAX_ATTEMPTS == 2
+    assert settings.SIDEARM_FETCH_BACKOFF_SECONDS == 0
+
+    with pytest.raises(ValueError):
+        build_settings(SIDEARM_FETCH_MAX_ATTEMPTS=0)
+
+
 def test_security_check_rejects_default_secret_in_production() -> None:
     settings = build_settings(DEV_MODE=False)
 

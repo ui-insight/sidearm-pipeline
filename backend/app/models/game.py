@@ -93,6 +93,11 @@ class Game(Base):
     status_history: Mapped[list["EventStatusHistory"]] = relationship(
         back_populates="game", cascade="all, delete-orphan"
     )
+    ingest_runs: Mapped[list["IngestRun"]] = relationship(
+        back_populates="game",
+        order_by="IngestRun.started_at.desc()",
+        passive_deletes=True,
+    )
     generated_content: Mapped[list["GeneratedContent"]] = relationship(  # noqa: F821
         back_populates="game",
         cascade="all, delete-orphan",
@@ -227,3 +232,36 @@ class EventStatusHistory(Base):
     )
 
     game: Mapped[Game] = relationship(back_populates="status_history")
+
+
+class IngestRun(Base):
+    """Durable status history for one ingestion attempt."""
+
+    __tablename__ = "ingest_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int | None] = mapped_column(
+        ForeignKey("games.id", ondelete="SET NULL"), index=True
+    )
+    trigger_type: Mapped[str] = mapped_column(String(64), default="manual")
+    source_system: Mapped[str] = mapped_column(String(64), default="sidearm")
+    source_type: Mapped[str] = mapped_column(String(64), default="boxscore_html")
+    source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    source_event_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    sport: Mapped[str | None] = mapped_column(String(64), index=True)
+    season: Mapped[str | None] = mapped_column(String(16), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="running", index=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1)
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_type: Mapped[str | None] = mapped_column(String(128))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    run_metadata: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+
+    game: Mapped[Game | None] = relationship(back_populates="ingest_runs")

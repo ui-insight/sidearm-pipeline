@@ -2,9 +2,15 @@
 
 from pathlib import Path
 
+import httpx
 import pytest
 
-from app.services.sidearm_scraper import parse_boxscore
+from app.services.sidearm_scraper import (
+    FetchRetryPolicy,
+    SidearmFetchError,
+    parse_boxscore,
+    scrape_boxscore,
+)
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
@@ -105,3 +111,81 @@ def test_parse_release_one_sport_boxscore_fixtures(
     assert parsed.home_score == expected_home_score
     assert parsed.away_score == expected_away_score
     assert parsed.team_stats[0]["stat_name"] == expected_stat
+
+
+async def test_scrape_boxscore_retries_transient_fetch(monkeypatch) -> None:
+    attempts = 0
+    url = "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467"
+
+    async def fake_fetch_boxscore(
+        requested_url: str,
+        timeout_seconds: float | None = None,
+    ) -> str:
+        nonlocal attempts
+        attempts += 1
+        assert requested_url == url
+        assert timeout_seconds == 3.0
+        if attempts == 1:
+            raise httpx.ConnectTimeout("temporary timeout")
+        return (FIXTURE_DIR / "football_boxscore_2025_uc_davis.html").read_text(
+            encoding="utf-8"
+        )
+
+    monkeypatch.setattr(
+        "app.services.sidearm_scraper.fetch_boxscore",
+        fake_fetch_boxscore,
+    )
+
+    parsed = await scrape_boxscore(
+        url,
+        policy=FetchRetryPolicy(
+            timeout_seconds=3.0,
+            max_attempts=2,
+            backoff_seconds=0,
+        ),
+    )
+
+    assert attempts == 2
+    assert parsed.fetch_attempt_count == 2
+    assert parsed.fetch_max_attempts == 2
+    assert parsed.fetch_retryable_failures == 1
+    assert parsed.home_team == "Idaho"
+
+
+async def test_scrape_boxscore_does_not_retry_terminal_status(monkeypatch) -> None:
+    attempts = 0
+    url = "https://govandals.com/sports/football/stats/2025/missing/boxscore/9999"
+
+    async def fake_fetch_boxscore(
+        requested_url: str,
+        timeout_seconds: float | None = None,
+    ) -> str:
+        nonlocal attempts
+        attempts += 1
+        request = httpx.Request("GET", requested_url)
+        response = httpx.Response(404, request=request)
+        raise httpx.HTTPStatusError(
+            "not found",
+            request=request,
+            response=response,
+        )
+
+    monkeypatch.setattr(
+        "app.services.sidearm_scraper.fetch_boxscore",
+        fake_fetch_boxscore,
+    )
+
+    with pytest.raises(SidearmFetchError) as exc_info:
+        await scrape_boxscore(
+            url,
+            policy=FetchRetryPolicy(
+                timeout_seconds=3.0,
+                max_attempts=3,
+                backoff_seconds=0,
+            ),
+        )
+
+    assert attempts == 1
+    assert exc_info.value.attempt_count == 1
+    assert exc_info.value.max_attempts == 3
+    assert exc_info.value.retryable is False

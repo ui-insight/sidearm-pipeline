@@ -10,7 +10,8 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from app.services.sidearm_scraper import REQUEST_TIMEOUT, USER_AGENT
+from app.config import settings
+from app.services.sidearm_scraper import USER_AGENT
 from app.services.source_registry import SportSource, get_source_registry
 
 
@@ -49,7 +50,7 @@ class ParsedScheduleEvent:
 async def fetch_schedule(url: str) -> str:
     """Fetch a Sidearm schedule HTML page."""
     async with httpx.AsyncClient(
-        timeout=REQUEST_TIMEOUT,
+        timeout=settings.SIDEARM_REQUEST_TIMEOUT_SECONDS,
         follow_redirects=True,
         headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*"},
     ) as client:

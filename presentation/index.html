@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>IIDS — First Formal Foray Into Agentic Systems</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+
+<style>
+  :root {
+    --brand-black: #191919;
+    --brand-white: #ffffff;
+    --pride-gold: #F1B300;
+    --silver: #808080;
+    --huckleberry: #261882;
+    --lupine: #5E48FF;
+    --clearwater: #008080;
+    --ink-dim: #c8c8c8;
+    --ink-faint: #909090;
+    --rule: #2c2c2c;
+  }
+
+  html, body, .reveal {
+    background: var(--brand-black);
+    color: var(--brand-white);
+    font-family: "Public Sans", system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01", "ss02";
+  }
+
+  .reveal {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+  }
+
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { padding: 0 60px; }
+
+  .reveal h1, .reveal h2, .reveal h3 {
+    font-family: "Public Sans", sans-serif;
+    color: var(--brand-white);
+    text-transform: none;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0 0 24px 0;
+    font-weight: 900;
+  }
+
+  .reveal h1 { font-size: 1.9em; }
+  .reveal h2 { font-size: 1.5em; }
+  .reveal h3 { font-size: 1.1em; font-weight: 700; }
+
+  .eyebrow {
+    font-size: 0.5em;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pride-gold);
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .reveal em.gold,
+  .reveal .gold {
+    color: var(--pride-gold);
+    font-style: normal;
+  }
+
+  .reveal i.owner,
+  .reveal .owner {
+    color: var(--pride-gold);
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .reveal .meta {
+    color: var(--ink-faint);
+    font-size: 0.55em;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 28px;
+  }
+
+  .reveal .meta .sep { color: var(--rule); margin: 0 10px; }
+
+  .reveal p { margin: 0 0 18px 0; line-height: 1.45; }
+  .reveal p.lede { font-size: 1.15em; font-weight: 500; color: var(--brand-white); max-width: 22em; }
+  .reveal p.kicker { color: var(--ink-dim); font-size: 0.95em; max-width: 28em; }
+  .reveal p.foot { color: var(--silver); font-size: 0.7em; font-style: italic; margin-top: 28px; }
+
+  .reveal ul, .reveal ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .reveal li {
+    padding: 6px 0;
+    line-height: 1.4;
+    position: relative;
+    padding-left: 22px;
+  }
+  .reveal li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--silver);
+  }
+  .reveal li.gold-bullet::before { color: var(--pride-gold); }
+  .reveal li strong { color: var(--brand-white); font-weight: 700; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 44px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 28px; }
+
+  .col h3 { color: var(--pride-gold); font-size: 0.7em; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
+
+  .reveal table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85em;
+    margin-top: 14px;
+  }
+  .reveal table th, .reveal table td {
+    border-bottom: 1px solid var(--rule);
+    padding: 12px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .reveal table th {
+    color: var(--pride-gold);
+    font-weight: 800;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 2px solid var(--pride-gold);
+  }
+  .reveal table td:first-child { color: var(--ink-faint); font-weight: 600; width: 24%; }
+
+  .reveal pre {
+    background: #0e0e0e;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--pride-gold);
+    border-radius: 4px;
+    box-shadow: none;
+    margin: 16px 0;
+  }
+  .reveal pre code {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.7em;
+    line-height: 1.6;
+    padding: 18px 22px;
+    color: var(--ink-dim);
+  }
+  .reveal code { color: var(--pride-gold); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.9em; }
+
+  .card {
+    border: 1px solid var(--rule);
+    padding: 22px 24px;
+    border-radius: 4px;
+    background: #1f1f1f;
+  }
+  .card h3 { color: var(--brand-white); font-size: 0.95em; margin-bottom: 8px; }
+  .card .tag { color: var(--pride-gold); font-size: 0.55em; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+  .card p { color: var(--ink-dim); font-size: 0.78em; margin: 0; line-height: 1.4; }
+
+  .reveal .progress { color: var(--pride-gold); }
+  .reveal .controls { color: var(--silver); }
+  .reveal .slide-number { color: var(--silver); font-size: 14px; font-weight: 600; }
+
+  .footer-rule {
+    height: 1px;
+    background: var(--rule);
+    margin: 32px 0 18px 0;
+  }
+
+  .stack-list { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; }
+  .stack-list span {
+    color: var(--ink-faint);
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .stack-list span:not(:last-child)::after { content: " ·"; color: var(--rule); }
+
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border: 1px solid var(--pride-gold);
+    color: var(--pride-gold);
+    font-size: 0.55em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    margin-right: 6px;
+  }
+  .pill.muted { border-color: var(--rule); color: var(--silver); }
+
+  a, .reveal a { color: var(--clearwater); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+</style>
+</head>
+<body>
+
+<div class="reveal">
+  <div class="slides">
+
+  <!-- ============================================================
+       1. THE FORAY — VANDALS STATS PIPELINE
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">The first foray</span>
+    <h1>Vandals Stats Pipeline</h1>
+    <p class="lede">Sidearm boxscore ingestion, normalized stat schema, AI-written recaps, natural-language queries over UI athletics data.</p>
+
+    <div class="grid-3" style="margin-top: 26px;">
+      <div class="col">
+        <h3>Already shipped</h3>
+        <ul>
+          <li>Sidearm scrapers</li>
+          <li>Normalized PostgreSQL schema — games, team stats, player stat groups, scoring plays, ingest runs</li>
+          <li>AI content-generation service (Anthropic SDK, model-agnostic via base URL)</li>
+          <li>React review UI</li>
+          <li>Docker Compose deployment</li>
+          <li>GitHub Actions CI</li>
+        </ul>
+      </div>
+
+      <div class="col">
+        <h3>The agentic surface</h3>
+        <ul>
+          <li class="gold-bullet">Natural-language query interface</li>
+          <li class="gold-bullet">Scheduled heartbeat ingestion</li>
+          <li class="gold-bullet">Auto-generated game recaps and social posts</li>
+          <li class="gold-bullet">Production deployment path</li>
+        </ul>
+      </div>
+
+      <div class="col">
+        <h3>Why this is safe ground</h3>
+        <ul>
+          <li>Public data on <code>govandals.com</code>. FERPA-clean.</li>
+          <li>Athletics owns the URL. We bypass the institutional review queue.</li>
+          <li>Working prototype already exists. Fork, don't greenfield.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       2. WHY THIS, NOT THE ALTERNATIVE
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Decision</span>
+    <h1>Why this and not the AI4RA Project Intelligence Agent</h1>
+
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Vandals Stats Pipeline</th>
+          <th>AI4RA Project Intelligence Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Status</td><td>Working prototype</td><td>Greenfield</td></tr>
+        <tr><td>Data</td><td>Public (govandals.com)</td><td>Internal (strategic plans, ClickUp)</td></tr>
+        <tr><td>Surface</td><td>User-facing product</td><td>Meta-tooling — agents about agents</td></tr>
+        <tr><td>Stakeholder</td><td>Real, named (Athletics)</td><td>The IIDS team itself</td></tr>
+        <tr><td>Demo at week 4</td><td>Yes</td><td>Maybe</td></tr>
+      </tbody>
+    </table>
+
+    <p class="foot">AI4RA is the higher-ceiling project. That's why it's the second foray, not the first.</p>
+  </section>
+
+
+  <!-- ============================================================
+       3. WHAT WE BUILT THAT MAKES THIS POSSIBLE — bridge slide
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Foundations</span>
+    <h1>What we built that makes this possible.</h1>
+    <p class="lede">The agentic foray sits on existing IIDS infrastructure. None of it is theoretical.</p>
+
+    <div class="grid-4" style="margin-top: 28px;">
+      <div class="card">
+        <span class="tag">Inference</span>
+        <h3>MindRouter</h3>
+        <p>The substrate every AI app at UI runs on.</p>
+      </div>
+      <div class="card">
+        <span class="tag">Extraction</span>
+        <h3>Vandalizer</h3>
+        <p>Structured LLM extraction at production scale.</p>
+      </div>
+      <div class="card">
+        <span class="tag">LLM-as-editor</span>
+        <h3>UCM Daily Register</h3>
+        <p>The diff-review pattern, in production.</p>
+      </div>
+      <div class="card">
+        <span class="tag">Domain model</span>
+        <h3>ProcessMapping</h3>
+        <p>Repo-as-substrate, schema-driven, version-controlled.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       4. MINDROUTER
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Foundation · Inference</span>
+    <h1>MindRouter</h1>
+    <p class="meta">
+      <i class="owner">Luke Sheneman</i> · IIDS
+      <span class="sep">·</span> Production
+      <span class="sep">·</span> <span class="pill">Open source</span> <span class="pill muted">AI4RA Core</span>
+      <span class="sep">·</span> mindrouter.ai
+    </p>
+
+    <div class="grid-2">
+      <div class="col">
+        <p class="kicker">LLM inference load balancer fronting an on-prem Ollama + vLLM cluster. Unified OpenAI-, Ollama-, and Anthropic-compatible endpoints. Fair-share scheduling, quotas, telemetry, Azure AD SSO, full audit logging.</p>
+
+        <div class="stack-list">
+          <span>Python 3.11+</span><span>Docker</span><span>Ollama</span><span>vLLM</span><span>Azure AD SSO</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3>Why it matters for the foray</h3>
+        <ul>
+          <li>Every AI app at UI routes through it.</li>
+          <li>"Model-agnostic" is operational, not aspirational.</li>
+          <li>Data stays on-prem. No vendor lock-in. No cloud egress on student data.</li>
+          <li>Audit trail for every inference.</li>
+          <li>Same endpoint shape as Anthropic — the pipeline already speaks it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       5. VANDALIZER
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Foundation · Extraction</span>
+    <h1>Vandalizer</h1>
+    <p class="meta">
+      <i class="owner">John Brunsfeld</i> (lead) · <i class="owner">Sarah Martonick</i> (UI implementation) · IIDS
+      <span class="sep">·</span> Production
+      <span class="sep">·</span> <span class="pill">AI4RA Core</span> <span class="pill">NSF GRANTED #2427549</span>
+      <span class="sep">·</span> vandalizer.uidaho.edu
+    </p>
+
+    <div class="grid-2">
+      <div class="col">
+        <p class="kicker">Open-source, self-hosted document intelligence platform built for research administration. Structured LLM extraction, workflow engine, citation-backed RAG chat, multi-tenant workspaces. Deployed at UI <em class="gold">and</em> Southern Utah University.</p>
+
+        <div class="stack-list">
+          <span>React 19</span><span>Python 3.11+</span><span>FastAPI</span><span>Docker</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3>Why it matters for the foray</h3>
+        <ul>
+          <li>The pattern: structured extraction → human review → persisted record. Same pattern the pipeline uses for AI-written recaps.</li>
+          <li>Production-deployed, NSF-funded. Proof IIDS ships serious AI software.</li>
+          <li>Workflow engine — composable agent skills. The mental model carries over.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       6. UCM DAILY REGISTER
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Foundation · LLM-as-editor</span>
+    <h1>UCM Daily Register</h1>
+    <p class="meta">
+      <i class="owner">Joy Bauer</i> · <i class="owner">Leigh Cooper</i> · <i class="owner">Jodi Walker</i> — UCM operational owners · IIDS build
+      <span class="sep">·</span> Prototype
+      <span class="sep">·</span> ucmnews.insight.uidaho.edu
+    </p>
+
+    <div class="grid-2">
+      <div class="col">
+        <p class="kicker">Editorial pipeline for The Daily Register and My UI. Submission intake, AI-assisted style editing (Claude or OpenAI via MindRouter, with AP + UI style enforcement), word-level diff review, section-organized auto-assembly, branded .docx export.</p>
+
+        <div class="stack-list">
+          <span>React 19</span><span>FastAPI</span><span>SQLAlchemy 2.0</span><span>MindRouter</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3>Why it matters for the foray</h3>
+        <ul>
+          <li>Same pattern: LLM proposes → human reviews diff → human approves → record persists.</li>
+          <li>Direct reuse — the diff-review UI in the pipeline borrows from this.</li>
+          <li>Style rules are data-driven, editable in-app. Sports writers can tune voice without redeploying.</li>
+          <li>Real measured outcome: faster newsletter turnaround, consistent style across issues.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       7. PROCESSMAPPING
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">Foundation · Domain model</span>
+    <h1>ProcessMapping</h1>
+    <p class="meta">
+      <i class="owner">Barrie Robison</i> · IIDS
+      <span class="sep">·</span> Prototype
+      <span class="sep">·</span> <span class="pill">AI4RA Core</span>
+      <span class="sep">·</span> processmapping.insight.uidaho.edu
+    </p>
+
+    <div class="grid-2">
+      <div class="col">
+        <p class="kicker">Full-stack app plus data repository for Research Administration process intelligence. Canonical process-map JSON, Vandalizer-powered transcript ingest, workflow comparison, schema-validated projection into <code>insight-db</code>.</p>
+
+        <div class="stack-list">
+          <span>React 19</span><span>TypeScript</span><span>Vite</span><span>FastAPI</span><span>Python 3.11+</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <h3>Why it matters for the foray</h3>
+        <ul>
+          <li>The data model lives in the repo as JSON, validated by schema, version-controlled.</li>
+          <li>Transcript ingestion uses Vandalizer to convert unstructured to structured. The pipeline uses the same primitive on box scores.</li>
+          <li>"Repo-as-substrate" operationalized. The pipeline inherits the pattern.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       8. THE REPO IS THE SOURCE OF TRUTH
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>The repo is the source of truth.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <ul>
+          <li><strong>AGENTS.md / CLAUDE.md</strong> — the agent's onboarding doc and the human's onboarding doc are the same file.</li>
+          <li><strong>docs/adr/</strong> — architecture decisions, dated, sequential.</li>
+          <li><strong>docs/governance/</strong> — data classification before storage, not after.</li>
+          <li><strong>docs/security/</strong> — institutional review checklist, rate-limiting, dependency scanning.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <ul>
+          <li><strong>mkdocs.yml</strong> — every doc in the repo is on the site.</li>
+          <li><strong>.github/workflows/</strong> — CI, security scan, SBOM, e2e tests, docs build, all on every PR.</li>
+          <li><strong>scripts/</strong> — repository maintenance helpers, runnable by humans or agents.</li>
+          <li><strong>ADR-driven</strong> — when an opinion is non-obvious, it becomes a tracked decision.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="foot">No Confluence page. No Jira board. No status meeting. The deliverable is the diff.</p>
+  </section>
+
+
+  <!-- ============================================================
+       9. MARKDOWN-NATIVE DEVELOPMENT
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Markdown is the substrate.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <h3>Loop</h3>
+        <ol>
+          <li>Issue opened — written in markdown.</li>
+          <li>Branch named <code>feature/...</code>.</li>
+          <li>Agent reads <code>AGENTS.md</code>, the relevant ADR, the existing module.</li>
+          <li>Agent proposes a diff.</li>
+          <li>PR template asks: tests? data classification? security review needed?</li>
+          <li>Reviewer reads the diff. If it's hard to read, the diff is wrong.</li>
+          <li>Merge. CI runs. Docs rebuild. Site updates.</li>
+        </ol>
+      </div>
+
+      <div class="col">
+        <h3>Why this works for both humans and agents</h3>
+        <p class="kicker">The same files that brief the agent brief the new contributor. The same checks that catch a bad PR catch a bad agent run. The repo is the contract.</p>
+        <p class="kicker">Process lives <em class="gold">in</em> the system, not <em class="gold">around</em> it.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       10. MODEL-AGNOSTIC BY DESIGN
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Model-agnostic by design.</h1>
+    <p class="lede">The content-generation service uses the Anthropic SDK with a configurable base URL. One environment variable changes the provider.</p>
+
+    <pre><code># Claude
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+
+# MindRouter — UI on-prem (Llama, Qwen, Gemma, dots.OCR)
+ANTHROPIC_BASE_URL=https://mindrouter.uidaho.edu/v1
+
+# OpenAI — drop-in via the OpenAI-compatible endpoint
+OPENAI_API_KEY=...</code></pre>
+
+    <p class="kicker">Same prompts. Same evaluation harness. Same schemas.</p>
+    <p class="foot">Vendors are interchangeable. Prompts and schemas are not. Never bet a project on a single model provider.</p>
+  </section>
+
+
+  <!-- ============================================================
+       11. THE AGENTIC LOOP
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>What an agentic sprint actually looks like.</h1>
+
+    <div class="grid-2" style="margin-top: 18px;">
+      <div class="col">
+        <h3>Instructions</h3>
+        <p class="kicker"><code>AGENTS.md</code>, <code>CLAUDE.md</code>, ADRs. The constraints the agent reads before it writes anything.</p>
+
+        <h3 style="margin-top: 22px;">Memory</h3>
+        <p class="kicker">File-based, per-project. What was tried, what worked, what was rejected. Persists across sessions.</p>
+      </div>
+
+      <div class="col">
+        <h3>Skills</h3>
+        <p class="kicker">Markdown-defined, composable. <code>SKILL.md</code> / <code>prompt.md</code> per task type. Versioned in the repo, not buried in a vendor's UI.</p>
+
+        <h3 style="margin-top: 22px;">Heartbeat</h3>
+        <p class="kicker">Scheduled runs. The agent doesn't only act when called — it checks in, reports drift, opens PRs for cleanup tasks.</p>
+      </div>
+    </div>
+
+    <div class="footer-rule"></div>
+    <p class="foot">The human still owns scope, definition-of-done, review, merge. <em class="gold">Orchestration, not abdication.</em></p>
+  </section>
+
+
+  <!-- ============================================================
+       12. THE DISCIPLINE THAT MAKES VELOCITY SAFE
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Velocity comes from tools, not ceremony.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <h3>Automated</h3>
+        <ul>
+          <li>Pre-commit hooks</li>
+          <li>Ruff — Python lint and format</li>
+          <li>TypeScript strict + ESLint zero-warnings</li>
+          <li>Pytest, Vitest, Playwright E2E</li>
+          <li>Trivy security scan + SBOM generation</li>
+          <li>Alembic migrations</li>
+          <li>Dependabot</li>
+          <li>MkDocs <code>--strict</code> on every PR</li>
+        </ul>
+      </div>
+
+      <div class="col">
+        <h3>Still on the human</h3>
+        <ul>
+          <li class="gold-bullet">Choosing the problem</li>
+          <li class="gold-bullet">Defining "done"</li>
+          <li class="gold-bullet">Reading the diff</li>
+          <li class="gold-bullet">Approving the merge</li>
+        </ul>
+        <p class="kicker" style="margin-top: 22px;">Everything else is the toolchain's job.</p>
+      </div>
+    </div>
+
+    <div class="footer-rule"></div>
+    <p class="foot">Modern tooling does what process theater pretends to do. And faster.</p>
+  </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    controls: true,
+    progress: true,
+    slideNumber: "c/t",
+    keyboard: true,
+    touch: true,
+    history: false,
+    center: false,
+    transition: "slide",
+    backgroundTransition: "none",
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    minScale: 0.2,
+    maxScale: 2.0,
+    hash: true,
+  });
+</script>
+</body>
+</html>

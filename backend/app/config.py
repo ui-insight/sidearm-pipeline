@@ -3,6 +3,7 @@
 import json
 from urllib.parse import urlparse
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     RATE_LIMIT_TRUST_PROXY_HEADERS: bool = False
     RATE_LIMIT_EXEMPT_PATHS: str = '["/api/v1/health", "/api/v1/ready"]'
+    SIDEARM_REQUEST_TIMEOUT_SECONDS: float = Field(default=20.0, gt=0)
+    SIDEARM_FETCH_MAX_ATTEMPTS: int = Field(default=3, ge=1)
+    SIDEARM_FETCH_BACKOFF_SECONDS: float = Field(default=0.5, ge=0)
     ANTHROPIC_API_KEY: str | None = None
     ANTHROPIC_BASE_URL: str | None = (
         None  # e.g. https://mindrouter.uidaho.edu/anthropic

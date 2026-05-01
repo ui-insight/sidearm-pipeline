@@ -1,10 +1,11 @@
 """Tests for game ingestion and canonical event metadata."""
 
+import httpx
 from sqlalchemy import func, select
 
 from app.models.content import GeneratedContent
-from app.models.game import Game, SourceSnapshot
-from app.services.sidearm_scraper import ParsedBoxscore
+from app.models.game import Game, IngestRun, SourceSnapshot
+from app.services.sidearm_scraper import ParsedBoxscore, SidearmFetchError
 
 
 async def test_ingest_creates_canonical_event_metadata(
@@ -75,6 +76,26 @@ async def test_ingest_creates_canonical_event_metadata(
     assert len(payload["source_snapshots"][0]["content_hash"]) == 64
     assert payload["status_history"][0]["to_status"] == "final"
 
+    history_response = await client.get("/api/v1/ingest-runs")
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert len(history_payload) == 1
+    assert history_payload[0]["game_id"] == payload["id"]
+    assert history_payload[0]["status"] == "succeeded"
+    assert history_payload[0]["trigger_type"] == "manual"
+    assert history_payload[0]["source_type"] == "boxscore_html"
+    assert history_payload[0]["source_url"] == payload["source_url"]
+    assert history_payload[0]["source_event_id"] == "8467"
+    assert history_payload[0]["sport"] == "football"
+    assert history_payload[0]["season"] == "2025"
+    assert history_payload[0]["http_status"] == 200
+    assert history_payload[0]["attempt_count"] == 1
+    assert history_payload[0]["max_attempts"] == 1
+    assert history_payload[0]["duration_ms"] >= 0
+    assert history_payload[0]["run_metadata"]["canonical_uid"] == (
+        "sidearm:football:2025:8467"
+    )
+
     game = await db_session.scalar(select(Game))
     assert game is not None
     assert game.canonical_uid == "sidearm:football:2025:8467"
@@ -82,6 +103,10 @@ async def test_ingest_creates_canonical_event_metadata(
     snapshot = await db_session.scalar(select(SourceSnapshot))
     assert snapshot is not None
     assert snapshot.raw_body == raw_html
+
+    ingest_run = await db_session.scalar(select(IngestRun))
+    assert ingest_run is not None
+    assert ingest_run.status == "succeeded"
 
 
 async def test_reingest_updates_existing_canonical_event(
@@ -158,3 +183,80 @@ async def test_reingest_updates_existing_canonical_event(
 
     game_count = await db_session.scalar(select(func.count()).select_from(Game))
     assert game_count == 1
+
+    ingest_run_count = await db_session.scalar(
+        select(func.count()).select_from(IngestRun)
+    )
+    assert ingest_run_count == 2
+
+
+async def test_ingest_records_failed_fetch_run(client, db_session, monkeypatch):
+    async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
+        raise httpx.ConnectTimeout("Sidearm timed out")
+
+    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+
+    response = await client.post(
+        "/api/v1/games",
+        json={
+            "url": "https://govandals.com/sports/football/stats/2025/"
+            "uc-davis/boxscore/8467"
+        },
+    )
+
+    assert response.status_code == 502
+
+    game_count = await db_session.scalar(select(func.count()).select_from(Game))
+    assert game_count == 0
+
+    ingest_run = await db_session.scalar(select(IngestRun))
+    assert ingest_run is not None
+    assert ingest_run.game_id is None
+    assert ingest_run.status == "failed"
+    assert ingest_run.source_url.endswith("/boxscore/8467")
+    assert ingest_run.error_type == "ConnectTimeout"
+    assert ingest_run.error_message == "Sidearm timed out"
+    assert ingest_run.retryable is True
+    assert ingest_run.attempt_count == 1
+    assert ingest_run.max_attempts >= 1
+    assert ingest_run.duration_ms is not None
+    assert ingest_run.duration_ms >= 0
+    assert ingest_run.run_metadata["failure_phase"] == "fetch_boxscore"
+
+    history_response = await client.get("/api/v1/ingest-runs?status=failed")
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert len(history_payload) == 1
+    assert history_payload[0]["status"] == "failed"
+    assert history_payload[0]["error_type"] == "ConnectTimeout"
+
+
+async def test_ingest_records_retry_exhaustion(client, db_session, monkeypatch):
+    async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
+        raise SidearmFetchError(
+            httpx.ConnectTimeout("Sidearm timed out"),
+            attempt_count=3,
+            max_attempts=3,
+            retryable=True,
+        )
+
+    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+
+    response = await client.post(
+        "/api/v1/games",
+        json={
+            "url": "https://govandals.com/sports/football/stats/2025/"
+            "uc-davis/boxscore/8467"
+        },
+    )
+
+    assert response.status_code == 502
+
+    ingest_run = await db_session.scalar(select(IngestRun))
+    assert ingest_run is not None
+    assert ingest_run.status == "failed"
+    assert ingest_run.error_type == "ConnectTimeout"
+    assert ingest_run.retryable is True
+    assert ingest_run.attempt_count == 3
+    assert ingest_run.max_attempts == 3
+    assert ingest_run.run_metadata["retry_exhausted"] is True

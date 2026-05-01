@@ -17,6 +17,9 @@ This page describes the baseline environment variables included in the template.
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rolling window size for the starter limiter |
 | `RATE_LIMIT_TRUST_PROXY_HEADERS` | `false` | Uses `X-Forwarded-For` when the proxy is trusted to set it correctly |
 | `RATE_LIMIT_EXEMPT_PATHS` | `["/api/v1/health","/api/v1/ready"]` | Path prefixes excluded from starter limiter checks |
+| `SIDEARM_REQUEST_TIMEOUT_SECONDS` | `20` | Timeout for Sidearm HTML fetch requests |
+| `SIDEARM_FETCH_MAX_ATTEMPTS` | `3` | Maximum attempts for retryable Sidearm fetch failures |
+| `SIDEARM_FETCH_BACKOFF_SECONDS` | `0.5` | Initial retry backoff in seconds; retries use exponential backoff |
 
 ## Deployment Notes
 
@@ -33,6 +36,8 @@ This page describes the baseline environment variables included in the template.
 - If you enable the starter middleware behind a reverse proxy, only set
   `RATE_LIMIT_TRUST_PROXY_HEADERS=true` when that proxy sanitizes
   `X-Forwarded-For`.
+- Keep Sidearm retry settings conservative. The default retry policy only
+  retries transient network errors plus HTTP 408, 429, and 5xx responses.
 
 ## Optional Documentation Deployment
 
