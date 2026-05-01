@@ -28,6 +28,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Background:
+    - "POC Project Options (PRP bootcamp)": background/poc-project-options.md
   - Architecture:
     - Overview: architecture/overview.md
     - Data Model: architecture/data-model.md
