@@ -60,6 +60,7 @@ nav:
     - Overview: adr/index.md
     - "ADR-001: Template Customization": adr/001-template-customization.md
     - "ADR-002: Tailwind Only": adr/002-tailwind-only.md
+  - Resources: resources.md
 
 markdown_extensions:
   - admonition

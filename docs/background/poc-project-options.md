@@ -206,10 +206,7 @@ are possible:
 
 Project 1 — the Vandals Stats Pipeline — was selected as the bootcamp's
 first formal foray into agentic systems for IIDS. Project 2 (the AI4RA
-Project Intelligence Agent) is held as the second foray. The decision
-rationale is summarized in the launching-pad presentation at the
-[GitHub Pages root URL](https://ui-insight.github.io/sidearm-pipeline/),
-slide 2.
+Project Intelligence Agent) is held as the second foray.
 
 The candidate scoping moves for laying the agentic foundation in this
 repository are tracked in

@@ -39,14 +39,6 @@ This page describes the baseline environment variables included in the template.
 - Keep Sidearm retry settings conservative. The default retry policy only
   retries transient network errors plus HTTP 408, 429, and 5xx responses.
 
-## Optional Documentation Deployment
-
-The template includes a GitHub Pages docs deployment workflow in
-`.github/workflows/docs.yml`.
-
-- Keep it if the project will publish docs from GitHub Pages.
-- Remove or disable it if documentation is hosted elsewhere.
-
 ## Security Automation Outputs
 
 The template now includes:
