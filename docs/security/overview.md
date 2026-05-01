@@ -134,8 +134,3 @@ Before deploying to production, verify:
   See [Rate Limiting Guidance](rate-limiting.md).
 - [ ] Logging and monitoring enabled
 - [ ] Dependency audit passing (`pip-audit`, `npm audit`)
-
-## Reference
-
-For a comprehensive security implementation example, see:
-[OpenERA Security Overview](https://github.com/ui-insight/OpenERA/blob/main/docs/security/overview.md)

@@ -67,8 +67,3 @@ Some patterns in the codebase are intentional and should not be "fixed":
 - Multiple valid approaches exist and the choice matters
 - Your changes would affect other developers' work
 - You discover a bug or inconsistency unrelated to your task
-
-## Reference
-
-For a comprehensive agent coordination framework, see:
-[OpenERA Agent Coordination](https://github.com/ui-insight/OpenERA/blob/main/docs/integration/agent-coordination.md)

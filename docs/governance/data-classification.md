@@ -58,8 +58,3 @@ stored in the core event pipeline.
 | Audit logging | No | Recommended for operational actions | Recommended | Required |
 | Data retention policy | Yes | Yes | Yes | Yes |
 | Disposal procedures | Delete or archive per business need | Delete or archive per operational policy | Secure delete or restricted archive | Rotate, revoke, and securely remove |
-
-## Reference
-
-For an example of data classification in practice, see:
-[OpenERA Security Data Handling](https://github.com/ui-insight/OpenERA/blob/main/docs/security/data-handling.md)

@@ -75,8 +75,3 @@ This checklist helps IT security teams evaluate this application for deployment.
 - [ ] No hardcoded credentials in source
 - [ ] Security-sensitive code paths reviewed
 - [ ] Third-party library licenses compatible
-
-## Reference
-
-For a detailed institutional review example, see:
-[OpenERA Institutional Review Checklist](https://github.com/ui-insight/OpenERA/blob/main/docs/security/institutional-review.md)

@@ -18,8 +18,3 @@ athletics website syndication.
 - [Data Governance](governance/data-governance.md) — data classification and handling rules
 - [Contributing](contributing/getting-started.md) — development setup and guidelines
 - [Agent Coordination](contributing/agent-coordination.md) — working with AI coding agents
-
-## Reference
-
-This project follows patterns established by [OpenERA](https://github.com/ui-insight/OpenERA).
-Consult the OpenERA documentation for detailed examples of these patterns in practice.

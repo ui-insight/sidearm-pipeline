@@ -59,9 +59,4 @@ The backend is a REST API built with:
 2. **Type-safe** — TypeScript on frontend, Pydantic on backend
 3. **Thin controllers** — route handlers delegate to service modules
 4. **One file per resource** — models, schemas, and routes each get their own file
-5. **Convention over configuration** — follow established patterns from OpenERA
-
-## Reference
-
-For a detailed example of this architecture in production, see:
-[OpenERA Architecture Overview](https://github.com/ui-insight/OpenERA/blob/main/docs/architecture/overview.md)
+5. **Convention over configuration** — follow the patterns established in this repository

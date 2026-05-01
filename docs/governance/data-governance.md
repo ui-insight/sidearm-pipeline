@@ -90,9 +90,3 @@ Every schema or workflow change that affects stored data should update:
 - [Data Lineage](data-lineage.md)
 - [Data Classification](data-classification.md)
 - [Schema Versioning](schema-versioning.md), when the migration policy or status changes
-
-## Reference
-
-For a detailed data governance implementation, see:
-- [OpenERA Data Lineage](https://github.com/ui-insight/OpenERA/blob/main/docs/governance/data-lineage.md)
-- [OpenERA UDM Conformance](https://github.com/ui-insight/OpenERA/blob/main/docs/governance/udm-conformance.md)

@@ -95,8 +95,3 @@
 - All CI checks must pass before merge
 - At least one review for non-trivial changes
 - If docs, governance, or template setup changed, run `python scripts/check_template_docs.py`
-
-## Reference
-
-For detailed coding standards examples, see:
-[OpenERA Coding Standards](https://github.com/ui-insight/OpenERA/blob/main/docs/contributing/coding-standards.md)

@@ -2,7 +2,6 @@
 
 > This file is the authoritative guide for AI coding agents working on this project.
 > It defines the tech stack, conventions, standards, and boundaries that agents must follow.
-> For the reference implementation of these patterns, see [OpenERA](https://github.com/ui-insight/OpenERA).
 > Keep this file synchronized with `CLAUDE.md`, which is the tracked source of truth.
 
 ---
@@ -319,23 +318,8 @@ What are the trade-offs?
 
 ---
 
-## Reference Implementation
-
-This template is based on patterns established in [OpenERA](https://github.com/ui-insight/OpenERA),
-an open-source electronic research administration system. When in doubt about conventions
-or patterns, consult the OpenERA repository for reference.
-
-Key OpenERA resources:
-- [Agent Coordination Guide](https://github.com/ui-insight/OpenERA/blob/main/docs/integration/agent-coordination.md)
-- [Coding Standards](https://github.com/ui-insight/OpenERA/blob/main/docs/contributing/coding-standards.md)
-- [Security Overview](https://github.com/ui-insight/OpenERA/blob/main/docs/security/overview.md)
-- [Architecture Overview](https://github.com/ui-insight/OpenERA/blob/main/docs/architecture/overview.md)
-- [Data Governance](https://github.com/ui-insight/OpenERA/blob/main/docs/governance/data-lineage.md)
-
----
-
 ## Getting Help
 
 - **Agent coordination**: See `docs/contributing/agent-coordination.md` for multi-agent workflows
 - **Stack questions**: Consult framework documentation — [FastAPI](https://fastapi.tiangolo.com/), [React](https://react.dev/), [SQLAlchemy](https://docs.sqlalchemy.org/), [Tailwind CSS](https://tailwindcss.com/)
-- **University standards**: Contact the UI-Insight team or consult OpenERA documentation
+- **University standards**: Contact the UI-Insight team

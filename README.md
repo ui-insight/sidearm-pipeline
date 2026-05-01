@@ -23,10 +23,7 @@ The project currently provides:
 ### Project Foundation
 
 This repository was bootstrapped from the
-[UI-Insight TEMPLATE-app](https://github.com/ui-insight/TEMPLATE-app) and
-continues to follow patterns established in
-[OpenERA](https://github.com/ui-insight/OpenERA), the University of Idaho's
-open-source electronic research administration system.
+[UI-Insight TEMPLATE-app](https://github.com/ui-insight/TEMPLATE-app).
 
 ---
 
@@ -234,5 +231,4 @@ CI also generates dependency audit artifacts and SBOMs from the GitHub Actions w
 
 ## Acknowledgments
 
-- Built on patterns from [OpenERA](https://github.com/ui-insight/OpenERA) by the University of Idaho
 - Part of the [UI-Insight](https://github.com/ui-insight) initiative
