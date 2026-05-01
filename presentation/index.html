@@ -211,40 +211,7 @@
   <div class="slides">
 
   <!-- ============================================================
-       1. WHERE IIDS ACTUALLY IS
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">IIDS · today</span>
-    <h1>We ship modern software.<br/><em class="gold">We have not deployed agentic systems.</em></h1>
-
-    <div class="grid-3" style="margin-top: 28px;">
-      <div class="col">
-        <h3>What we ship</h3>
-        <p class="kicker">UCM Daily Register · ProcessMapping · Vandalizer · MindRouter · AISPEG · Strategic Plan Dashboard · Audit Dashboard · CAREER Dashboard · OpenERA · TEMPLATE-app.</p>
-        <p class="kicker"><span class="gold">Production. Real users. Real outcomes.</span></p>
-      </div>
-
-      <div class="col">
-        <h3>What we don't</h3>
-        <p class="kicker">No agent has shipped autonomously into a production UI workflow. No long-running loop. No scheduled heartbeat with institutional consequences.</p>
-      </div>
-
-      <div class="col">
-        <h3>Why</h3>
-        <ul>
-          <li><strong>OIT throughput.</strong> Small apps wait months for institutional review.</li>
-          <li><strong>The data ecosystem.</strong> Fragmented, undocumented. Agents would die a slow death in there.</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="footer-rule"></div>
-    <p class="foot">This project is the first formal foray into agentic systems for IIDS. Chosen because it sidesteps both constraints — public data, our own deploy path.</p>
-  </section>
-
-
-  <!-- ============================================================
-       2. THE FORAY — VANDALS STATS PIPELINE
+       1. THE FORAY — VANDALS STATS PIPELINE
        ============================================================ -->
   <section>
     <span class="eyebrow">The first foray</span>
@@ -287,7 +254,7 @@
 
 
   <!-- ============================================================
-       3. WHY THIS, NOT THE ALTERNATIVE
+       2. WHY THIS, NOT THE ALTERNATIVE
        ============================================================ -->
   <section>
     <span class="eyebrow">Decision</span>
@@ -315,158 +282,7 @@
 
 
   <!-- ============================================================
-       4. THE REPO IS THE SOURCE OF TRUTH
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">How we work</span>
-    <h1>The repo is the source of truth.</h1>
-
-    <div class="grid-2" style="margin-top: 24px;">
-      <div class="col">
-        <ul>
-          <li><strong>AGENTS.md / CLAUDE.md</strong> — the agent's onboarding doc and the human's onboarding doc are the same file.</li>
-          <li><strong>docs/adr/</strong> — architecture decisions, dated, sequential.</li>
-          <li><strong>docs/governance/</strong> — data classification before storage, not after.</li>
-          <li><strong>docs/security/</strong> — institutional review checklist, rate-limiting, dependency scanning.</li>
-        </ul>
-      </div>
-      <div class="col">
-        <ul>
-          <li><strong>mkdocs.yml</strong> — every doc in the repo is on the site.</li>
-          <li><strong>.github/workflows/</strong> — CI, security scan, SBOM, e2e tests, docs build, all on every PR.</li>
-          <li><strong>scripts/</strong> — repository maintenance helpers, runnable by humans or agents.</li>
-          <li><strong>ADR-driven</strong> — when an opinion is non-obvious, it becomes a tracked decision.</li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="foot">No Confluence page. No Jira board. No status meeting. The deliverable is the diff.</p>
-  </section>
-
-
-  <!-- ============================================================
-       5. MARKDOWN-NATIVE DEVELOPMENT
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">How we work</span>
-    <h1>Markdown is the substrate.</h1>
-
-    <div class="grid-2" style="margin-top: 24px;">
-      <div class="col">
-        <h3>Loop</h3>
-        <ol>
-          <li>Issue opened — written in markdown.</li>
-          <li>Branch named <code>feature/...</code>.</li>
-          <li>Agent reads <code>AGENTS.md</code>, the relevant ADR, the existing module.</li>
-          <li>Agent proposes a diff.</li>
-          <li>PR template asks: tests? data classification? security review needed?</li>
-          <li>Reviewer reads the diff. If it's hard to read, the diff is wrong.</li>
-          <li>Merge. CI runs. Docs rebuild. Site updates.</li>
-        </ol>
-      </div>
-
-      <div class="col">
-        <h3>Why this works for both humans and agents</h3>
-        <p class="kicker">The same files that brief the agent brief the new contributor. The same checks that catch a bad PR catch a bad agent run. The repo is the contract.</p>
-        <p class="kicker">Process lives <em class="gold">in</em> the system, not <em class="gold">around</em> it.</p>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ============================================================
-       6. MODEL-AGNOSTIC BY DESIGN
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">How we work</span>
-    <h1>Model-agnostic by design.</h1>
-    <p class="lede">The content-generation service uses the Anthropic SDK with a configurable base URL. One environment variable changes the provider.</p>
-
-    <pre><code># Claude
-ANTHROPIC_BASE_URL=https://api.anthropic.com
-
-# MindRouter — UI on-prem (Llama, Qwen, Gemma, dots.OCR)
-ANTHROPIC_BASE_URL=https://mindrouter.uidaho.edu/v1
-
-# OpenAI — drop-in via the OpenAI-compatible endpoint
-OPENAI_API_KEY=...</code></pre>
-
-    <p class="kicker">Same prompts. Same evaluation harness. Same schemas.</p>
-    <p class="foot">Vendors are interchangeable. Prompts and schemas are not. Never bet a project on a single model provider.</p>
-  </section>
-
-
-  <!-- ============================================================
-       7. THE AGENTIC LOOP
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">How we work</span>
-    <h1>What an agentic sprint actually looks like.</h1>
-
-    <div class="grid-2" style="margin-top: 18px;">
-      <div class="col">
-        <h3>Instructions</h3>
-        <p class="kicker"><code>AGENTS.md</code>, <code>CLAUDE.md</code>, ADRs. The constraints the agent reads before it writes anything.</p>
-
-        <h3 style="margin-top: 22px;">Memory</h3>
-        <p class="kicker">File-based, per-project. What was tried, what worked, what was rejected. Persists across sessions.</p>
-      </div>
-
-      <div class="col">
-        <h3>Skills</h3>
-        <p class="kicker">Markdown-defined, composable. <code>SKILL.md</code> / <code>prompt.md</code> per task type. Versioned in the repo, not buried in a vendor's UI.</p>
-
-        <h3 style="margin-top: 22px;">Heartbeat</h3>
-        <p class="kicker">Scheduled runs. The agent doesn't only act when called — it checks in, reports drift, opens PRs for cleanup tasks.</p>
-      </div>
-    </div>
-
-    <div class="footer-rule"></div>
-    <p class="foot">The human still owns scope, definition-of-done, review, merge. <em class="gold">Orchestration, not abdication.</em></p>
-  </section>
-
-
-  <!-- ============================================================
-       8. THE DISCIPLINE THAT MAKES VELOCITY SAFE
-       ============================================================ -->
-  <section>
-    <span class="eyebrow">How we work</span>
-    <h1>Velocity comes from tools, not ceremony.</h1>
-
-    <div class="grid-2" style="margin-top: 24px;">
-      <div class="col">
-        <h3>Automated</h3>
-        <ul>
-          <li>Pre-commit hooks</li>
-          <li>Ruff — Python lint and format</li>
-          <li>TypeScript strict + ESLint zero-warnings</li>
-          <li>Pytest, Vitest, Playwright E2E</li>
-          <li>Trivy security scan + SBOM generation</li>
-          <li>Alembic migrations</li>
-          <li>Dependabot</li>
-          <li>MkDocs <code>--strict</code> on every PR</li>
-        </ul>
-      </div>
-
-      <div class="col">
-        <h3>Still on the human</h3>
-        <ul>
-          <li class="gold-bullet">Choosing the problem</li>
-          <li class="gold-bullet">Defining "done"</li>
-          <li class="gold-bullet">Reading the diff</li>
-          <li class="gold-bullet">Approving the merge</li>
-        </ul>
-        <p class="kicker" style="margin-top: 22px;">Everything else is the toolchain's job.</p>
-      </div>
-    </div>
-
-    <div class="footer-rule"></div>
-    <p class="foot">Modern tooling does what process theater pretends to do. And faster.</p>
-  </section>
-
-
-  <!-- ============================================================
-       9. WHAT WE BUILT THAT MAKES THIS POSSIBLE — bridge slide
+       3. WHAT WE BUILT THAT MAKES THIS POSSIBLE — bridge slide
        ============================================================ -->
   <section>
     <span class="eyebrow">Foundations</span>
@@ -499,7 +315,7 @@ OPENAI_API_KEY=...</code></pre>
 
 
   <!-- ============================================================
-       10. MINDROUTER
+       4. MINDROUTER
        ============================================================ -->
   <section>
     <span class="eyebrow">Foundation · Inference</span>
@@ -535,7 +351,7 @@ OPENAI_API_KEY=...</code></pre>
 
 
   <!-- ============================================================
-       11. VANDALIZER
+       5. VANDALIZER
        ============================================================ -->
   <section>
     <span class="eyebrow">Foundation · Extraction</span>
@@ -569,7 +385,7 @@ OPENAI_API_KEY=...</code></pre>
 
 
   <!-- ============================================================
-       12. UCM DAILY REGISTER
+       6. UCM DAILY REGISTER
        ============================================================ -->
   <section>
     <span class="eyebrow">Foundation · LLM-as-editor</span>
@@ -603,7 +419,7 @@ OPENAI_API_KEY=...</code></pre>
 
 
   <!-- ============================================================
-       13. PROCESSMAPPING
+       7. PROCESSMAPPING
        ============================================================ -->
   <section>
     <span class="eyebrow">Foundation · Domain model</span>
@@ -633,6 +449,157 @@ OPENAI_API_KEY=...</code></pre>
         </ul>
       </div>
     </div>
+  </section>
+
+
+  <!-- ============================================================
+       8. THE REPO IS THE SOURCE OF TRUTH
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>The repo is the source of truth.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <ul>
+          <li><strong>AGENTS.md / CLAUDE.md</strong> — the agent's onboarding doc and the human's onboarding doc are the same file.</li>
+          <li><strong>docs/adr/</strong> — architecture decisions, dated, sequential.</li>
+          <li><strong>docs/governance/</strong> — data classification before storage, not after.</li>
+          <li><strong>docs/security/</strong> — institutional review checklist, rate-limiting, dependency scanning.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <ul>
+          <li><strong>mkdocs.yml</strong> — every doc in the repo is on the site.</li>
+          <li><strong>.github/workflows/</strong> — CI, security scan, SBOM, e2e tests, docs build, all on every PR.</li>
+          <li><strong>scripts/</strong> — repository maintenance helpers, runnable by humans or agents.</li>
+          <li><strong>ADR-driven</strong> — when an opinion is non-obvious, it becomes a tracked decision.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="foot">No Confluence page. No Jira board. No status meeting. The deliverable is the diff.</p>
+  </section>
+
+
+  <!-- ============================================================
+       9. MARKDOWN-NATIVE DEVELOPMENT
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Markdown is the substrate.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <h3>Loop</h3>
+        <ol>
+          <li>Issue opened — written in markdown.</li>
+          <li>Branch named <code>feature/...</code>.</li>
+          <li>Agent reads <code>AGENTS.md</code>, the relevant ADR, the existing module.</li>
+          <li>Agent proposes a diff.</li>
+          <li>PR template asks: tests? data classification? security review needed?</li>
+          <li>Reviewer reads the diff. If it's hard to read, the diff is wrong.</li>
+          <li>Merge. CI runs. Docs rebuild. Site updates.</li>
+        </ol>
+      </div>
+
+      <div class="col">
+        <h3>Why this works for both humans and agents</h3>
+        <p class="kicker">The same files that brief the agent brief the new contributor. The same checks that catch a bad PR catch a bad agent run. The repo is the contract.</p>
+        <p class="kicker">Process lives <em class="gold">in</em> the system, not <em class="gold">around</em> it.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       10. MODEL-AGNOSTIC BY DESIGN
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Model-agnostic by design.</h1>
+    <p class="lede">The content-generation service uses the Anthropic SDK with a configurable base URL. One environment variable changes the provider.</p>
+
+    <pre><code># Claude
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+
+# MindRouter — UI on-prem (Llama, Qwen, Gemma, dots.OCR)
+ANTHROPIC_BASE_URL=https://mindrouter.uidaho.edu/v1
+
+# OpenAI — drop-in via the OpenAI-compatible endpoint
+OPENAI_API_KEY=...</code></pre>
+
+    <p class="kicker">Same prompts. Same evaluation harness. Same schemas.</p>
+    <p class="foot">Vendors are interchangeable. Prompts and schemas are not. Never bet a project on a single model provider.</p>
+  </section>
+
+
+  <!-- ============================================================
+       11. THE AGENTIC LOOP
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>What an agentic sprint actually looks like.</h1>
+
+    <div class="grid-2" style="margin-top: 18px;">
+      <div class="col">
+        <h3>Instructions</h3>
+        <p class="kicker"><code>AGENTS.md</code>, <code>CLAUDE.md</code>, ADRs. The constraints the agent reads before it writes anything.</p>
+
+        <h3 style="margin-top: 22px;">Memory</h3>
+        <p class="kicker">File-based, per-project. What was tried, what worked, what was rejected. Persists across sessions.</p>
+      </div>
+
+      <div class="col">
+        <h3>Skills</h3>
+        <p class="kicker">Markdown-defined, composable. <code>SKILL.md</code> / <code>prompt.md</code> per task type. Versioned in the repo, not buried in a vendor's UI.</p>
+
+        <h3 style="margin-top: 22px;">Heartbeat</h3>
+        <p class="kicker">Scheduled runs. The agent doesn't only act when called — it checks in, reports drift, opens PRs for cleanup tasks.</p>
+      </div>
+    </div>
+
+    <div class="footer-rule"></div>
+    <p class="foot">The human still owns scope, definition-of-done, review, merge. <em class="gold">Orchestration, not abdication.</em></p>
+  </section>
+
+
+  <!-- ============================================================
+       12. THE DISCIPLINE THAT MAKES VELOCITY SAFE
+       ============================================================ -->
+  <section>
+    <span class="eyebrow">How we work</span>
+    <h1>Velocity comes from tools, not ceremony.</h1>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="col">
+        <h3>Automated</h3>
+        <ul>
+          <li>Pre-commit hooks</li>
+          <li>Ruff — Python lint and format</li>
+          <li>TypeScript strict + ESLint zero-warnings</li>
+          <li>Pytest, Vitest, Playwright E2E</li>
+          <li>Trivy security scan + SBOM generation</li>
+          <li>Alembic migrations</li>
+          <li>Dependabot</li>
+          <li>MkDocs <code>--strict</code> on every PR</li>
+        </ul>
+      </div>
+
+      <div class="col">
+        <h3>Still on the human</h3>
+        <ul>
+          <li class="gold-bullet">Choosing the problem</li>
+          <li class="gold-bullet">Defining "done"</li>
+          <li class="gold-bullet">Reading the diff</li>
+          <li class="gold-bullet">Approving the merge</li>
+        </ul>
+        <p class="kicker" style="margin-top: 22px;">Everything else is the toolchain's job.</p>
+      </div>
+    </div>
+
+    <div class="footer-rule"></div>
+    <p class="foot">Modern tooling does what process theater pretends to do. And faster.</p>
   </section>
 
   </div>
