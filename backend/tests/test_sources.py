@@ -385,7 +385,7 @@ async def test_schedule_imported_game_is_refreshed_by_boxscore_ingest(
         "app.api.v1.sources.discover_schedule_events",
         fake_discover_schedule_events,
     )
-    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
 
     import_response = await client.post("/api/v1/sources/football/schedule/import")
     imported_game_id = import_response.json()[0]["id"]

@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     SIDEARM_REQUEST_TIMEOUT_SECONDS: float = Field(default=20.0, gt=0)
     SIDEARM_FETCH_MAX_ATTEMPTS: int = Field(default=3, ge=1)
     SIDEARM_FETCH_BACKOFF_SECONDS: float = Field(default=0.5, ge=0)
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_INTERVAL_SECONDS: int = Field(default=900, ge=60)
     ANTHROPIC_API_KEY: str | None = None
     ANTHROPIC_BASE_URL: str | None = (
         None  # e.g. https://mindrouter.uidaho.edu/anthropic

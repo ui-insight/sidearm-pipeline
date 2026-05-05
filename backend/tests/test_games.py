@@ -49,7 +49,7 @@ async def test_ingest_creates_canonical_event_metadata(
             raw_html=raw_html,
         )
 
-    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
 
     response = await client.post(
         "/api/v1/games",
@@ -148,7 +148,7 @@ async def test_reingest_updates_existing_canonical_event(
         parsed.source_url = url
         return parsed
 
-    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
 
     ingest_payload = {
         "url": "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467"
@@ -194,7 +194,7 @@ async def test_ingest_records_failed_fetch_run(client, db_session, monkeypatch):
     async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
         raise httpx.ConnectTimeout("Sidearm timed out")
 
-    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
 
     response = await client.post(
         "/api/v1/games",
@@ -240,7 +240,7 @@ async def test_ingest_records_retry_exhaustion(client, db_session, monkeypatch):
             retryable=True,
         )
 
-    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
 
     response = await client.post(
         "/api/v1/games",

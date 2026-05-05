@@ -1,7 +1,8 @@
 """Vandals Stats Pipeline — FastAPI Application Entry Point."""
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.config import settings
-from app.db.engine import init_db
+from app.db.engine import async_session, init_db
 from app.logging import (
     REQUEST_ID_HEADER,
     bind_request_id,
@@ -17,9 +18,11 @@ from app.logging import (
     reset_request_id,
 )
 from app.rate_limit import configure_rate_limiting
+from app.services.scheduler import scheduler_loop
 
 configure_logging()
 request_logger = logging.getLogger("app.request")
+_scheduler_logger = logging.getLogger("app.scheduler")
 
 
 @asynccontextmanager
@@ -27,7 +30,24 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
     settings.check_security()
     await init_db()
+
+    scheduler_task: asyncio.Task | None = None
+    if settings.SCHEDULER_ENABLED:
+        scheduler_task = asyncio.create_task(
+            scheduler_loop(async_session, settings.SCHEDULER_INTERVAL_SECONDS)
+        )
+        _scheduler_logger.info(
+            "Scheduler started interval_seconds=%d",
+            settings.SCHEDULER_INTERVAL_SECONDS,
+        )
+
     yield
+
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler_task
+        _scheduler_logger.info("Scheduler stopped")
 
 
 app = FastAPI(

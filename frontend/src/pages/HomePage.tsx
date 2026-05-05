@@ -201,13 +201,21 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-6 py-10">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Vandals Stats Pipeline
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Ingest Sidearm boxscore URLs and browse the normalized data.
-          </p>
+        <header className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Vandals Stats Pipeline
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Ingest Sidearm boxscore URLs and browse the normalized data.
+            </p>
+          </div>
+          <Link
+            to="/ingest-runs"
+            className="mt-1 text-sm text-gray-500 hover:text-yellow-700"
+          >
+            Ingest history →
+          </Link>
         </header>
 
         <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
