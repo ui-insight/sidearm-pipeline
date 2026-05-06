@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         if "*" in cors_origins:
             raise RuntimeError("CORS_ORIGINS must not include '*' in production.")
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": ["../.env", ".env"], "extra": "ignore"}
 
 
 settings = Settings()
