@@ -210,12 +210,26 @@ function HomePage() {
               Ingest Sidearm boxscore URLs and browse the normalized data.
             </p>
           </div>
-          <Link
-            to="/ingest-runs"
-            className="mt-1 text-sm text-gray-500 hover:text-yellow-700"
-          >
-            Ingest history →
-          </Link>
+          <div className="flex flex-col items-end gap-1 mt-1">
+            <Link
+              to="/ingest-runs"
+              className="text-sm text-gray-500 hover:text-yellow-700"
+            >
+              Ingest history →
+            </Link>
+            <Link
+              to="/agent-runs"
+              className="text-sm text-gray-500 hover:text-yellow-700"
+            >
+              Agent runs →
+            </Link>
+            <Link
+              to="/query"
+              className="text-sm text-gray-500 hover:text-yellow-700"
+            >
+              Query →
+            </Link>
+          </div>
         </header>
 
         <section className="bg-white rounded-lg shadow-sm p-6 mb-8">

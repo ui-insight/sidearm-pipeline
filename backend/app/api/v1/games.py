@@ -8,14 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.agents.recap_writer import run_recap_writer
+from app.config import settings
 from app.db.engine import get_db
-from app.models.content import GeneratedContent
 from app.models.game import Game
+from app.schemas.agent import AgentRunRead
 from app.schemas.content import GeneratedContentRead
 from app.schemas.game import GameDetail, GameSummary, IngestRequest
-from app.services.content_generator import generate_coverage
 from app.services.ingest import ingest_boxscore_url
-from app.config import settings
 
 router = APIRouter()
 
@@ -42,6 +42,7 @@ async def ingest_game(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to fetch Sidearm page: {exc}",
         ) from exc
+    game = await _load_game(db, game.id)
     return GameDetail.model_validate(game)
 
 
@@ -107,6 +108,7 @@ async def reingest_game(
             detail=f"Failed to fetch Sidearm page: {exc}",
         ) from exc
 
+    game = await _load_game(db, game.id)
     return GameDetail.model_validate(game)
 
 
@@ -129,15 +131,23 @@ async def delete_game(game_id: int, db: AsyncSession = Depends(get_db)) -> None:
 
 @router.post(
     "/{game_id}/generate",
-    response_model=GeneratedContentRead,
+    response_model=AgentRunRead,
     status_code=status.HTTP_201_CREATED,
     summary="Generate AI coverage (recap + spotlight + social) for a game",
 )
 async def generate_game_content(
     game_id: int,
     db: AsyncSession = Depends(get_db),
-) -> GeneratedContentRead:
-    """Call the content generator and persist the result."""
+) -> AgentRunRead:
+    """Run the recap-writer agent for a game and return the AgentRun.
+
+    **Breaking change from previous API**: this endpoint now returns
+    ``AgentRunRead`` instead of ``GeneratedContentRead``. The content is not
+    persisted until a human approves it via
+    ``POST /api/v1/agent-runs/{id}/verdict``.
+
+    This is the Tier-1 (human-gated) pattern per ADR-003.
+    """
     game = await _load_game(db, game_id)
     if game is None:
         raise HTTPException(
@@ -146,26 +156,25 @@ async def generate_game_content(
         )
 
     try:
-        coverage = await generate_coverage(game)
+        agent_run = await run_recap_writer(game, db, trigger="manual")
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
 
-    record = GeneratedContent(
-        game_id=game.id,
-        headline=coverage.headline,
-        recap=coverage.recap,
-        spotlight_player=coverage.spotlight_player,
-        spotlight_body=coverage.spotlight_body,
-        social_post=coverage.social_post,
-        model=settings.CONTENT_MODEL,
+    from app.models.agent import AgentRun as AgentRunModel
+
+    stmt = (
+        select(AgentRunModel)
+        .where(AgentRunModel.id == agent_run.id)
+        .options(
+            selectinload(AgentRunModel.steps),
+            selectinload(AgentRunModel.evaluations),
+        )
     )
-    db.add(record)
-    await db.commit()
-    await db.refresh(record)
-    return GeneratedContentRead.model_validate(record)
+    loaded_run = await db.scalar(stmt)
+    return AgentRunRead.model_validate(loaded_run)
 
 
 async def _load_game(db: AsyncSession, game_id: int) -> Game | None:
@@ -180,6 +189,7 @@ async def _load_game(db: AsyncSession, game_id: int) -> Game | None:
             selectinload(Game.source_snapshots),
             selectinload(Game.status_history),
             selectinload(Game.generated_content),
+            selectinload(Game.agent_runs),
         )
     )
     return await db.scalar(stmt)

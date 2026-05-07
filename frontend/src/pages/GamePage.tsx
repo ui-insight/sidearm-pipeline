@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { gamesApi } from "../api/games";
-import { ApiError } from "../api/client";
+import CoverageReviewPanel from "../components/CoverageReviewPanel";
 import type { GameDetail, GeneratedContent, PlayerStatGroup } from "../types/game";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -25,8 +25,6 @@ function GamePage() {
   const { id } = useParams<{ id: string }>();
   const [game, setGame] = useState<GameDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -38,29 +36,12 @@ function GamePage() {
       );
   }, [id]);
 
-  async function handleGenerate() {
+  function handleContentApproved(content: GeneratedContent) {
     if (!game) return;
-    setGenError(null);
-    setGenerating(true);
-    try {
-      const newContent = await gamesApi.generate(game.id);
-      setGame({
-        ...game,
-        generated_content: [newContent, ...game.generated_content],
-      });
-    } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? typeof err.data === "object" && err.data && "detail" in err.data
-            ? String(err.data.detail)
-            : err.message
-          : err instanceof Error
-            ? err.message
-            : "Generation failed";
-      setGenError(msg);
-    } finally {
-      setGenerating(false);
-    }
+    setGame({
+      ...game,
+      generated_content: [content, ...game.generated_content],
+    });
   }
 
   if (error) {
@@ -113,12 +94,10 @@ function GamePage() {
           </a>
         </header>
 
-        <CoverageSection
-          content={game.generated_content[0] ?? null}
-          history={game.generated_content.slice(1)}
-          generating={generating}
-          onGenerate={handleGenerate}
-          error={genError}
+        <CoverageReviewPanel
+          gameId={game.id}
+          approvedContent={game.generated_content[0] ?? null}
+          onContentApproved={handleContentApproved}
         />
 
         {game.scoring_plays.length > 0 && (
@@ -203,145 +182,6 @@ function Section({
       <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
       {children}
     </section>
-  );
-}
-
-function CoverageSection({
-  content,
-  history,
-  generating,
-  onGenerate,
-  error,
-}: {
-  content: GeneratedContent | null;
-  history: GeneratedContent[];
-  generating: boolean;
-  onGenerate: () => void;
-  error: string | null;
-}) {
-  return (
-    <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">
-            AI Coverage
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Generated from the boxscore above using Claude.
-          </p>
-        </div>
-        <button
-          onClick={onGenerate}
-          disabled={generating}
-          className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
-        >
-          {generating
-            ? "Generating…"
-            : content
-              ? "Regenerate"
-              : "Generate Coverage"}
-        </button>
-      </div>
-
-      {error && (
-        <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      {!content && !generating && !error && (
-        <p className="text-sm text-gray-500">
-          No coverage yet. Click the button to produce a headline, recap,
-          player spotlight, and social post from this boxscore.
-        </p>
-      )}
-
-      {content && (
-        <div className="space-y-6">
-          {content.headline && (
-            <div>
-              <Label>Headline</Label>
-              <p className="text-xl font-bold text-gray-900 leading-snug">
-                {content.headline}
-              </p>
-            </div>
-          )}
-
-          <CopyableBlock label="Recap" text={content.recap}>
-            {content.recap.split(/\n\n+/).map((para, i) => (
-              <p key={i} className="text-gray-800 leading-relaxed mb-3 last:mb-0">
-                {para}
-              </p>
-            ))}
-          </CopyableBlock>
-
-          <CopyableBlock
-            label={`Player Spotlight${content.spotlight_player ? ` — ${content.spotlight_player}` : ""}`}
-            text={content.spotlight_body}
-          >
-            <p className="text-gray-800 leading-relaxed">
-              {content.spotlight_body}
-            </p>
-          </CopyableBlock>
-
-          <CopyableBlock label="Social Post" text={content.social_post}>
-            <p className="text-gray-800 leading-relaxed font-mono text-sm bg-gray-50 rounded p-3 border border-gray-200">
-              {content.social_post}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {content.social_post.length} chars
-            </p>
-          </CopyableBlock>
-
-          <p className="text-xs text-gray-400 pt-2 border-t border-gray-100">
-            Generated {new Date(content.generated_at).toLocaleString()}
-            {content.model && ` · ${content.model}`}
-            {history.length > 0 && ` · ${history.length} earlier version${history.length === 1 ? "" : "s"}`}
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-      {children}
-    </p>
-  );
-}
-
-function CopyableBlock({
-  label,
-  text,
-  children,
-}: {
-  label: string;
-  text: string;
-  children: React.ReactNode;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-1">
-        <Label>{label}</Label>
-        <button
-          onClick={copy}
-          className="text-xs text-gray-500 hover:text-gray-900"
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      {children}
-    </div>
   );
 }
 

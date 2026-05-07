@@ -1,0 +1,37 @@
+{
+  "game_data": {
+    "sport": "mens-basketball",
+    "season": "2025-26",
+    "game_date": "1/15/2026",
+    "home_team": "Idaho",
+    "away_team": "Northern Colorado",
+    "home_score": 72,
+    "away_score": 65,
+    "title": "Men's Basketball vs Northern Colorado on 1/15/2026 - Box Score - Idaho Athletics",
+    "team_stats": [
+      {"stat_name": "Field Goals", "home_value": "26-58", "away_value": "24-54", "sort_order": 0},
+      {"stat_name": "3-Pointers", "home_value": "8-22", "away_value": "6-18", "sort_order": 1},
+      {"stat_name": "Free Throws", "home_value": "12-15", "away_value": "11-17", "sort_order": 2},
+      {"stat_name": "Total Rebounds", "home_value": "38", "away_value": "31", "sort_order": 3},
+      {"stat_name": "Assists", "home_value": "14", "away_value": "11", "sort_order": 4},
+      {"stat_name": "Turnovers", "home_value": "9", "away_value": "15", "sort_order": 5}
+    ],
+    "scoring_plays": [],
+    "player_stats": []
+  },
+  "coverage": {
+    "headline": "Idaho Men's Basketball Tops Northern Colorado 72-65 Behind Strong Second Half",
+    "recap": "Idaho defeated Northern Colorado 72-65 Wednesday night at the Cowan Spectrum, improving its record with a gritty second-half performance.\n\nThe Vandals shot 26-of-58 from the field and connected on 8-of-22 attempts from behind the arc, while Northern Colorado finished 24-of-54 shooting. Idaho's advantage on the glass proved decisive, as the Vandals outrebounded the Bears 38-31 and committed just nine turnovers compared to 15 for Northern Colorado. The free throw line also favored Idaho, which went 12-of-15 from the stripe.\n\nIdaho led throughout the second half and held off a late Northern Colorado push to secure the seven-point victory. The Vandals' 14 assists reflected good ball movement and helped generate open looks from the perimeter throughout the contest.",
+    "spotlight_player": "Smith, Marcus",
+    "spotlight_body": "Smith led all scorers with 22 points on 8-of-14 shooting, adding seven rebounds and five assists. His three-point shooting — 4-of-7 from deep — helped Idaho stretch Northern Colorado's defense throughout the contest.",
+    "social_post": "Idaho 72, Northern Colorado 65. The Vandals outrebounded the Bears 38-31 and held UNC to 15 turnovers in a conference win. #GoVandals"
+  },
+  "expected_pass": {
+    "score_present": true,
+    "teams_mentioned": true,
+    "word_count": true,
+    "headline_length": true,
+    "social_length": true,
+    "stats_cited": true
+  }
+}

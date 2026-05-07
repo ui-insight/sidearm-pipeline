@@ -4,6 +4,7 @@ Add one file per resource (e.g., user.py, project.py).
 Import all models here so they are registered with Base.metadata.
 """
 
+from app.models.agent import AgentRun, AgentRunEvaluation, AgentRunStep
 from app.models.content import GeneratedContent
 from app.models.game import (
     EventSource,
@@ -17,6 +18,9 @@ from app.models.game import (
 )
 
 __all__ = [
+    "AgentRun",
+    "AgentRunEvaluation",
+    "AgentRunStep",
     "EventSource",
     "EventStatusHistory",
     "Game",

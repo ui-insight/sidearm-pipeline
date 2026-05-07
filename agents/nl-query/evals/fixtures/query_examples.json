@@ -1,0 +1,32 @@
+[
+  {
+    "question": "How many games have been ingested?",
+    "expected_sql_pattern": "SELECT.*COUNT.*FROM.*games",
+    "expected_answer_contains": ["game", "ingested"],
+    "notes": "Basic count query"
+  },
+  {
+    "question": "What sports are in the database?",
+    "expected_sql_pattern": "SELECT.*DISTINCT.*sport.*FROM.*games",
+    "expected_answer_contains": ["sport"],
+    "notes": "Distinct values query"
+  },
+  {
+    "question": "Which games did Idaho win?",
+    "expected_sql_pattern": "SELECT.*FROM.*games.*WHERE",
+    "expected_answer_contains": ["Idaho", "win"],
+    "notes": "Filtered query with comparison"
+  },
+  {
+    "question": "What was the highest scoring game?",
+    "expected_sql_pattern": "SELECT.*FROM.*games.*ORDER.*DESC.*LIMIT",
+    "expected_answer_contains": ["score", "game"],
+    "notes": "Aggregate + sort query"
+  },
+  {
+    "question": "How many games were played in football season 2025?",
+    "expected_sql_pattern": "SELECT.*COUNT.*FROM.*games.*WHERE",
+    "expected_answer_contains": ["football", "2025"],
+    "notes": "Multi-condition filter"
+  }
+]

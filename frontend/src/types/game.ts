@@ -90,6 +90,8 @@ export interface GeneratedContent {
   generated_at: string;
 }
 
+import type { AgentRunSummary } from "./agentRun";
+
 export interface GameDetail extends GameSummary {
   team_stats: TeamStat[];
   player_stats: PlayerStatGroup[];
@@ -98,4 +100,5 @@ export interface GameDetail extends GameSummary {
   source_snapshots: SourceSnapshot[];
   status_history: EventStatusHistory[];
   generated_content: GeneratedContent[];
+  agent_runs: AgentRunSummary[];
 }

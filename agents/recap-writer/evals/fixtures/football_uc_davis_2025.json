@@ -1,0 +1,42 @@
+{
+  "game_data": {
+    "sport": "football",
+    "season": "2025",
+    "game_date": "11/8/2025",
+    "home_team": "Idaho",
+    "away_team": "UC Davis",
+    "home_score": 31,
+    "away_score": 28,
+    "title": "Football vs UC Davis on 11/8/2025 - Box Score - Idaho Athletics",
+    "team_stats": [
+      {"stat_name": "First Downs", "home_value": "22", "away_value": "18", "sort_order": 0},
+      {"stat_name": "Rushing Yards", "home_value": "145", "away_value": "112", "sort_order": 1},
+      {"stat_name": "Passing Yards", "home_value": "243", "away_value": "287", "sort_order": 2},
+      {"stat_name": "Total Yards", "home_value": "388", "away_value": "399", "sort_order": 3},
+      {"stat_name": "Turnovers", "home_value": "1", "away_value": "3", "sort_order": 4}
+    ],
+    "scoring_plays": [
+      {"period": "1", "clock": "8:45", "team": "IDA", "description": "IDA - touchdown pass 42 yards", "home_score": 7, "away_score": 0},
+      {"period": "2", "clock": "5:22", "team": "UCD", "description": "UCD - rushing touchdown 8 yards", "home_score": 7, "away_score": 7},
+      {"period": "3", "clock": "11:30", "team": "IDA", "description": "IDA - field goal 38 yards", "home_score": 10, "away_score": 7},
+      {"period": "4", "clock": "2:15", "team": "UCD", "description": "UCD - touchdown pass 24 yards", "home_score": 10, "away_score": 14},
+      {"period": "4", "clock": "0:48", "team": "IDA", "description": "IDA - touchdown pass 18 yards", "home_score": 17, "away_score": 14}
+    ],
+    "player_stats": []
+  },
+  "coverage": {
+    "headline": "Idaho Holds Off UC Davis 31-28 in Final Seconds",
+    "recap": "Idaho defeated UC Davis 31-28 on Saturday at the Kibbie Dome, escaping with a narrow victory on a late fourth-quarter touchdown pass with 48 seconds remaining.\n\nThe Vandals trailed 14-10 entering the final period after UC Davis scored on a 24-yard touchdown pass at the 2:15 mark of the fourth quarter. Idaho responded with a scoring drive capped by an 18-yard touchdown throw that put the Vandals back in front. Idaho finished with 388 total yards against UC Davis's 399, but turned the ball over just once compared to three turnovers by the Aggies.\n\nIdaho controlled the ground game with 145 rushing yards while UC Davis passed for 287 yards through the air. The Vandals' defense forced three turnovers, which proved decisive in the final outcome. Idaho holds on for the win.",
+    "spotlight_player": "Doe, John",
+    "spotlight_body": "Doe completed 18 of 27 passes for 243 yards and two touchdowns to lead the Vandal offense. His 18-yard scoring throw with 48 seconds left proved to be the game-winner.",
+    "social_post": "Idaho holds on 31-28! The Vandals turned three UC Davis turnovers into points, surviving a late comeback attempt to secure the win. #GoVandals"
+  },
+  "expected_pass": {
+    "score_present": true,
+    "teams_mentioned": true,
+    "word_count": true,
+    "headline_length": true,
+    "social_length": true,
+    "stats_cited": true
+  }
+}

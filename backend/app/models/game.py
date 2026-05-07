@@ -103,6 +103,12 @@ class Game(Base):
         cascade="all, delete-orphan",
         order_by="GeneratedContent.generated_at.desc()",
     )
+    agent_runs: Mapped[list["AgentRun"]] = relationship(  # noqa: F821
+        "AgentRun",
+        back_populates="game",
+        order_by="AgentRun.started_at.desc()",
+        passive_deletes=True,
+    )
 
 
 class TeamStat(Base):

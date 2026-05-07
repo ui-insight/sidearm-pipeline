@@ -1,5 +1,6 @@
 import { api } from "./client";
-import type { GameDetail, GameSummary, GeneratedContent } from "../types/game";
+import type { GameDetail, GameSummary } from "../types/game";
+import type { AgentRunRead } from "../types/agentRun";
 
 export const gamesApi = {
   list: () => api.get<GameSummary[]>("/games"),
@@ -7,5 +8,5 @@ export const gamesApi = {
   ingest: (url: string) => api.post<GameDetail>("/games", { url }),
   remove: (id: number) => api.delete<void>(`/games/${id}`),
   generate: (id: number) =>
-    api.post<GeneratedContent>(`/games/${id}/generate`, {}),
+    api.post<AgentRunRead>(`/games/${id}/generate`, {}),
 };

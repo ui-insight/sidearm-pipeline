@@ -117,9 +117,11 @@ class GameDetail(GameSummary):
     source_snapshots: list[SourceSnapshotRead] = []
     status_history: list[EventStatusHistoryRead] = []
     generated_content: list["GeneratedContentRead"] = []  # noqa: F821
+    agent_runs: list["AgentRunSummary"] = []  # noqa: F821
 
 
 # Imported after GameDetail to avoid circular import at module load time.
+from app.schemas.agent import AgentRunSummary  # noqa: E402
 from app.schemas.content import GeneratedContentRead  # noqa: E402
 
 GameDetail.model_rebuild()
