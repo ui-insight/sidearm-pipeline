@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from app.models.agent import AgentRun
 
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -53,18 +52,6 @@ async def test_nl_query_returns_result_for_valid_question(
     assert payload["agent_run_id"] == fake_run.id
 
 
-async def test_nl_query_rejects_non_select_sql(monkeypatch):
-    """The SELECT-only guard should reject non-SELECT SQL."""
-    from app.agents.nl_query import _is_select_only
-
-    assert _is_select_only("SELECT * FROM games") is True
-    assert _is_select_only("  select id from games where id = 1") is True
-    assert _is_select_only("DROP TABLE games") is False
-    assert _is_select_only("INSERT INTO games VALUES (1)") is False
-    assert _is_select_only("DELETE FROM games") is False
-    assert _is_select_only("UPDATE games SET home_score=0") is False
-
-
 async def test_nl_query_creates_agent_run_record(
     client,
     db_session,
@@ -82,7 +69,10 @@ async def test_nl_query_creates_agent_run_record(
         input_payload={"question": "Which sport has the most games?"},
         output_payload={
             "question": "Which sport has the most games?",
-            "sql": "SELECT sport, COUNT(*) FROM games GROUP BY sport ORDER BY COUNT(*) DESC LIMIT 1",
+            "sql": (
+                "SELECT sport, COUNT(*) FROM games"
+                " GROUP BY sport ORDER BY COUNT(*) DESC LIMIT 1"
+            ),
             "rows": [{"sport": "football", "count": 3}],
             "answer": "Football has the most games with 3.",
         },

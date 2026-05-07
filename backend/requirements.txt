@@ -16,6 +16,7 @@ httpx==0.28.1
 beautifulsoup4==4.14.3
 lxml==6.1.0
 anthropic==0.97.0
+mcp==1.9.4
 
 # Development / Testing pins used by contributors and CI.
 pytest==9.0.3

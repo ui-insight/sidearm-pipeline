@@ -30,6 +30,7 @@ class Settings(BaseSettings):
         None  # e.g. https://mindrouter.uidaho.edu/anthropic
     )
     CONTENT_MODEL: str = "claude-opus-4-7"
+    MAX_TOOL_ITERATIONS: int = Field(default=10, ge=1, le=50)
 
     @staticmethod
     def parse_cors_origins(value: str) -> list[str]:

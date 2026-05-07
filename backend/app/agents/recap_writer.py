@@ -6,6 +6,9 @@ step recording, prompt versioning, and human-review gating.
 The agent does NOT create GeneratedContent directly. Instead it returns
 an AgentRun record. GeneratedContent is only created when a human approves
 via POST /api/v1/agent-runs/{id}/verdict.
+
+Uses the MCP boxscore server in a dynamic tool-use loop so the model
+selectively fetches only the data it needs.
 """
 
 from __future__ import annotations
@@ -15,13 +18,14 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
 from anthropic import AsyncAnthropic, AuthenticationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents._mcp_client import mcp_session, mcp_tools_to_anthropic
 from app.config import settings
 from app.models.agent import AgentRun, AgentRunStep
 from app.models.game import Game
@@ -52,8 +56,9 @@ _FALLBACK_PROMPT = (
     "or \"came to play\".\n"
     "- Do NOT use emoji in the recap or spotlight. At most one tasteful emoji is "
     "allowed in the social post.\n\n"
-    "You respond with a single JSON object and nothing else. No prose outside the "
-    "JSON, no markdown code fences, no commentary."
+    "You have tools to fetch boxscore data: get_game_summary, get_team_stats, "
+    "get_player_stats, get_scoring_plays. Use them to gather the data you need, "
+    "then respond with a single JSON object and nothing else."
 )
 
 _SCHEMA_DOC = """{
@@ -104,48 +109,6 @@ def _load_prompt() -> tuple[str, str]:
     return system_prompt, prompt_version
 
 
-def _serialize_game(game: Game) -> dict:
-    """Flatten a Game ORM record into a compact JSON payload for the model."""
-    return {
-        "sport": game.sport,
-        "season": game.season,
-        "game_date": game.game_date,
-        "home_team": game.home_team,
-        "away_team": game.away_team,
-        "home_score": game.home_score,
-        "away_score": game.away_score,
-        "title": game.title,
-        "scoring_plays": [
-            {
-                "period": play.period,
-                "clock": play.clock,
-                "team": play.team,
-                "description": play.description,
-                "away_score": play.away_score,
-                "home_score": play.home_score,
-            }
-            for play in sorted(game.scoring_plays, key=lambda p: p.sort_order)
-        ],
-        "team_stats": [
-            {
-                "stat": stat.stat_name,
-                "home": stat.home_value,
-                "away": stat.away_value,
-            }
-            for stat in sorted(game.team_stats, key=lambda s: s.sort_order)
-        ],
-        "player_stats": [
-            {
-                "category": group.category,
-                "team": group.team,
-                "columns": group.columns,
-                "rows": group.rows,
-            }
-            for group in game.player_stats
-        ],
-    }
-
-
 async def _record_step(
     db: AsyncSession,
     agent_run: AgentRun,
@@ -159,7 +122,7 @@ async def _record_step(
     error_message: str | None = None,
 ) -> AgentRunStep:
     """Persist one step record for an agent run."""
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
     step = AgentRunStep(
         agent_run_id=agent_run.id,
         step_name=step_name,
@@ -187,10 +150,14 @@ async def run_recap_writer(
     Returns an AgentRun with status="succeeded" or "failed".
     The AgentRun is committed to the database.
     GeneratedContent is NOT created here — a human verdict is required.
+
+    The agent selectively fetches boxscore data via the MCP boxscore server
+    (get_game_summary, get_team_stats, get_player_stats, get_scoring_plays)
+    in a tool-use loop, then emits a JSON coverage object.
     """
     system_prompt, prompt_version = _load_prompt()
     run_start = time.monotonic()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
 
     agent_run = AgentRun(
         agent_name="recap-writer",
@@ -198,110 +165,138 @@ async def run_recap_writer(
         prompt_version=prompt_version,
         game_id=game.id,
         trigger=trigger,
-        input_payload={},
+        input_payload={"game_id": game.id},
         status="running",
         run_metadata={"game_canonical_uid": game.canonical_uid or ""},
     )
     db.add(agent_run)
     await db.flush()  # get agent_run.id
 
-    # ── Step 1: serialize_input ──────────────────────────────────────────────
-    step1_start = time.monotonic()
-    step1_started_at = datetime.now(timezone.utc)
-    try:
-        game_payload = _serialize_game(game)
-        agent_run.input_payload = game_payload
-        await _record_step(
-            db,
-            agent_run,
-            step_name="serialize_input",
-            step_order=0,
-            input_snapshot={"game_id": game.id},
-            output_snapshot=game_payload,
-            status="succeeded",
-            started_at=step1_started_at,
-            duration_ms=int((time.monotonic() - step1_start) * 1000),
-        )
-    except Exception as exc:
-        await _fail_run(db, agent_run, started_at, run_start, str(exc))
-        raise
-
-    # ── Step 2: call_model ───────────────────────────────────────────────────
-    step2_start = time.monotonic()
-    step2_started_at = datetime.now(timezone.utc)
+    client = _get_client()
     raw_text: str | None = None
+
     try:
-        client = _get_client()
-        user_message = (
-            "Generate coverage for the game below. The boxscore JSON is authoritative "
-            "— every number you cite must come from it. Pick the spotlight player by "
-            "looking across all player stat categories and choosing the single most "
-            "dominant performance, regardless of team.\n\n"
-            f"Your JSON object must have exactly these keys:\n{_SCHEMA_DOC}\n\n"
-            f"BOXSCORE:\n{json.dumps(game_payload, indent=2)}"
-        )
-        response = await client.messages.create(
-            model=settings.CONTENT_MODEL,
-            max_tokens=4000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-        raw_text = next(
-            (block.text for block in response.content if block.type == "text"),
-            None,
-        )
-        usage = getattr(response, "usage", None)
-        await _record_step(
-            db,
-            agent_run,
-            step_name="call_model",
-            step_order=1,
-            input_snapshot={"model": settings.CONTENT_MODEL},
-            output_snapshot={
-                "raw_text_length": len(raw_text) if raw_text else 0,
-                "usage": {
-                    "input_tokens": getattr(usage, "input_tokens", None),
-                    "output_tokens": getattr(usage, "output_tokens", None),
+        async with mcp_session("boxscore") as session:
+            tool_list = await session.list_tools()
+            tools = mcp_tools_to_anthropic(tool_list.tools)
+            messages: list[dict] = [
+                {
+                    "role": "user",
+                    "content": (
+                        f"Generate coverage for game_id={game.id}. "
+                        "Use the available tools to fetch the boxscore data, "
+                        "then respond with a JSON object with these keys:\n"
+                        f"{_SCHEMA_DOC}"
+                    ),
                 }
-                if usage
-                else None,
-            },
-            status="succeeded",
-            started_at=step2_started_at,
-            duration_ms=int((time.monotonic() - step2_start) * 1000),
-        )
-    except AuthenticationError as exc:
-        err = (
-            "Upstream rejected the API key. Check ANTHROPIC_API_KEY "
-            "(and ANTHROPIC_BASE_URL if using a gateway like MindRouter)."
-        )
-        await _record_step(
-            db,
-            agent_run,
-            "call_model",
-            1,
-            None,
-            None,
-            "failed",
-            step2_started_at,
-            int((time.monotonic() - step2_start) * 1000),
-            err,
-        )
-        await _fail_run(db, agent_run, started_at, run_start, err)
-        raise RuntimeError(err) from exc
+            ]
+            step_order = 0
+
+            for iteration in range(settings.MAX_TOOL_ITERATIONS):
+                try:
+                    response = await client.messages.create(
+                        model=settings.CONTENT_MODEL,
+                        max_tokens=4000,
+                        system=system_prompt,
+                        tools=tools,
+                        messages=messages,
+                    )
+                except AuthenticationError as exc:
+                    err = (
+                        "Upstream rejected the API key. Check ANTHROPIC_API_KEY "
+                        "(and ANTHROPIC_BASE_URL if using a gateway like MindRouter)."
+                    )
+                    await _record_step(
+                        db,
+                        agent_run,
+                        "call_model",
+                        step_order,
+                        None,
+                        None,
+                        "failed",
+                        datetime.now(UTC),
+                        0,
+                        err,
+                    )
+                    await _fail_run(db, agent_run, started_at, run_start, err)
+                    raise RuntimeError(err) from exc
+
+                if response.stop_reason == "end_turn":
+                    raw_text = next(
+                        (
+                            b.text
+                            for b in response.content
+                            if b.type == "text"
+                        ),
+                        None,
+                    )
+                    break
+
+                # Process tool_use blocks
+                tool_results = []
+                for block in response.content:
+                    if block.type != "tool_use":
+                        continue
+                    step_start = time.monotonic()
+                    step_started_at = datetime.now(UTC)
+                    try:
+                        result = await session.call_tool(block.name, block.input)
+                        content = (
+                            result.content[0].text if result.content else ""
+                        )
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": content,
+                            }
+                        )
+                        await _record_step(
+                            db,
+                            agent_run,
+                            f"tool:{block.name}",
+                            step_order,
+                            {"input": block.input},
+                            {"output_length": len(content)},
+                            "succeeded",
+                            step_started_at,
+                            int((time.monotonic() - step_start) * 1000),
+                        )
+                    except Exception as exc:
+                        err = str(exc)
+                        await _record_step(
+                            db,
+                            agent_run,
+                            f"tool:{block.name}",
+                            step_order,
+                            {"input": block.input},
+                            None,
+                            "failed",
+                            step_started_at,
+                            int((time.monotonic() - step_start) * 1000),
+                            err,
+                        )
+                        await _fail_run(db, agent_run, started_at, run_start, err)
+                        raise RuntimeError(
+                            f"Tool {block.name} failed: {exc}"
+                        ) from exc
+                    step_order += 1
+
+                messages.append(
+                    {"role": "assistant", "content": response.content}
+                )
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                err = (
+                    f"Tool-use loop exceeded MAX_TOOL_ITERATIONS="
+                    f"{settings.MAX_TOOL_ITERATIONS}"
+                )
+                await _fail_run(db, agent_run, started_at, run_start, err)
+                raise RuntimeError(err)
+
+    except RuntimeError:
+        raise
     except Exception as exc:
-        await _record_step(
-            db,
-            agent_run,
-            "call_model",
-            1,
-            None,
-            None,
-            "failed",
-            step2_started_at,
-            int((time.monotonic() - step2_start) * 1000),
-            str(exc),
-        )
         await _fail_run(db, agent_run, started_at, run_start, str(exc))
         raise
 
@@ -310,9 +305,10 @@ async def run_recap_writer(
         await _fail_run(db, agent_run, started_at, run_start, err)
         raise RuntimeError(err)
 
-    # ── Step 3: parse_output ─────────────────────────────────────────────────
-    step3_start = time.monotonic()
-    step3_started_at = datetime.now(timezone.utc)
+    # ── Step: parse_output ───────────────────────────────────────────────────
+    step_start = time.monotonic()
+    step_started_at = datetime.now(UTC)
+    step_order_final = settings.MAX_TOOL_ITERATIONS  # place after tool steps
     try:
         parsed = _extract_json(raw_text)
         if parsed is None:
@@ -326,24 +322,24 @@ async def run_recap_writer(
             db,
             agent_run,
             step_name="parse_output",
-            step_order=2,
+            step_order=step_order_final,
             input_snapshot={"raw_text_length": len(raw_text)},
             output_snapshot=output_payload,
             status="succeeded",
-            started_at=step3_started_at,
-            duration_ms=int((time.monotonic() - step3_start) * 1000),
+            started_at=step_started_at,
+            duration_ms=int((time.monotonic() - step_start) * 1000),
         )
     except Exception as exc:
         await _record_step(
             db,
             agent_run,
             "parse_output",
-            2,
+            step_order_final,
             None,
             None,
             "failed",
-            step3_started_at,
-            int((time.monotonic() - step3_start) * 1000),
+            step_started_at,
+            int((time.monotonic() - step_start) * 1000),
             str(exc),
         )
         await _fail_run(db, agent_run, started_at, run_start, str(exc))
@@ -352,7 +348,7 @@ async def run_recap_writer(
     # ── Finalize run ─────────────────────────────────────────────────────────
     total_ms = int((time.monotonic() - run_start) * 1000)
     agent_run.status = "succeeded"
-    agent_run.finished_at = datetime.now(timezone.utc)
+    agent_run.finished_at = datetime.now(UTC)
     agent_run.duration_ms = total_ms
     await db.commit()
 
@@ -375,7 +371,7 @@ async def _fail_run(
 ) -> None:
     """Mark an AgentRun as failed and commit."""
     agent_run.status = "failed"
-    agent_run.finished_at = datetime.now(timezone.utc)
+    agent_run.finished_at = datetime.now(UTC)
     agent_run.duration_ms = int((time.monotonic() - run_start) * 1000)
     agent_run.run_metadata = {
         **agent_run.run_metadata,
