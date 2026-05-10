@@ -229,6 +229,12 @@ function HomePage() {
             >
               Query →
             </Link>
+            <Link
+              to="/operator"
+              className="text-sm text-gray-500 hover:text-yellow-700"
+            >
+              Operator →
+            </Link>
           </div>
         </header>
 

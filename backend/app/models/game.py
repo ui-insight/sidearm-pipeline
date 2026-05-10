@@ -17,6 +17,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
+from app.models.publish_event import PublishEvent
 
 JSONType = JSON().with_variant(JSONB(), "postgresql")
 
@@ -74,6 +75,8 @@ class Game(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     raw_html: Mapped[str | None] = mapped_column(Text)
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    validation_detail: Mapped[dict | None] = mapped_column(JSONType)
 
     team_stats: Mapped[list["TeamStat"]] = relationship(
         back_populates="game", cascade="all, delete-orphan"
@@ -108,6 +111,11 @@ class Game(Base):
         back_populates="game",
         order_by="AgentRun.started_at.desc()",
         passive_deletes=True,
+    )
+    publish_events: Mapped[list[PublishEvent]] = relationship(
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="PublishEvent.changed_at",
     )
 
 

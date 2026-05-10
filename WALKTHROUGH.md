@@ -2,7 +2,8 @@
 
 This guide covers everything from first-time setup through running the full
 agentic workflow: ingest → generate → evaluate → approve. It also explains how
-to run tests, use the Natural Language Query agent, and tune the eval harness.
+to validate and publish game records, run tests, use the Natural Language Query
+agent, and tune the eval harness.
 
 ---
 
@@ -12,14 +13,15 @@ to run tests, use the Natural Language Query agent, and tune the eval harness.
 2. [First-Time Setup](#2-first-time-setup)
 3. [Running the Application](#3-running-the-application)
 4. [Core Workflow: Ingest → Generate → Evaluate → Approve](#4-core-workflow)
-5. [Scheduler (Automated Ingestion)](#5-scheduler-automated-ingestion)
-6. [Natural Language Query Agent](#6-natural-language-query-agent)
-7. [Agent Runs Provenance Log](#7-agent-runs-provenance-log)
-8. [Running Tests](#8-running-tests)
-9. [Eval Harness (Local)](#9-eval-harness-local)
-10. [Database Migrations](#10-database-migrations)
-11. [Docker Deployment](#11-docker-deployment)
-12. [Environment Reference](#12-environment-reference)
+5. [Validation & Publish Workflow](#5-validation--publish-workflow)
+6. [Scheduler (Automated Ingestion)](#6-scheduler-automated-ingestion)
+7. [Natural Language Query Agent](#7-natural-language-query-agent)
+8. [Agent Runs Provenance Log](#8-agent-runs-provenance-log)
+9. [Running Tests](#9-running-tests)
+10. [Eval Harness (Local)](#10-eval-harness-local)
+11. [Database Migrations](#11-database-migrations)
+12. [Docker Deployment](#12-docker-deployment)
+13. [Environment Reference](#13-environment-reference)
 
 ---
 
@@ -99,7 +101,7 @@ cd backend
 cd ..
 ```
 
-This applies all four migrations:
+This applies all five migrations:
 
 | Revision | Description |
 |----------|-------------|
@@ -107,6 +109,7 @@ This applies all four migrations:
 | `0002_ingest_run_history` | Ingest run audit table |
 | `0003_ingest_retry_attempts` | Retry-attempt tracking |
 | `0004_agent_runs_provenance` | AgentRun, AgentRunStep, AgentRunEvaluation |
+| `0005_validation_publish_workflow` | `last_validated_at` + `validation_detail` on games; `publish_events` audit table |
 
 ---
 
@@ -298,7 +301,141 @@ curl -s http://localhost:8000/api/v1/games/$GAME_ID \
 
 ---
 
-## 5. Scheduler (Automated Ingestion)
+## 5. Validation & Publish Workflow
+
+Every game record starts in **draft** status. Before data can be considered
+publication-ready, an operator validates it against a set of sport-specific
+rules and then explicitly publishes it. The transitions are:
+
+```
+draft → validated → published
+                 ↘ errored   (any validation failure)
+```
+
+Every transition is recorded in the `publish_events` audit table with the
+old status, new status, and trigger source (`"api"`).
+
+### Validation rules
+
+| Rule | When applied | Passes when |
+|------|-------------|-------------|
+| `has_sport` | always | `sport` is not null |
+| `has_season` | always | `season` is not null |
+| `has_game_date` | always | `game_date` is not null |
+| `has_teams` | always | both `home_team` and `away_team` are not null |
+| `has_title` | always | `title` is not null |
+| `has_score` | `event_status == "final"` | both scores are not null |
+| `score_non_negative` | final + `has_score` passes | both scores ≥ 0 |
+| `has_team_stats` | `event_status == "final"` | at least one team stat row exists |
+| `scoring_plays_present` | final + football or basketball | at least one scoring play exists |
+
+### Operator Review page
+
+**UI:** Navigate to `/operator` (linked from the home page header as
+**Operator →**). The page shows all games in a table with:
+
+- Filter pills — **All / Draft / Validated / Published / Errors** — to narrow
+  the view by publish status
+- A color-coded `PublishStatusBadge` in each row
+- **Last Validated** timestamp
+- **Validate** button (always clickable; updates the badge on response)
+- **Publish** button (enabled only when status is `validated`)
+
+Click **Validate** on a row to run all applicable rules. The badge updates
+immediately:
+- All rules passed → badge changes to **Validated** (blue)
+- Any rule failed → badge changes to **Errors** (red); hover/row shows the
+  first failing rule
+
+Click **Publish** on a validated row. The API re-runs validation as a safety
+check, then sets `publish_status = "published"`. The badge changes to
+**Published** (green).
+
+Errors from a 409 response are displayed inline below the game title in the
+row — no full-page reload.
+
+The game detail page (`/games/:id`) also shows the `PublishStatusBadge` in the
+header for a read-only view of the current status.
+
+### API — Validate
+
+```bash
+GAME_ID=1
+
+curl -s -X POST http://localhost:8000/api/v1/games/$GAME_ID/validate \
+  | python3 -m json.tool
+```
+
+Response (`ValidationResult`):
+
+```json
+{
+  "game_id": 1,
+  "passed": true,
+  "publish_status": "validated",
+  "validated_at": "2026-05-10T08:00:00Z",
+  "checks": [
+    {"rule": "has_sport",            "passed": true,  "detail": null},
+    {"rule": "has_season",           "passed": true,  "detail": null},
+    {"rule": "has_game_date",        "passed": true,  "detail": null},
+    {"rule": "has_teams",            "passed": true,  "detail": null},
+    {"rule": "has_title",            "passed": true,  "detail": null},
+    {"rule": "has_score",            "passed": true,  "detail": null},
+    {"rule": "score_non_negative",   "passed": true,  "detail": null},
+    {"rule": "has_team_stats",       "passed": true,  "detail": null},
+    {"rule": "scoring_plays_present","passed": true,  "detail": null}
+  ]
+}
+```
+
+When any check fails, `passed` is `false`, `publish_status` becomes
+`"errored"`, and the failing rule's `detail` field explains the problem:
+
+```json
+{
+  "game_id": 2,
+  "passed": false,
+  "publish_status": "errored",
+  "checks": [
+    ...
+    {"rule": "has_team_stats", "passed": false, "detail": "team_stats is empty"},
+    ...
+  ]
+}
+```
+
+### API — Publish
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/games/$GAME_ID/publish \
+  | python3 -m json.tool
+# → GameDetail with publish_status="published"
+```
+
+Returns **409** if the game is not in `validated` status (i.e., still `draft`
+or `errored`). Validate first, then publish.
+
+### API — Filter game list by status
+
+```bash
+# Only validated games
+curl "http://localhost:8000/api/v1/games?publish_status=validated"
+
+# Only draft games
+curl "http://localhost:8000/api/v1/games?publish_status=draft"
+
+# Only published games
+curl "http://localhost:8000/api/v1/games?publish_status=published"
+
+# Errored games (need re-ingest or manual correction)
+curl "http://localhost:8000/api/v1/games?publish_status=errored"
+```
+
+No `publish_status` parameter returns all games (default behavior, unchanged).
+
+---
+
+## 6. Scheduler (Automated Ingestion)
 
 The scheduler polls all registered Sidearm schedule pages every N seconds and
 ingests any games that have reached `event_status=final`.
@@ -340,7 +477,7 @@ scheduler):
 
 ---
 
-## 6. Natural Language Query Agent
+## 7. Natural Language Query Agent
 
 Ask plain-English questions about the games database. The agent uses a
 **MCP tool-use loop**: the model calls `describe_schema` to inspect the
@@ -390,7 +527,7 @@ database. The loop is also capped at `MAX_TOOL_ITERATIONS` model turns (default
 
 ---
 
-## 7. Agent Runs Provenance Log
+## 8. Agent Runs Provenance Log
 
 Every agent invocation — whether it succeeds or fails — creates an `AgentRun`
 record with full step-by-step provenance.
@@ -446,7 +583,7 @@ any `error_message`. Tool steps record the tool input and output byte length;
 
 ---
 
-## 8. Running Tests
+## 9. Running Tests
 
 ### Backend tests
 
@@ -455,7 +592,7 @@ cd backend
 .venv/bin/pytest -v --tb=short
 ```
 
-65 tests pass; 5 are skipped. The skipped tests exercise the MCP server tool
+74 tests pass; 5 are skipped. The skipped tests exercise the MCP server tool
 functions directly against a live PostgreSQL connection — they auto-skip when
 using the default SQLite in-memory backend. The test suite is otherwise
 self-contained with no Postgres connection required.
@@ -473,6 +610,7 @@ Run a specific test file:
 .venv/bin/pytest tests/test_agent_runs.py -v
 .venv/bin/pytest tests/test_nl_query.py -v
 .venv/bin/pytest tests/test_games.py -v
+.venv/bin/pytest tests/test_validation.py -v
 ```
 
 Run a single test by name:
@@ -497,7 +635,7 @@ make check-all
 
 ---
 
-## 9. Eval Harness (Local)
+## 10. Eval Harness (Local)
 
 The eval harness can be run locally with pytest against pre-built fixtures,
 without requiring an API key or a running server.
@@ -592,7 +730,7 @@ def check_headline_length(headline: str, max_chars: int = 90) -> EvalResult:
 
 ---
 
-## 10. Database Migrations
+## 11. Database Migrations
 
 ### Apply pending migrations
 
@@ -625,7 +763,7 @@ applying — Alembic's autogenerate can miss certain schema details.
 
 ---
 
-## 11. Docker Deployment
+## 12. Docker Deployment
 
 ### Full stack
 
@@ -671,7 +809,7 @@ and the `/api/v1/health` endpoint respond correctly.
 
 ---
 
-## 12. Environment Reference
+## 13. Environment Reference
 
 All variables live in `.env` (copy from `.env.example`).
 

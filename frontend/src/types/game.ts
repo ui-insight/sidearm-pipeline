@@ -53,6 +53,7 @@ export interface GameSummary {
   last_seen_at: string | null;
   last_successful_ingest_at: string | null;
   ingested_at: string;
+  last_validated_at: string | null;
 }
 
 export interface EventSource {
@@ -90,6 +91,30 @@ export interface GeneratedContent {
   generated_at: string;
 }
 
+export interface ValidationCheck {
+  rule: string;
+  passed: boolean;
+  detail: string | null;
+}
+
+export interface ValidationResult {
+  game_id: number;
+  passed: boolean;
+  publish_status: string;
+  checks: ValidationCheck[];
+  validated_at: string;
+}
+
+export interface PublishEvent {
+  id: number;
+  game_id: number;
+  from_status: string;
+  to_status: string;
+  trigger: string;
+  detail: Record<string, unknown>;
+  changed_at: string;
+}
+
 import type { AgentRunSummary } from "./agentRun";
 
 export interface GameDetail extends GameSummary {
@@ -101,4 +126,5 @@ export interface GameDetail extends GameSummary {
   status_history: EventStatusHistory[];
   generated_content: GeneratedContent[];
   agent_runs: AgentRunSummary[];
+  publish_events: PublishEvent[];
 }

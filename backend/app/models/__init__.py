@@ -16,6 +16,7 @@ from app.models.game import (
     SourceSnapshot,
     TeamStat,
 )
+from app.models.publish_event import PublishEvent
 
 __all__ = [
     "AgentRun",
@@ -27,6 +28,7 @@ __all__ = [
     "GeneratedContent",
     "IngestRun",
     "PlayerStatGroup",
+    "PublishEvent",
     "ScoringPlay",
     "SourceSnapshot",
     "TeamStat",

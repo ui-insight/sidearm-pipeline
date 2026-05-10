@@ -260,3 +260,67 @@ async def test_ingest_records_retry_exhaustion(client, db_session, monkeypatch):
     assert ingest_run.attempt_count == 3
     assert ingest_run.max_attempts == 3
     assert ingest_run.run_metadata["retry_exhausted"] is True
+
+
+async def test_list_games_filters_by_publish_status(client, db_session, monkeypatch):
+    from app.services.sidearm_scraper import ParsedBoxscore
+
+    calls = [0]
+
+    async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
+        calls[0] += 1
+        return ParsedBoxscore(
+            source_url=url,
+            title=f"Football vs Opponent {calls[0]} on 11/8/2025",
+            sport="football",
+            season="2025",
+            game_date="11/8/2025",
+            home_team="Idaho",
+            away_team=f"Opponent {calls[0]}",
+            home_score=31,
+            away_score=28,
+            team_stats=[{"stat_name": "First Downs", "home_value": "22", "away_value": "18", "sort_order": 0}],
+            scoring_plays=[{"period": "4", "clock": "00:00", "team": "IDA", "description": "FG", "home_score": 31, "away_score": 28, "sort_order": 0}],
+            player_stats=[],
+            raw_html="<html></html>",
+        )
+
+    monkeypatch.setattr("app.services.ingest.scrape_boxscore", fake_scrape_boxscore)
+
+    # Ingest two games — both start as "draft"
+    resp1 = await client.post(
+        "/api/v1/games",
+        json={"url": "https://govandals.com/sports/football/stats/2025/opp1/boxscore/1"},
+    )
+    assert resp1.status_code == 201
+    game1_id = resp1.json()["id"]
+
+    resp2 = await client.post(
+        "/api/v1/games",
+        json={"url": "https://govandals.com/sports/football/stats/2025/opp2/boxscore/2"},
+    )
+    assert resp2.status_code == 201
+
+    # Validate game1 so it transitions to "validated"
+    validate_resp = await client.post(f"/api/v1/games/{game1_id}/validate")
+    assert validate_resp.status_code == 200
+
+    # Filter by "validated" — only game1 should appear
+    validated_resp = await client.get("/api/v1/games?publish_status=validated")
+    assert validated_resp.status_code == 200
+    validated_games = validated_resp.json()
+    assert len(validated_games) == 1
+    assert validated_games[0]["id"] == game1_id
+    assert validated_games[0]["publish_status"] == "validated"
+
+    # Filter by "draft" — only game2 should appear
+    draft_resp = await client.get("/api/v1/games?publish_status=draft")
+    assert draft_resp.status_code == 200
+    draft_games = draft_resp.json()
+    assert len(draft_games) == 1
+    assert draft_games[0]["publish_status"] == "draft"
+
+    # No filter — both should appear
+    all_resp = await client.get("/api/v1/games")
+    assert all_resp.status_code == 200
+    assert len(all_resp.json()) == 2

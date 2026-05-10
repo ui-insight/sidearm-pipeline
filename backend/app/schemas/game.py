@@ -5,6 +5,34 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
+class ValidationCheckResult(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    rule: str
+    passed: bool
+    detail: str | None = None
+
+
+class ValidationResult(BaseModel):
+    game_id: int
+    passed: bool
+    publish_status: str
+    checks: list[ValidationCheckResult]
+    validated_at: datetime
+
+
+class PublishEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    game_id: int
+    from_status: str
+    to_status: str
+    trigger: str
+    detail: dict
+    changed_at: datetime
+
+
 class IngestRequest(BaseModel):
     """Request body for ingesting a Sidearm boxscore URL."""
 
@@ -76,6 +104,7 @@ class GameSummary(BaseModel):
     last_seen_at: datetime | None = None
     last_successful_ingest_at: datetime | None = None
     ingested_at: datetime
+    last_validated_at: datetime | None = None
 
 
 class EventSourceRead(BaseModel):
@@ -118,6 +147,7 @@ class GameDetail(GameSummary):
     status_history: list[EventStatusHistoryRead] = []
     generated_content: list["GeneratedContentRead"] = []  # noqa: F821
     agent_runs: list["AgentRunSummary"] = []  # noqa: F821
+    publish_events: list[PublishEventRead] = []
 
 
 # Imported after GameDetail to avoid circular import at module load time.

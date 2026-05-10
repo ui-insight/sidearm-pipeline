@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { gamesApi } from "../api/games";
 import CoverageReviewPanel from "../components/CoverageReviewPanel";
+import PublishStatusBadge from "../components/PublishStatusBadge";
 import type { GameDetail, GeneratedContent, PlayerStatGroup } from "../types/game";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -73,9 +74,12 @@ function GamePage() {
         </Link>
 
         <header className="mt-4 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {game.away_team ?? "Away"} at {game.home_team ?? "Home"}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {game.away_team ?? "Away"} at {game.home_team ?? "Home"}
+            </h1>
+            <PublishStatusBadge status={game.publish_status} />
+          </div>
           <p className="text-sm text-gray-600 mt-1">
             {game.sport && <span className="uppercase mr-2">{game.sport}</span>}
             {game.game_date ?? ""} · Season {game.season}
