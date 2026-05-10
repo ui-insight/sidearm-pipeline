@@ -1,0 +1,35 @@
+name: Prompt Evals
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - agents/**
+      - .github/workflows/eval-test.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - agents/**
+      - .github/workflows/eval-test.yml
+
+jobs:
+  recap-writer-evals:
+    name: recap-writer deterministic evals
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agents/recap-writer/evals
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run evals
+        run: pytest test_evals.py -v
