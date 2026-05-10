@@ -26,6 +26,17 @@ export const agentRunsApi = {
     api.post<AgentRunRead>(`/agent-runs/${id}/verdict`, {
       verdict: "rejected",
     }),
+
+  updateOutput: (
+    id: number,
+    payload: Partial<{
+      headline: string;
+      recap: string;
+      spotlight_player: string;
+      spotlight_body: string;
+      social_post: string;
+    }>
+  ) => api.patch<AgentRunRead>(`/agent-runs/${id}/output`, payload),
 };
 
 export const nlQueryApi = {

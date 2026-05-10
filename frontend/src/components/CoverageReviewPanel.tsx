@@ -73,12 +73,29 @@ function EvalChip({
   );
 }
 
+type EditFields = {
+  headline: string;
+  recap: string;
+  spotlight_player: string;
+  spotlight_body: string;
+  social_post: string;
+};
+
 function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Props) {
   const [pendingRun, setPendingRun] = useState<AgentRunRead | null>(null);
   const [generating, setGenerating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [edits, setEdits] = useState<EditFields>({
+    headline: "",
+    recap: "",
+    spotlight_player: "",
+    spotlight_body: "",
+    social_post: "",
+  });
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function extractString(run: AgentRunRead, key: string): string {
@@ -143,7 +160,34 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
     }
   }
 
-  const busy = generating || approving || rejecting || evaluating;
+  function handleEnterEditMode() {
+    if (!pendingRun) return;
+    setEdits({
+      headline: extractString(pendingRun, "headline"),
+      recap: extractString(pendingRun, "recap"),
+      spotlight_player: extractString(pendingRun, "spotlight_player"),
+      spotlight_body: extractString(pendingRun, "spotlight_body"),
+      social_post: extractString(pendingRun, "social_post"),
+    });
+    setEditMode(true);
+  }
+
+  async function handleSaveEdits() {
+    if (!pendingRun) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await agentRunsApi.updateOutput(pendingRun.id, edits);
+      setPendingRun(updated);
+      setEditMode(false);
+    } catch (err) {
+      setError(apiErrorMsg(err, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const busy = generating || approving || rejecting || evaluating || saving;
 
   return (
     <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -199,67 +243,160 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                 {evaluating ? "Evaluating…" : "Run eval checks"}
               </button>
             )}
+            {!editMode && (
+              <button
+                onClick={handleEnterEditMode}
+                disabled={busy}
+                className="ml-auto text-xs text-yellow-700 hover:text-yellow-900 underline disabled:opacity-50"
+              >
+                Edit
+              </button>
+            )}
           </div>
 
-          {extractString(pendingRun, "headline") && (
-            <div>
-              <Label>Headline</Label>
-              <p className="text-xl font-bold text-gray-900 leading-snug">
-                {extractString(pendingRun, "headline")}
-              </p>
-            </div>
+          {editMode ? (
+            <>
+              <div>
+                <Label>Headline</Label>
+                <input
+                  type="text"
+                  value={edits.headline}
+                  onChange={(e) => setEdits((p) => ({ ...p, headline: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </div>
+
+              <div>
+                <Label>Recap</Label>
+                <textarea
+                  rows={8}
+                  value={edits.recap}
+                  onChange={(e) => setEdits((p) => ({ ...p, recap: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                />
+              </div>
+
+              <div>
+                <Label>Spotlight Player</Label>
+                <input
+                  type="text"
+                  value={edits.spotlight_player}
+                  onChange={(e) =>
+                    setEdits((p) => ({ ...p, spotlight_player: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </div>
+
+              <div>
+                <Label>Spotlight Body</Label>
+                <textarea
+                  rows={4}
+                  value={edits.spotlight_body}
+                  onChange={(e) =>
+                    setEdits((p) => ({ ...p, spotlight_body: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                />
+              </div>
+
+              <div>
+                <Label>Social Post</Label>
+                <textarea
+                  rows={3}
+                  value={edits.social_post}
+                  onChange={(e) =>
+                    setEdits((p) => ({ ...p, social_post: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                />
+                <p className="text-xs text-gray-400 mt-1">{edits.social_post.length} chars</p>
+              </div>
+            </>
+          ) : (
+            <>
+              {extractString(pendingRun, "headline") && (
+                <div>
+                  <Label>Headline</Label>
+                  <p className="text-xl font-bold text-gray-900 leading-snug">
+                    {extractString(pendingRun, "headline")}
+                  </p>
+                </div>
+              )}
+
+              <CopyableBlock label="Recap" text={extractString(pendingRun, "recap")}>
+                {extractString(pendingRun, "recap")
+                  .split(/\n\n+/)
+                  .map((para, i) => (
+                    <p key={i} className="text-gray-800 leading-relaxed mb-3 last:mb-0">
+                      {para}
+                    </p>
+                  ))}
+              </CopyableBlock>
+
+              <CopyableBlock
+                label={`Player Spotlight${
+                  extractString(pendingRun, "spotlight_player")
+                    ? ` — ${extractString(pendingRun, "spotlight_player")}`
+                    : ""
+                }`}
+                text={extractString(pendingRun, "spotlight_body")}
+              >
+                <p className="text-gray-800 leading-relaxed">
+                  {extractString(pendingRun, "spotlight_body")}
+                </p>
+              </CopyableBlock>
+
+              <CopyableBlock
+                label="Social Post"
+                text={extractString(pendingRun, "social_post")}
+              >
+                <p className="text-gray-800 leading-relaxed font-mono text-sm bg-gray-50 rounded p-3 border border-gray-200">
+                  {extractString(pendingRun, "social_post")}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {extractString(pendingRun, "social_post").length} chars
+                </p>
+              </CopyableBlock>
+            </>
           )}
 
-          <CopyableBlock label="Recap" text={extractString(pendingRun, "recap")}>
-            {extractString(pendingRun, "recap")
-              .split(/\n\n+/)
-              .map((para, i) => (
-                <p key={i} className="text-gray-800 leading-relaxed mb-3 last:mb-0">
-                  {para}
-                </p>
-              ))}
-          </CopyableBlock>
-
-          <CopyableBlock
-            label={`Player Spotlight${
-              extractString(pendingRun, "spotlight_player")
-                ? ` — ${extractString(pendingRun, "spotlight_player")}`
-                : ""
-            }`}
-            text={extractString(pendingRun, "spotlight_body")}
-          >
-            <p className="text-gray-800 leading-relaxed">
-              {extractString(pendingRun, "spotlight_body")}
-            </p>
-          </CopyableBlock>
-
-          <CopyableBlock
-            label="Social Post"
-            text={extractString(pendingRun, "social_post")}
-          >
-            <p className="text-gray-800 leading-relaxed font-mono text-sm bg-gray-50 rounded p-3 border border-gray-200">
-              {extractString(pendingRun, "social_post")}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {extractString(pendingRun, "social_post").length} chars
-            </p>
-          </CopyableBlock>
-
           <div className="flex gap-3 pt-2 border-t border-gray-100">
-            <button
-              onClick={handleApprove}
-              disabled={busy}
-              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
-            >
-              {approving ? "Approving…" : "Approve"}
-            </button>
-            <button
-              onClick={handleReject}
-              disabled={busy}
-              className="border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-md text-sm transition"
-            >
-              {rejecting ? "Rejecting…" : "Reject"}
-            </button>
+            {editMode ? (
+              <>
+                <button
+                  onClick={handleSaveEdits}
+                  disabled={saving}
+                  className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+                <button
+                  onClick={() => setEditMode(false)}
+                  disabled={saving}
+                  className="border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-md text-sm transition"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleApprove}
+                  disabled={busy || editMode}
+                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
+                >
+                  {approving ? "Approving…" : "Approve"}
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={busy}
+                  className="border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-md text-sm transition"
+                >
+                  {rejecting ? "Rejecting…" : "Reject"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

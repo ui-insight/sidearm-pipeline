@@ -17,6 +17,7 @@ export const gamesApi = {
   ingest: (url: string) => api.post<GameDetail>("/games", { url }),
   remove: (id: number) => api.delete<void>(`/games/${id}`),
   generate: (id: number) => api.post<AgentRunRead>(`/games/${id}/generate`, {}),
+  reingest: (id: number) => api.post<GameDetail>(`/games/${id}/ingest`, {}),
   validate: (id: number) => api.post<ValidationResult>(`/games/${id}/validate`, {}),
   publish: (id: number) => api.post<GameDetail>(`/games/${id}/publish`, {}),
 };

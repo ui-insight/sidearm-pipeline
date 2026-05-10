@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.agents.recap_writer import run_recap_writer
 from app.db.engine import get_db
+from app.models.agent import AgentRun
 from app.models.game import Game
 from app.models.publish_event import PublishEvent
 from app.schemas.agent import AgentRunRead
@@ -293,14 +294,12 @@ async def generate_game_content(
             detail=str(exc),
         ) from exc
 
-    from app.models.agent import AgentRun as AgentRunModel
-
     stmt = (
-        select(AgentRunModel)
-        .where(AgentRunModel.id == agent_run.id)
+        select(AgentRun)
+        .where(AgentRun.id == agent_run.id)
         .options(
-            selectinload(AgentRunModel.steps),
-            selectinload(AgentRunModel.evaluations),
+            selectinload(AgentRun.steps),
+            selectinload(AgentRun.evaluations),
         )
     )
     loaded_run = await db.scalar(stmt)
@@ -319,7 +318,7 @@ async def _load_game(db: AsyncSession, game_id: int) -> Game | None:
             selectinload(Game.source_snapshots),
             selectinload(Game.status_history),
             selectinload(Game.generated_content),
-            selectinload(Game.agent_runs),
+            selectinload(Game.agent_runs).selectinload(AgentRun.evaluations),
             selectinload(Game.publish_events),
         )
     )

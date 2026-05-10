@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { gamesApi } from "../api/games";
 import { ApiError } from "../api/client";
 import PublishStatusBadge from "../components/PublishStatusBadge";
-import type { GameSummary } from "../types/game";
+import type { GameSummary, ValidationCheck } from "../types/game";
 
 type FilterStatus = "all" | "draft" | "validated" | "published" | "errored";
 
@@ -22,6 +22,7 @@ function OperatorPage() {
   const [listError, setListError] = useState<string | null>(null);
   const [rowLoading, setRowLoading] = useState<Record<number, boolean>>({});
   const [rowError, setRowError] = useState<Record<number, string>>({});
+  const [rowChecks, setRowChecks] = useState<Record<number, ValidationCheck[]>>({});
 
   const loadGames = useCallback(async (status: FilterStatus) => {
     setListLoading(true);
@@ -48,6 +49,11 @@ function OperatorPage() {
       delete next[game.id];
       return next;
     });
+    setRowChecks((prev) => {
+      const next = { ...prev };
+      delete next[game.id];
+      return next;
+    });
     try {
       const result = await gamesApi.validate(game.id);
       setGames((prev) =>
@@ -61,6 +67,12 @@ function OperatorPage() {
             : g,
         ),
       );
+      if (!result.passed) {
+        setRowChecks((prev) => ({
+          ...prev,
+          [game.id]: result.checks.filter((c) => !c.passed),
+        }));
+      }
     } catch (err) {
       const detail =
         err instanceof ApiError
@@ -164,6 +176,7 @@ function OperatorPage() {
                 {games.map((game) => {
                   const loading = rowLoading[game.id] ?? false;
                   const err = rowError[game.id];
+                  const failedChecks = rowChecks[game.id];
                   return (
                     <tr key={game.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
@@ -178,6 +191,18 @@ function OperatorPage() {
                           {game.game_date ?? "—"}
                           {game.sport && ` · ${game.sport.toUpperCase()}`}
                         </p>
+                        {failedChecks && failedChecks.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {failedChecks.map((check) => (
+                              <li key={check.rule} className="text-xs text-red-600">
+                                <span className="font-mono">{check.rule}</span>
+                                {check.detail && (
+                                  <span className="text-red-400"> — {check.detail}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {err && (
                           <p className="mt-1 text-xs text-red-600">{err}</p>
                         )}

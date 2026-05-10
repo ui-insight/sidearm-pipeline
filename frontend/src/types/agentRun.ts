@@ -54,6 +54,7 @@ export interface AgentRunSummary {
   started_at: string;
   duration_ms: number | null;
   game_id: number | null;
+  evaluations: AgentRunEvaluation[];
 }
 
 export interface NLQueryResult {

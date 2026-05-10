@@ -5,15 +5,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.agents.eval_runner import run_evaluation
 from app.db.engine import get_db
-from app.models.agent import AgentRun
+from app.models.agent import AgentRun, AgentRunEvaluation
 from app.models.content import GeneratedContent
-from app.schemas.agent import AgentRunRead, AgentRunSummary, VerdictRequest
+from app.schemas.agent import (
+    AgentRunRead,
+    AgentRunSummary,
+    ContentEditRequest,
+    VerdictRequest,
+)
 from app.schemas.content import GeneratedContentRead
 
 router = APIRouter()
@@ -33,7 +39,12 @@ async def list_agent_runs(
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentRunSummary]:
     """Return recent agent runs, newest first. Filterable by agent name and status."""
-    stmt = select(AgentRun).order_by(AgentRun.started_at.desc()).limit(limit)
+    stmt = (
+        select(AgentRun)
+        .order_by(AgentRun.started_at.desc())
+        .limit(limit)
+        .options(selectinload(AgentRun.evaluations))
+    )
     if agent_name:
         stmt = stmt.where(AgentRun.agent_name == agent_name)
     if status_filter:
@@ -159,6 +170,52 @@ async def submit_verdict(
         return GeneratedContentRead.model_validate(record)
 
     # rejected
+    await db.commit()
+    agent_run = await _load_agent_run(db, run_id)
+    return AgentRunRead.model_validate(agent_run)
+
+
+@router.patch(
+    "/{run_id}/output",
+    response_model=AgentRunRead,
+    summary="Edit output fields on a pending agent run",
+)
+async def edit_run_output(
+    run_id: int,
+    payload: ContentEditRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AgentRunRead:
+    """Merge edits into a succeeded, unverdicted run's output_payload.
+
+    Clears all evaluation rows and eval_score so the caller can re-run
+    eval checks against the updated content before approving.
+    Only runs with status='succeeded' and human_verdict=None are editable.
+    """
+    agent_run = await _load_agent_run(db, run_id)
+    if agent_run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent run not found",
+        )
+
+    if agent_run.status != "succeeded" or agent_run.human_verdict is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only succeeded runs with no verdict can be edited",
+        )
+
+    current = dict(agent_run.output_payload or {})
+    updates = payload.model_dump(exclude_none=True)
+    current.update(updates)
+    agent_run.output_payload = current
+
+    await db.execute(
+        sa_delete(AgentRunEvaluation).where(
+            AgentRunEvaluation.agent_run_id == run_id
+        )
+    )
+    agent_run.eval_score = None
+
     await db.commit()
     agent_run = await _load_agent_run(db, run_id)
     return AgentRunRead.model_validate(agent_run)

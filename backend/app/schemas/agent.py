@@ -74,6 +74,17 @@ class AgentRunSummary(BaseModel):
     started_at: datetime
     duration_ms: int | None = None
     game_id: int | None = None
+    evaluations: list[AgentRunEvaluationRead] = []
+
+
+class ContentEditRequest(BaseModel):
+    """Request body for editing pending run output fields."""
+
+    headline: str | None = None
+    recap: str | None = None
+    spotlight_player: str | None = None
+    spotlight_body: str | None = None
+    social_post: str | None = None
 
 
 class VerdictRequest(BaseModel):

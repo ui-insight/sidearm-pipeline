@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Path to the eval_metrics module in the agents directory
 _EVAL_METRICS_PATH = (
-    Path(__file__).parent.parent.parent.parent.parent
+    Path(__file__).parent.parent.parent.parent
     / "agents"
     / "recap-writer"
     / "evals"
@@ -36,6 +37,7 @@ def _load_eval_metrics():
     if _EVAL_METRICS_PATH.exists():
         spec = importlib.util.spec_from_file_location("recap_eval_metrics", _EVAL_METRICS_PATH)
         module = importlib.util.module_from_spec(spec)
+        sys.modules["recap_eval_metrics"] = module
         spec.loader.exec_module(module)
         return module
     return None

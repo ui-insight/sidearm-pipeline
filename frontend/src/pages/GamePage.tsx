@@ -26,6 +26,8 @@ function GamePage() {
   const { id } = useParams<{ id: string }>();
   const [game, setGame] = useState<GameDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reingesting, setReingesting] = useState(false);
+  const [reingestError, setReingestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -43,6 +45,20 @@ function GamePage() {
       ...game,
       generated_content: [content, ...game.generated_content],
     });
+  }
+
+  async function handleReingest() {
+    if (!game) return;
+    setReingesting(true);
+    setReingestError(null);
+    try {
+      const updated = await gamesApi.reingest(game.id);
+      setGame(updated);
+    } catch (err) {
+      setReingestError(err instanceof Error ? err.message : "Re-ingest failed");
+    } finally {
+      setReingesting(false);
+    }
   }
 
   if (error) {
@@ -96,6 +112,19 @@ function GamePage() {
           >
             {game.source_url}
           </a>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleReingest()}
+              disabled={reingesting}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              {reingesting ? "Re-ingesting…" : "Re-ingest boxscore"}
+            </button>
+            {reingestError && (
+              <span className="text-xs text-red-600">{reingestError}</span>
+            )}
+          </div>
         </header>
 
         <CoverageReviewPanel

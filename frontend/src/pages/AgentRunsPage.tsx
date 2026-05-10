@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { agentRunsApi } from "../api/agentRuns";
-import type { AgentRunSummary } from "../types/agentRun";
+import type { AgentRunEvaluation, AgentRunSummary } from "../types/agentRun";
 
 function statusColor(status: string): string {
   switch (status) {
@@ -33,6 +33,37 @@ function scoreBar(score: number | null): React.ReactNode {
         <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs text-gray-600 tabular-nums">{pct}%</span>
+    </div>
+  );
+}
+
+function metricBars(evals: AgentRunEvaluation[]): React.ReactNode {
+  if (evals.length === 0) return null;
+  return (
+    <div className="mt-1 space-y-0.5">
+      {evals.map((ev) => {
+        const ok = ev.passed ?? (ev.score != null && ev.score >= 0.5);
+        return (
+          <div key={ev.id} className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-400 w-24 truncate">{ev.metric_name}</span>
+            {ev.score != null ? (
+              <>
+                <div className="w-8 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${ok ? "bg-green-400" : "bg-red-400"}`}
+                    style={{ width: `${Math.round(ev.score * 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-400 tabular-nums">
+                  {Math.round(ev.score * 100)}%
+                </span>
+              </>
+            ) : (
+              <span className="text-xs">{ok ? "✓" : "✗"}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -93,6 +124,7 @@ function AgentRunsPage() {
                 <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
                   <th className="px-4 py-3">ID</th>
                   <th className="px-4 py-3">Agent</th>
+                  <th className="px-4 py-3">Model</th>
                   <th className="px-4 py-3">Game</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Eval</th>
@@ -110,6 +142,9 @@ function AgentRunsPage() {
                     <td className="px-4 py-3 font-mono text-gray-500">#{run.id}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {run.agent_name}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {run.model}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {run.game_id != null ? (
@@ -130,7 +165,10 @@ function AgentRunsPage() {
                         {run.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{scoreBar(run.eval_score)}</td>
+                    <td className="px-4 py-3">
+                      {scoreBar(run.eval_score)}
+                      {metricBars(run.evaluations)}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block rounded-full border px-2 py-0.5 text-xs ${verdictBadge(run.human_verdict)}`}

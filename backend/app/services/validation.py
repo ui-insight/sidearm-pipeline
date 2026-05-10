@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from app.models.game import Game
 
 SPORTS_REQUIRING_SCORING_PLAYS = {"football", "mens-basketball", "womens-basketball"}
+SPORTS_REQUIRING_TEAM_STATS = {"football", "mens-basketball", "womens-basketball"}
 
 
 @dataclass
@@ -86,14 +87,15 @@ def validate_game(game: Game) -> list[ValidationCheck]:
                 )
             )
 
-        has_team_stats = len(game.team_stats) > 0
-        checks.append(
-            ValidationCheck(
-                rule="has_team_stats",
-                passed=has_team_stats,
-                detail=None if has_team_stats else "team_stats is empty",
+        if game.sport in SPORTS_REQUIRING_TEAM_STATS:
+            has_team_stats = len(game.team_stats) > 0
+            checks.append(
+                ValidationCheck(
+                    rule="has_team_stats",
+                    passed=has_team_stats,
+                    detail=None if has_team_stats else "team_stats is empty",
+                )
             )
-        )
 
         if game.sport in SPORTS_REQUIRING_SCORING_PLAYS:
             has_scoring_plays = len(game.scoring_plays) > 0
