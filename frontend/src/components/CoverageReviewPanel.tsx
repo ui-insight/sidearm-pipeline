@@ -190,8 +190,8 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
   const busy = generating || approving || rejecting || evaluating || saving;
 
   return (
-    <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+      <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">AI Coverage</h2>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -202,7 +202,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
         <button
           onClick={handleGenerate}
           disabled={busy}
-          className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
+          className="bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
         >
           {generating
             ? "Generating…"
@@ -221,7 +221,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
       {/* Pending agent run — awaiting human review */}
       {pendingRun && pendingRun.status === "succeeded" && (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <span className="text-xs font-medium text-yellow-900">
               Pending review — run #{pendingRun.id}
             </span>
@@ -262,7 +262,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                   type="text"
                   value={edits.headline}
                   onChange={(e) => setEdits((p) => ({ ...p, headline: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
                 />
               </div>
 
@@ -272,7 +272,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                   rows={8}
                   value={edits.recap}
                   onChange={(e) => setEdits((p) => ({ ...p, recap: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 resize-y"
                 />
               </div>
 
@@ -284,7 +284,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                   onChange={(e) =>
                     setEdits((p) => ({ ...p, spotlight_player: e.target.value }))
                   }
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
                 />
               </div>
 
@@ -296,7 +296,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                   onChange={(e) =>
                     setEdits((p) => ({ ...p, spotlight_body: e.target.value }))
                   }
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 resize-y"
                 />
               </div>
 
@@ -308,7 +308,7 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                   onChange={(e) =>
                     setEdits((p) => ({ ...p, social_post: e.target.value }))
                   }
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-y"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 resize-y"
                 />
                 <p className="text-xs text-gray-400 mt-1">{edits.social_post.length} chars</p>
               </div>
@@ -367,14 +367,14 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                 <button
                   onClick={handleSaveEdits}
                   disabled={saving}
-                  className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
+                  className="bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
                 >
                   {saving ? "Saving…" : "Save changes"}
                 </button>
                 <button
                   onClick={() => setEditMode(false)}
                   disabled={saving}
-                  className="border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-md text-sm transition"
+                  className="border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-lg text-sm transition"
                 >
                   Cancel
                 </button>
@@ -384,14 +384,14 @@ function CoverageReviewPanel({ gameId, approvedContent, onContentApproved }: Pro
                 <button
                   onClick={handleApprove}
                   disabled={busy || editMode}
-                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-md text-sm transition"
+                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
                 >
                   {approving ? "Approving…" : "Approve"}
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={busy}
-                  className="border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-md text-sm transition"
+                  className="border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-lg text-sm transition"
                 >
                   {rejecting ? "Rejecting…" : "Reject"}
                 </button>

@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import AppLayout from "./components/AppLayout";
 import HomePage from "./pages/HomePage";
 import GamePage from "./pages/GamePage";
 import IngestRunsPage from "./pages/IngestRunsPage";
@@ -10,12 +11,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/games/:id" element={<GamePage />} />
-        <Route path="/ingest-runs" element={<IngestRunsPage />} />
-        <Route path="/agent-runs" element={<AgentRunsPage />} />
-        <Route path="/query" element={<NLQueryPage />} />
-        <Route path="/operator" element={<OperatorPage />} />
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/games/:id" element={<GamePage />} />
+          <Route path="/ingest-runs" element={<IngestRunsPage />} />
+          <Route path="/agent-runs" element={<AgentRunsPage />} />
+          <Route path="/query" element={<NLQueryPage />} />
+          <Route path="/operator" element={<OperatorPage />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

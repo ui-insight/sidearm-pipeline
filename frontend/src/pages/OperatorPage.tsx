@@ -118,130 +118,121 @@ function OperatorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <header className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Operator Review
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Validate and publish game records.
-            </p>
-          </div>
-          <Link to="/" className="text-sm text-gray-500 hover:text-yellow-700 mt-1">
-            ← Home
-          </Link>
-        </header>
+    <div className="max-w-5xl mx-auto px-6 py-10">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Operator Review</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Validate and publish game records.
+        </p>
+      </header>
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          {FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setFilter(opt.value)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                filter === opt.value
-                  ? "bg-gray-900 text-white"
-                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-6">
+        {FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setFilter(opt.value)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+              filter === opt.value
+                ? "bg-white shadow-sm text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
-        {listError && (
-          <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {listError}
-          </p>
-        )}
+      {listError && (
+        <p className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {listError}
+        </p>
+      )}
 
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {listLoading ? (
-            <p className="p-6 text-sm text-gray-500">Loading…</p>
-          ) : games.length === 0 ? (
-            <p className="p-6 text-sm text-gray-500">No games match this filter.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
-                  <th className="px-6 py-3">Title / Date / Sport</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Last Validated</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {games.map((game) => {
-                  const loading = rowLoading[game.id] ?? false;
-                  const err = rowError[game.id];
-                  const failedChecks = rowChecks[game.id];
-                  return (
-                    <tr key={game.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <Link
-                          to={`/games/${game.id}`}
-                          className="font-medium text-gray-900 hover:text-yellow-700"
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {listLoading ? (
+          <p className="p-6 text-sm text-gray-500">Loading…</p>
+        ) : games.length === 0 ? (
+          <p className="p-6 text-sm text-gray-500">No games match this filter.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-5 py-3.5">Title / Date / Sport</th>
+                <th className="px-5 py-3.5">Status</th>
+                <th className="px-5 py-3.5">Last Validated</th>
+                <th className="px-5 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {games.map((game) => {
+                const loading = rowLoading[game.id] ?? false;
+                const err = rowError[game.id];
+                const failedChecks = rowChecks[game.id];
+                return (
+                  <tr key={game.id} className="even:bg-gray-50 hover:bg-gray-50">
+                    <td className="px-5 py-3.5">
+                      <Link
+                        to={`/games/${game.id}`}
+                        className="font-medium text-gray-900 hover:text-yellow-700 transition-colors"
+                      >
+                        {game.title ??
+                          `${game.away_team ?? "Away"} at ${game.home_team ?? "Home"}`}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {game.game_date ?? "—"}
+                        {game.sport && ` · ${game.sport.toUpperCase()}`}
+                      </p>
+                      {failedChecks && failedChecks.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {failedChecks.map((check) => (
+                            <li key={check.rule} className="text-xs text-red-600">
+                              <span className="font-mono">{check.rule}</span>
+                              {check.detail && (
+                                <span className="text-red-400"> — {check.detail}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {err && (
+                        <p className="mt-1 text-xs text-red-600">{err}</p>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <PublishStatusBadge status={game.publish_status} />
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-gray-500">
+                      {game.last_validated_at
+                        ? new Date(game.last_validated_at).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="inline-flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleValidate(game)}
+                          disabled={loading}
+                          className="border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium px-4 py-2 rounded-lg text-sm transition"
                         >
-                          {game.title ??
-                            `${game.away_team ?? "Away"} at ${game.home_team ?? "Home"}`}
-                        </Link>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          {game.game_date ?? "—"}
-                          {game.sport && ` · ${game.sport.toUpperCase()}`}
-                        </p>
-                        {failedChecks && failedChecks.length > 0 && (
-                          <ul className="mt-1.5 space-y-0.5">
-                            {failedChecks.map((check) => (
-                              <li key={check.rule} className="text-xs text-red-600">
-                                <span className="font-mono">{check.rule}</span>
-                                {check.detail && (
-                                  <span className="text-red-400"> — {check.detail}</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {err && (
-                          <p className="mt-1 text-xs text-red-600">{err}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <PublishStatusBadge status={game.publish_status} />
-                      </td>
-                      <td className="px-4 py-4 text-xs text-gray-500">
-                        {game.last_validated_at
-                          ? new Date(game.last_validated_at).toLocaleString()
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="inline-flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleValidate(game)}
-                            disabled={loading}
-                            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-                          >
-                            {loading ? "…" : "Validate"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handlePublish(game)}
-                            disabled={loading || game.publish_status !== "validated"}
-                            className="rounded-md bg-yellow-500 px-3 py-1.5 text-xs font-medium text-gray-900 transition hover:bg-yellow-600 disabled:opacity-50"
-                          >
-                            {loading ? "…" : "Publish"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                          {loading ? "…" : "Validate"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handlePublish(game)}
+                          disabled={loading || game.publish_status !== "validated"}
+                          className="bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-950 font-semibold px-4 py-2 rounded-lg text-sm transition"
+                        >
+                          {loading ? "…" : "Publish"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

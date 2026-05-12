@@ -93,101 +93,96 @@ function AgentRunsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <header className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Agent Runs</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Full provenance log for every AI agent invocation.
-            </p>
-          </div>
-          <Link to="/" className="text-sm text-gray-500 hover:text-yellow-700 mt-1">
-            ← Home
-          </Link>
-        </header>
+    <div className="max-w-6xl mx-auto px-6 py-10">
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Agent Runs</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Full provenance log for every AI agent invocation.
+        </p>
+      </header>
 
-        {error && (
-          <p className="mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-4 py-3">
-            {error}
-          </p>
-        )}
+      {error && (
+        <p className="mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          {error}
+        </p>
+      )}
 
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {loading ? (
-            <p className="p-6 text-sm text-gray-500">Loading…</p>
-          ) : runs.length === 0 ? (
-            <p className="p-6 text-sm text-gray-500">No agent runs yet.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500">
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Agent</th>
-                  <th className="px-4 py-3">Model</th>
-                  <th className="px-4 py-3">Game</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Eval</th>
-                  <th className="px-4 py-3">Verdict</th>
-                  <th className="px-4 py-3">Started</th>
-                  <th className="px-4 py-3">ms</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((run) => (
-                  <tr
-                    key={run.id}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-3 font-mono text-gray-500">#{run.id}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {run.agent_name}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {loading ? (
+          <p className="p-6 text-sm text-gray-500">Loading…</p>
+        ) : runs.length === 0 ? (
+          <p className="p-6 text-sm text-gray-500">No agent runs yet.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-4 py-3">ID</th>
+                <th className="px-4 py-3">Agent</th>
+                <th className="px-4 py-3">Model</th>
+                <th className="px-4 py-3">Game</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Eval</th>
+                <th className="px-4 py-3">Verdict</th>
+                <th className="px-4 py-3">Started</th>
+                <th className="px-4 py-3">ms</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr
+                  key={run.id}
+                  className="border-t border-gray-100 even:bg-gray-50 hover:bg-gray-50"
+                >
+                  <td className="px-4 py-3 font-mono text-gray-500">#{run.id}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {run.agent_name}
+                  </td>
+                  <td className="px-4 py-3">
+                    <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">
                       {run.model}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {run.game_id != null ? (
-                        <Link
-                          to={`/games/${run.game_id}`}
-                          className="hover:text-yellow-700 underline"
-                        >
-                          #{run.game_id}
-                        </Link>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor(run.status)}`}
+                    </code>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {run.game_id != null ? (
+                      <Link
+                        to={`/games/${run.game_id}`}
+                        className="hover:text-yellow-700 underline"
                       >
-                        {run.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {scoreBar(run.eval_score)}
-                      {metricBars(run.evaluations)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full border px-2 py-0.5 text-xs ${verdictBadge(run.human_verdict)}`}
-                      >
-                        {run.human_verdict ?? "pending"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                      {new Date(run.started_at).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500 tabular-nums">
-                      {run.duration_ms != null ? run.duration_ms : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                        #{run.game_id}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor(run.status)}`}
+                    >
+                      {run.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {scoreBar(run.eval_score)}
+                    {metricBars(run.evaluations)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-block rounded-full border px-2 py-0.5 text-xs ${verdictBadge(run.human_verdict)}`}
+                    >
+                      {run.human_verdict ?? "pending"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                    {new Date(run.started_at).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500 tabular-nums">
+                    {run.duration_ms != null ? run.duration_ms : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -3,15 +3,15 @@ interface PublishStatusBadgeProps {
 }
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  draft: { color: "bg-gray-100 text-gray-600", label: "Draft" },
-  validated: { color: "bg-blue-100 text-blue-700", label: "Validated" },
-  published: { color: "bg-green-100 text-green-700", label: "Published" },
-  errored: { color: "bg-red-100 text-red-700", label: "Errors" },
+  draft: { color: "bg-gray-100 text-gray-700 ring-1 ring-gray-200", label: "Draft" },
+  validated: { color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200", label: "Validated" },
+  published: { color: "bg-green-50 text-green-700 ring-1 ring-green-200", label: "Published" },
+  errored: { color: "bg-red-50 text-red-700 ring-1 ring-red-200", label: "Errors" },
 };
 
 function PublishStatusBadge({ status }: PublishStatusBadgeProps) {
   const config = STATUS_CONFIG[status] ?? {
-    color: "bg-gray-100 text-gray-600",
+    color: "bg-gray-100 text-gray-700 ring-1 ring-gray-200",
     label: status,
   };
 
