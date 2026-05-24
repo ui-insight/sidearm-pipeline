@@ -21,6 +21,11 @@ If you hit a term you don't recognize, check the
 3. **[Architecture Overview](architecture/overview.md)** — the system at
    one zoom level. Look at the diagram and the design principles; come
    back later for details.
+4. **[Walkthrough](walkthrough.md)** — once the app is running, read this
+   to understand every page, what each game status means, how the AI
+   coverage pipeline works, and how validation and publication are
+   gated. This is the operator and contributor reference for the live
+   system.
 
 By the end of this hour you should be able to answer, in your own
 words: *what does this app do, and why this app for the bootcamp?*
