@@ -55,11 +55,10 @@ All models use the SQLAlchemy ORM (CLAUDE.md rule 6 — no raw SQL).
 
 ### Key decision — stat storage shape
 
-Normalized long-form `PlayerGameStat` (**recommended** — sport-extensible, ORM-friendly,
-records are trivial queries) vs. per-sport typed tables (`wbb_game_stat` with real
-columns — more type-safe, but a table + migration per sport). Recommendation:
-long-form + `StatDefinition`, so "add a sport" means inserting rows, not authoring new
-tables. This is hard to reverse and will get its own ADR once confirmed.
+**Resolved ([ADR-007](../adr/007-normalized-long-form-stat-storage.md)):** normalized
+long-form `PlayerGameStat` + `StatDefinition`, chosen over per-sport typed tables so that
+"add a sport" means inserting rows, not authoring new tables. Trade-off: `value` is
+loosely typed and stat semantics live in `StatDefinition` rather than column types.
 
 ## Phased sequence
 
@@ -90,8 +89,8 @@ via the curated semantic layer (ADR-005) — never authoring SQL or generating n
 
 ## Open decisions
 
-1. **Stat storage shape** — normalized long-form (recommended) vs. per-sport typed tables.
-   Confirm before Phase 1; write an ADR on the choice.
+1. **Stat storage shape** — *resolved:* normalized long-form + `StatDefinition`
+   ([ADR-007](../adr/007-normalized-long-form-stat-storage.md)).
 2. **Aggregates** — query-time first, materialize only if performance requires it
    (recommended) vs. materialized rollups up front.
 3. **Game-grain backfill depth** — accept that pre-2017-18 "HTML version" markup may not

@@ -65,6 +65,7 @@ nav:
     - "ADR-002: Tailwind Only": adr/002-tailwind-only.md
     - "ADR-005: Semantic Layer for NLQ": adr/005-semantic-layer-for-nlq.md
     - "ADR-006: Release 1 Internal-SID-First": adr/006-release1-internal-sid-first.md
+    - "ADR-007: Normalized Long-Form Stat Storage": adr/007-normalized-long-form-stat-storage.md
   - Resources: resources.md
 
 markdown_extensions:
