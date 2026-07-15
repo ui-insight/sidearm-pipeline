@@ -39,6 +39,14 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         metadata = MetaData()
         stat_definitions = Table("stat_definitions", metadata, autoload_with=connection)
         sport_programs = Table("sport_programs", metadata, autoload_with=connection)
+        source_snapshot_columns = {
+            column["name"]: column
+            for column in inspect(connection).get_columns("source_snapshots")
+        }
+        quality_issue_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("data_quality_issues")
+        }
         definition_count = connection.scalar(
             select(func.count()).select_from(stat_definitions)
         )
@@ -61,6 +69,46 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
     }.issubset(tables)
     assert definition_count == 16
     assert program_slug == "womens-basketball"
+    assert source_snapshot_columns["game_id"]["nullable"] is True
+    assert {
+        "source_system",
+        "source_type",
+        "source_url",
+    }.issubset(source_snapshot_columns)
+    assert "deduplication_key" in quality_issue_columns
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "downgrade",
+            "0004_normalized_warehouse_core",
+        ],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    with engine.connect() as connection:
+        source_snapshot_columns = {
+            column["name"]: column
+            for column in inspect(connection).get_columns("source_snapshots")
+        }
+    engine.dispose()
+    assert source_snapshot_columns["game_id"]["nullable"] is False
+    assert "source_url" not in source_snapshot_columns
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     subprocess.run(
         [sys.executable, "-m", "alembic", "downgrade", "0003_ingest_retry_attempts"],

@@ -4,9 +4,122 @@ from datetime import date
 
 from sqlalchemy import func, select
 
+from app.db.seed import seed_warehouse_reference_data
 from app.models.game import EventSource, Game
+from app.models.player import Player, PlayerExternalIdentity, PlayerSeason
+from app.services.sidearm_roster import ParsedRoster, ParsedRosterPlayer
 from app.services.sidearm_schedule import ParsedScheduleEvent
 from app.services.sidearm_scraper import ParsedBoxscore
+
+
+def _discovered_roster() -> ParsedRoster:
+    return ParsedRoster(
+        sport_program_slug="womens-basketball",
+        season="2025-26",
+        source_system="sidearm",
+        institution="University of Idaho",
+        team_slug="idaho",
+        source_url=("https://govandals.com/sports/womens-basketball/roster/2025-26"),
+        raw_html="<html>roster</html>",
+        players=[
+            ParsedRosterPlayer(
+                display_name="Sarah Brans",
+                jersey_number="2",
+                class_year="Sr.",
+                position="F",
+                bio_url=(
+                    "https://govandals.com/sports/womens-basketball/roster/"
+                    "sarah-brans/8428"
+                ),
+                source_player_id="8428",
+                canonical_bio_url=(
+                    "https://govandals.com/sports/womens-basketball/roster/"
+                    "sarah-brans/8428"
+                ),
+            )
+        ],
+    )
+
+
+async def test_preview_roster_discovery_returns_namespaced_identity_fields(
+    client,
+    monkeypatch,
+) -> None:
+    async def fake_discover_roster(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedRoster:
+        assert sport_slug == "womens-basketball"
+        assert season == "2025-26"
+        return _discovered_roster()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_roster",
+        fake_discover_roster,
+    )
+
+    response = await client.get(
+        "/api/v1/sources/womens-basketball/roster?season=2025-26"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "display_name": "Sarah Brans",
+            "jersey_number": "2",
+            "class_year": "Sr.",
+            "position": "F",
+            "bio_url": (
+                "https://govandals.com/sports/womens-basketball/roster/sarah-brans/8428"
+            ),
+            "source_player_id": "8428",
+            "canonical_bio_url": (
+                "https://govandals.com/sports/womens-basketball/roster/sarah-brans/8428"
+            ),
+            "canonical_source_player_id": "8428",
+            "identity_resolution_error": None,
+        }
+    ]
+
+
+async def test_import_roster_discovery_persists_canonical_identity(
+    client,
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+
+    async def fake_discover_roster(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedRoster:
+        return _discovered_roster()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_roster",
+        fake_discover_roster,
+    )
+
+    response = await client.post(
+        "/api/v1/sources/womens-basketball/roster/import?season=2025-26"
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "source_url": ("https://govandals.com/sports/womens-basketball/roster/2025-26"),
+        "season": "2025-26",
+        "source_snapshot_id": 1,
+        "players_seen": 1,
+        "players_created": 1,
+        "identities_created": 1,
+        "player_seasons_created": 1,
+        "player_seasons_updated": 0,
+        "quality_issues_created": 0,
+    }
+    assert await db_session.scalar(select(func.count(Player.id))) == 1
+    assert await db_session.scalar(select(func.count(PlayerExternalIdentity.id))) == 1
+    assert await db_session.scalar(select(func.count(PlayerSeason.id))) == 1
 
 
 async def test_preview_schedule_discovery_returns_events(client, monkeypatch) -> None:

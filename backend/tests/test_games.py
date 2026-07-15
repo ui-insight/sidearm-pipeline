@@ -73,6 +73,9 @@ async def test_ingest_creates_canonical_event_metadata(
     assert payload["event_sources"][0]["source_id"] == "8467"
     assert payload["event_sources"][0]["primary_source"] is True
     assert payload["source_snapshots"][0]["parser_version"] == "sidearm-html-v2"
+    assert payload["source_snapshots"][0]["source_system"] == "sidearm"
+    assert payload["source_snapshots"][0]["source_type"] == "boxscore_html"
+    assert payload["source_snapshots"][0]["source_url"] == payload["source_url"]
     assert len(payload["source_snapshots"][0]["content_hash"]) == 64
     assert payload["status_history"][0]["to_status"] == "final"
 

@@ -92,6 +92,9 @@ class EventSourceRead(BaseModel):
 class SourceSnapshotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    source_system: str
+    source_type: str
+    source_url: str
     parser_version: str
     content_hash: str
     http_status: int | None = None
