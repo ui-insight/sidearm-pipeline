@@ -93,6 +93,27 @@ function IdentityQueuePage() {
     }
   }
 
+  async function createPlayer(
+    item: IdentityQueueItem,
+    displayName: string,
+    resolutionNotes: string,
+  ) {
+    setError(null);
+    setSuccess(null);
+    try {
+      await identityResolutionApi.createPlayer(item.id, {
+        displayName,
+        resolutionNotes,
+      });
+      setItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      setSuccess(
+        `${displayName} was created and linked. Future ingests will use this identity.`,
+      );
+    } catch (createError) {
+      setError(apiErrorMessage(createError));
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <header className="mb-8 max-w-3xl">
@@ -184,7 +205,12 @@ function IdentityQueuePage() {
         ) : (
           <ol className="divide-y divide-gray-200">
             {items.map((item) => (
-              <IdentityQueueRow key={item.id} item={item} onResolve={resolveItem} />
+              <IdentityQueueRow
+                key={item.id}
+                item={item}
+                onResolve={resolveItem}
+                onCreatePlayer={createPlayer}
+              />
             ))}
           </ol>
         )}
@@ -210,11 +236,17 @@ function QueueSkeleton() {
 function IdentityQueueRow({
   item,
   onResolve,
+  onCreatePlayer,
 }: {
   item: IdentityQueueItem;
   onResolve: (
     item: IdentityQueueItem,
     playerId: number,
+    resolutionNotes: string,
+  ) => Promise<void>;
+  onCreatePlayer: (
+    item: IdentityQueueItem,
+    displayName: string,
     resolutionNotes: string,
   ) => Promise<void>;
 }) {
@@ -345,14 +377,78 @@ function IdentityQueueRow({
           </button>
         </form>
       ) : (
-        <div className="border-l border-gray-200 pl-4">
-          <p className="text-sm font-semibold text-gray-950">No roster candidate found</p>
-          <p className="mt-1 text-sm leading-5 text-gray-600">
-            Add or import the canonical player identity before resolving this source row.
-          </p>
-        </div>
+        <CreatePlayerForm item={item} onCreatePlayer={onCreatePlayer} />
       )}
     </li>
+  );
+}
+
+function CreatePlayerForm({
+  item,
+  onCreatePlayer,
+}: {
+  item: IdentityQueueItem;
+  onCreatePlayer: (
+    item: IdentityQueueItem,
+    displayName: string,
+    resolutionNotes: string,
+  ) => Promise<void>;
+}) {
+  const [displayName, setDisplayName] = useState(displayPlayerName(item));
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const helpId = `create-player-help-${item.id}`;
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!displayName.trim() || !notes.trim()) return;
+    setSubmitting(true);
+    try {
+      await onCreatePlayer(item, displayName.trim(), notes.trim());
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-3">
+      <div>
+        <p className="text-sm font-semibold text-gray-950">Create canonical player</p>
+        <p id={helpId} className="mt-1 text-sm leading-5 text-gray-600">
+          No roster candidate exists. Confirm the name from the attached evidence.
+        </p>
+      </div>
+      <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Canonical name
+        <input
+          required
+          maxLength={255}
+          value={displayName}
+          aria-describedby={helpId}
+          onChange={(event) => setDisplayName(event.target.value)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Decision note
+        <textarea
+          required
+          maxLength={2000}
+          rows={2}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Record the evidence used to create this player"
+          className="resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 placeholder:text-gray-400 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="justify-self-start rounded-md bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {submitting ? "Creating player..." : "Create and resolve"}
+      </button>
+    </form>
   );
 }
 

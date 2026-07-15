@@ -42,6 +42,21 @@ const queueItem = {
   resolved_player_name: null,
 };
 
+const unmatchedQueueItem = {
+  ...queueItem,
+  id: 10,
+  summary: "Player row 'Reynolds, Maria' did not match the 2025-26 roster",
+  details: {
+    reason: "unmatched",
+    institution: "Idaho State University",
+    season: "2025-26",
+    player_name: "Reynolds, Maria",
+    jersey_number: "12",
+    source_url: "https://isubengals.com/roster/maria-reynolds/9912",
+  },
+  candidate_players: [],
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input, init) => {
@@ -109,6 +124,66 @@ describe("IdentityQueuePage", () => {
         body: JSON.stringify({
           player_id: 3,
           resolution_notes: "SID confirmed the roster and source bio.",
+        }),
+      }),
+    );
+  });
+
+  it("creates and resolves a canonical player for an unmatched source row", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const endpoint = String(input);
+      if (
+        endpoint === "/api/v1/identity-resolution/queue?status=open" &&
+        init?.method === "GET"
+      ) {
+        return jsonResponse([unmatchedQueueItem]);
+      }
+      if (
+        endpoint === "/api/v1/identity-resolution/queue/10/create-player" &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse(
+          {
+            issue_id: 10,
+            player_id: 27,
+            match_key: "identity-key",
+            status: "resolved",
+          },
+          { status: 201 },
+        );
+      }
+      return jsonResponse([]);
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <IdentityQueuePage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Maria Reynolds" }),
+    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Maria Reynolds")).toBeInTheDocument();
+
+    await user.type(
+      screen.getByLabelText("Decision note"),
+      "SID verified the opponent bio and jersey number.",
+    );
+    await user.click(screen.getByRole("button", { name: "Create and resolve" }));
+
+    expect(
+      await screen.findByText(
+        "Maria Reynolds was created and linked. Future ingests will use this identity.",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/identity-resolution/queue/10/create-player",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          display_name: "Maria Reynolds",
+          resolution_notes: "SID verified the opponent bio and jersey number.",
         }),
       }),
     );

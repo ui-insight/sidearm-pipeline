@@ -258,3 +258,141 @@ async def test_manual_source_id_resolution_creates_future_exact_identity(
     )
     assert identity is not None
     assert identity.player_id == player.id
+
+
+async def test_queue_api_can_create_and_resolve_an_unmatched_player(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    row = _source_row(
+        program,
+        institution="Idaho State University",
+        player_name="Reynolds, Maria",
+        jersey_number="12",
+        source_player_id="9912",
+        source_url="https://isubengals.com/sports/womens-basketball/roster/maria-reynolds/9912",
+    )
+    unresolved = await resolve_player_identity(db_session, row)
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/identity-resolution/queue/{unresolved.issue_id}/create-player",
+        json={
+            "display_name": "Maria Reynolds",
+            "resolution_notes": "SID verified the opponent bio and jersey number.",
+        },
+    )
+
+    assert response.status_code == 201
+    player_id = response.json()["player_id"]
+    player = await db_session.get(Player, player_id)
+    assert player is not None
+    assert player.display_name == "Maria Reynolds"
+
+    identity = await db_session.scalar(
+        select(PlayerExternalIdentity).where(
+            PlayerExternalIdentity.source_system == "sidearm",
+            PlayerExternalIdentity.institution == "Idaho State University",
+            PlayerExternalIdentity.source_player_id == "9912",
+        )
+    )
+    assert identity is not None
+    assert identity.player_id == player_id
+
+    membership = await db_session.scalar(
+        select(PlayerSeason).where(PlayerSeason.player_id == player_id)
+    )
+    assert membership is not None
+    assert membership.sport_program_id == program.id
+    assert membership.season == SEASON
+    assert membership.jersey_number == "12"
+    assert membership.bio_url == row.source_url
+
+    future_match = await resolve_player_identity(db_session, row)
+    assert future_match.player_id == player_id
+    assert future_match.method == "source_player_id"
+
+    assert (await client.get("/api/v1/identity-resolution/queue")).json() == []
+    resolved_queue = await client.get(
+        "/api/v1/identity-resolution/queue?status=resolved"
+    )
+    assert resolved_queue.json()[0]["resolved_player_name"] == "Maria Reynolds"
+
+
+async def test_create_player_rejects_an_already_resolved_issue(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    unresolved = await resolve_player_identity(db_session, _source_row(program))
+    await db_session.commit()
+
+    first_response = await client.post(
+        f"/api/v1/identity-resolution/queue/{unresolved.issue_id}/create-player",
+        json={
+            "display_name": "Kyra Gardner",
+            "resolution_notes": "SID verified the player.",
+        },
+    )
+    duplicate_response = await client.post(
+        f"/api/v1/identity-resolution/queue/{unresolved.issue_id}/create-player",
+        json={
+            "display_name": "Duplicate Player",
+            "resolution_notes": "Stale browser retry.",
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json()["detail"] == (
+        f"Identity issue {unresolved.issue_id} has already been resolved"
+    )
+    assert await db_session.scalar(select(func.count(Player.id))) == 1
+
+
+async def test_create_player_rejects_an_ambiguous_issue_with_candidates(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    await _add_roster_player(
+        db_session,
+        program,
+        display_name="Kyra Gardner",
+        jersey_number="3",
+    )
+    await _add_roster_player(
+        db_session,
+        program,
+        display_name="Gardner, Kyra",
+        jersey_number="03",
+    )
+    unresolved = await resolve_player_identity(db_session, _source_row(program))
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/identity-resolution/queue/{unresolved.issue_id}/create-player",
+        json={
+            "display_name": "Duplicate Player",
+            "resolution_notes": "Attempted to bypass the candidate review.",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "This identity issue has roster candidates and must link to an existing "
+        "canonical player"
+    )
+    assert await db_session.scalar(select(func.count(Player.id))) == 2
+
+
+async def test_create_player_request_rejects_whitespace_only_fields(
+    client,
+) -> None:
+    response = await client.post(
+        "/api/v1/identity-resolution/queue/1/create-player",
+        json={"display_name": "   ", "resolution_notes": "  "},
+    )
+
+    assert response.status_code == 422

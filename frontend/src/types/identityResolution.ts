@@ -33,3 +33,8 @@ export interface IdentityResolution {
   match_key: string;
   status: "resolved";
 }
+
+export interface IdentityPlayerCreation {
+  displayName: string;
+  resolutionNotes: string;
+}
