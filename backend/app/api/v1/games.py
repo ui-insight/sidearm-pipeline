@@ -27,6 +27,7 @@ from app.models.game import (
 from app.schemas.content import GeneratedContentRead
 from app.schemas.game import GameDetail, GameSummary, IngestRequest
 from app.services.content_generator import generate_coverage
+from app.services.player_game_stat_import import replace_wbb_player_game_stats
 from app.services.sidearm_scraper import (
     ParsedBoxscore,
     fetch_attempt_count,
@@ -89,7 +90,27 @@ async def ingest_game(
     else:
         _refresh_game(game, parsed, registry_entry)
 
+    await db.flush()
+    normalized_result = None
+    if parsed.sport == "womens-basketball":
+        normalized_result = await replace_wbb_player_game_stats(
+            db,
+            game=game,
+            snapshot=game.source_snapshots[-1],
+            parsed=parsed,
+        )
+
     _finish_successful_ingest_run(ingest_run, game, parsed, started_at)
+    if normalized_result is not None:
+        ingest_run.run_metadata = {
+            **ingest_run.run_metadata,
+            "normalized_player_rows_seen": normalized_result.player_rows_seen,
+            "normalized_player_rows_resolved": normalized_result.player_rows_resolved,
+            "normalized_player_rows_unresolved": (
+                normalized_result.player_rows_unresolved
+            ),
+            "normalized_player_game_stats_written": normalized_result.facts_written,
+        }
     await db.commit()
     await db.refresh(
         game,
@@ -328,7 +349,7 @@ def _build_game(
     )
     game.team_stats = [TeamStat(**row) for row in parsed.team_stats]
     game.scoring_plays = [ScoringPlay(**row) for row in parsed.scoring_plays]
-    game.player_stats = [PlayerStatGroup(**row) for row in parsed.player_stats]
+    game.player_stats = _legacy_player_stat_groups(parsed)
     game.event_sources = [source]
     game.source_snapshots = [
         SourceSnapshot(
@@ -388,7 +409,7 @@ def _refresh_game(
 
     game.team_stats = [TeamStat(**row) for row in parsed.team_stats]
     game.scoring_plays = [ScoringPlay(**row) for row in parsed.scoring_plays]
-    game.player_stats = [PlayerStatGroup(**row) for row in parsed.player_stats]
+    game.player_stats = _legacy_player_stat_groups(parsed)
 
     source = _upsert_boxscore_source(game, parsed, source_event_id, now)
     game.source_snapshots.append(
@@ -441,6 +462,13 @@ def _upsert_boxscore_source(
     )
     game.event_sources.append(source)
     return source
+
+
+def _legacy_player_stat_groups(parsed: ParsedBoxscore) -> list[PlayerStatGroup]:
+    """Retain legacy groups only for sports without a normalized fact adapter."""
+    if parsed.sport == "womens-basketball":
+        return []
+    return [PlayerStatGroup(**row) for row in parsed.player_stats]
 
 
 def _canonical_uid(parsed: ParsedBoxscore) -> str:
