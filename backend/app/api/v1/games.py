@@ -24,8 +24,17 @@ from app.models.game import (
     SourceSnapshot,
     TeamStat,
 )
+from app.models.player import Player
+from app.models.player_game_stat import PlayerGameStat
+from app.models.stat_definition import StatDefinition
+from app.models.team import Team
 from app.schemas.content import GeneratedContentRead
-from app.schemas.game import GameDetail, GameSummary, IngestRequest
+from app.schemas.game import (
+    GameDetail,
+    GameSummary,
+    IngestRequest,
+    NormalizedPlayerGameStatRead,
+)
 from app.services.content_generator import generate_coverage
 from app.services.player_game_stat_import import replace_wbb_player_game_stats
 from app.services.sidearm_scraper import (
@@ -208,6 +217,59 @@ async def get_game(
             detail="Game not found",
         )
     return GameDetail.model_validate(game)
+
+
+@router.get(
+    "/{game_id}/player-stats",
+    response_model=list[NormalizedPlayerGameStatRead],
+    summary="List normalized player facts for a game",
+)
+async def list_normalized_player_game_stats(
+    game_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> list[NormalizedPlayerGameStatRead]:
+    """Return atomic player facts with identity, definition, and source context."""
+    if await db.get(Game, game_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Game not found",
+        )
+
+    rows = (
+        await db.execute(
+            select(PlayerGameStat, Player, Team, StatDefinition)
+            .join(Player, Player.id == PlayerGameStat.player_id)
+            .join(
+                StatDefinition,
+                StatDefinition.id == PlayerGameStat.stat_definition_id,
+            )
+            .outerjoin(Team, Team.id == PlayerGameStat.team_id)
+            .where(PlayerGameStat.game_id == game_id)
+            .order_by(
+                Team.canonical_name,
+                Player.display_name,
+                StatDefinition.id,
+            )
+        )
+    ).all()
+
+    return [
+        NormalizedPlayerGameStatRead(
+            player_id=fact.player_id,
+            player_name=player.display_name,
+            team_id=fact.team_id,
+            team_name=team.canonical_name if team else None,
+            stat_key=definition.stat_key,
+            display_label=definition.display_label,
+            value=fact.value,
+            value_type=definition.value_type,
+            display_format=definition.display_format,
+            source_field=fact.source_field,
+            source_value=fact.source_value,
+            source_snapshot_id=fact.source_snapshot_id,
+        )
+        for fact, player, team, definition in rows
+    ]
 
 
 @router.delete(

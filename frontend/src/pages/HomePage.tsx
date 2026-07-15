@@ -24,13 +24,13 @@ const DEFAULT_SPORT_SLUG = "football";
 const DEFAULT_SEASON = "2025";
 
 function formatScore(game: GameSummary): string {
-  if (game.away_score === null || game.home_score === null) return "—";
-  return `${game.away_score} – ${game.home_score}`;
+  if (game.away_score === null || game.home_score === null) return "-";
+  return `${game.away_score} - ${game.home_score}`;
 }
 
 function formatScheduleScore(event: ScheduleEvent): string | null {
   if (event.team_score === null || event.opponent_score === null) return null;
-  return `${event.team_score} – ${event.opponent_score}`;
+  return `${event.team_score} - ${event.opponent_score}`;
 }
 
 function formatStatus(status: string): string {
@@ -199,20 +199,23 @@ function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Vandals Stats Pipeline
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <header className="mb-8 max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-yellow-700">
+            Newsroom operations
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-950">
+            Games desk
           </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Ingest Sidearm boxscore URLs and browse the normalized data.
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+            Discover schedules, ingest Sidearm boxscores, and move from a game
+            to verified source facts without leaving the desk.
           </p>
         </header>
 
-        <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">
-            Ingest a boxscore
+            Direct boxscore ingest
           </h2>
           <div className="mb-4 flex flex-col gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-gray-800 sm:flex-row sm:items-center sm:justify-between">
             <span>
@@ -251,7 +254,7 @@ function HomePage() {
           )}
         </section>
 
-        <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 sm:p-6">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
@@ -399,10 +402,10 @@ function HomePage() {
           )}
         </section>
 
-        <section className="bg-white rounded-lg shadow-sm">
+        <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
-              Ingested games
+              Recent games
             </h2>
             <span className="text-xs text-gray-500">
               {games.length} record{games.length === 1 ? "" : "s"}
@@ -447,7 +450,6 @@ function HomePage() {
             </ul>
           )}
         </section>
-      </div>
     </div>
   );
 }

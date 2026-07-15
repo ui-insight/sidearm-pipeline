@@ -136,6 +136,7 @@ async def test_resolver_does_not_fallback_on_name_without_matching_jersey(
 
 
 async def test_ambiguous_fallback_is_deduplicated_in_review_queue(
+    client,
     db_session,
 ) -> None:
     program = await _seed_program(db_session)
@@ -162,6 +163,14 @@ async def test_ambiguous_fallback_is_deduplicated_in_review_queue(
     assert issue.details["reason"] == "ambiguous"
     assert issue.details["candidate_player_ids"] == sorted([first.id, second.id])
     assert await db_session.scalar(select(func.count(DataQualityIssue.id))) == 1
+
+    await db_session.commit()
+    response = await client.get("/api/v1/identity-resolution/queue")
+    assert response.status_code == 200
+    assert response.json()[0]["candidate_players"] == [
+        {"id": first.id, "display_name": "Kyra Gardner"},
+        {"id": second.id, "display_name": "Gardner, Kyra"},
+    ]
 
 
 async def test_queue_api_resolution_is_reused_for_future_signature_rows(

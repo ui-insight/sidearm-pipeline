@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
 from app.models.data_quality_issue import DataQualityIssue
+from app.models.player import Player
 from app.schemas.identity_resolution import (
+    IdentityCandidateRead,
     IdentityIssueResolutionRead,
     IdentityIssueResolveRequest,
     IdentityQueueItemRead,
@@ -32,16 +34,55 @@ async def list_identity_queue(
     db: AsyncSession = Depends(get_db),
 ) -> list[IdentityQueueItemRead]:
     """Return identity issues for SID review, newest first."""
-    issues = await db.scalars(
-        select(DataQualityIssue)
-        .where(
-            DataQualityIssue.issue_type == "unresolved_identity",
-            DataQualityIssue.status == status_filter,
+    issues = list(
+        await db.scalars(
+            select(DataQualityIssue)
+            .where(
+                DataQualityIssue.issue_type == "unresolved_identity",
+                DataQualityIssue.status == status_filter,
+            )
+            .order_by(DataQualityIssue.detected_at.desc(), DataQualityIssue.id.desc())
+            .limit(limit)
         )
-        .order_by(DataQualityIssue.detected_at.desc(), DataQualityIssue.id.desc())
-        .limit(limit)
     )
-    return [IdentityQueueItemRead.model_validate(issue) for issue in issues.all()]
+    player_ids = {
+        player_id
+        for issue in issues
+        for player_id in [issue.player_id, *_candidate_player_ids(issue.details)]
+        if player_id is not None
+    }
+    players = {
+        player.id: player
+        for player in await db.scalars(select(Player).where(Player.id.in_(player_ids)))
+    }
+
+    return [
+        IdentityQueueItemRead.model_validate(issue).model_copy(
+            update={
+                "candidate_players": [
+                    IdentityCandidateRead(
+                        id=player_id,
+                        display_name=players[player_id].display_name,
+                    )
+                    for player_id in _candidate_player_ids(issue.details)
+                    if player_id in players
+                ],
+                "resolved_player_name": (
+                    players[issue.player_id].display_name
+                    if issue.player_id in players
+                    else None
+                ),
+            }
+        )
+        for issue in issues
+    ]
+
+
+def _candidate_player_ids(details: dict) -> list[int]:
+    values = details.get("candidate_player_ids", [])
+    if not isinstance(values, list):
+        return []
+    return [value for value in values if isinstance(value, int)]
 
 
 @router.post(

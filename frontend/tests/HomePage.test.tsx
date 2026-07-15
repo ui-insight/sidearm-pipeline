@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe("HomePage", () => {
-  it("renders the pipeline heading and empty state", async () => {
+  it("renders the games desk heading and empty state", async () => {
     render(
       <MemoryRouter>
         <HomePage />
@@ -47,7 +47,7 @@ describe("HomePage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Vandals Stats Pipeline" }),
+      screen.getByRole("heading", { name: "Games desk" }),
     ).toBeInTheDocument();
     expect(
       await screen.findByText(/No games yet/i),

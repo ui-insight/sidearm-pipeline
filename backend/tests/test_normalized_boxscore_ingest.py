@@ -1,5 +1,6 @@
 """End-to-end coverage for normalized WBB boxscore persistence."""
 
+from decimal import Decimal
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -116,6 +117,24 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
     assert kyra_points.team_id is not None
     assert kyra_points.source_snapshot_id is not None
 
+    facts_response = await client.get(
+        f"/api/v1/games/{first_payload['id']}/player-stats"
+    )
+    assert facts_response.status_code == 200
+    facts = facts_response.json()
+    assert len(facts) == 144
+    kyra_points_payload = next(
+        fact
+        for fact in facts
+        if fact["player_name"] == "Gardner, Kyra" and fact["stat_key"] == "points"
+    )
+    assert Decimal(kyra_points_payload["value"]) == 13
+    assert kyra_points_payload["display_label"] == "Points"
+    assert kyra_points_payload["team_name"] == "Idaho"
+    assert kyra_points_payload["source_field"] == "PTS"
+    assert kyra_points_payload["source_value"] == "13"
+    assert kyra_points_payload["source_snapshot_id"] is not None
+
     first_snapshot = await db_session.get(
         SourceSnapshot,
         kyra_points.source_snapshot_id,
@@ -159,3 +178,11 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
         await db_session.scalars(select(PlayerGameStat.source_snapshot_id))
     )
     assert fact_snapshot_ids == {latest_snapshot_id}
+
+
+async def test_normalized_player_stats_returns_not_found_for_unknown_game(
+    client,
+) -> None:
+    response = await client.get("/api/v1/games/999999/player-stats")
+
+    assert response.status_code == 404

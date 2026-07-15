@@ -4,7 +4,7 @@ test("pipeline homepage renders ingest form", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: "Vandals Stats Pipeline" }),
+    page.getByRole("heading", { name: "Games desk" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /ingest/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ingest", exact: true })).toBeVisible();
 });
