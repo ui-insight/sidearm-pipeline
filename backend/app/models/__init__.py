@@ -19,6 +19,7 @@ from app.models.game import (
 )
 from app.models.player import Player, PlayerExternalIdentity, PlayerSeason
 from app.models.player_game_stat import PlayerGameStat
+from app.models.player_identity_resolution import PlayerIdentityResolution
 from app.models.player_season_stat import PlayerSeasonStat
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
@@ -38,6 +39,7 @@ __all__ = [
     "Player",
     "PlayerExternalIdentity",
     "PlayerGameStat",
+    "PlayerIdentityResolution",
     "PlayerSeason",
     "PlayerSeasonStat",
     "PlayerStatGroup",

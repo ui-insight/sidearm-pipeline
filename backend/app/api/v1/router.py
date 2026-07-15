@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1 import games, ingest_runs, sources
+from app.api.v1 import games, identity_resolution, ingest_runs, sources
 from app.db.engine import get_db
 from app.schemas.health import HealthResponse, ReadinessResponse
 
@@ -17,6 +17,11 @@ api_router.include_router(
     tags=["ingest-runs"],
 )
 api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
+api_router.include_router(
+    identity_resolution.router,
+    prefix="/identity-resolution",
+    tags=["identity-resolution"],
+)
 
 
 @api_router.get("/health", response_model=HealthResponse)
