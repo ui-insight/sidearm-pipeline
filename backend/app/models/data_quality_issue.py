@@ -55,6 +55,9 @@ class DataQualityIssue(Base):
     source_snapshot_id: Mapped[int | None] = mapped_column(
         ForeignKey("source_snapshots.id", ondelete="SET NULL"), index=True
     )
+    deduplication_key: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True
+    )
     issue_type: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)
     severity: Mapped[str] = mapped_column(String(32), default="warning")

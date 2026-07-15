@@ -8,6 +8,7 @@ from app.services.source_registry import get_source_registry, load_source_regist
 def test_bundled_source_registry_loads_release_1_sports() -> None:
     registry = get_source_registry()
 
+    assert registry.version == "1.1.0"
     assert registry.source_system == "sidearm"
     assert str(registry.base_url) == "https://govandals.com/"
     assert [sport.sport_slug for sport in registry.release_1_sports] == [
@@ -36,6 +37,14 @@ def test_require_sport_returns_entry_or_clear_error() -> None:
 
     with pytest.raises(KeyError, match="No source registry entry"):
         registry.require_sport("baseball")
+
+
+def test_womens_basketball_registers_roster_sources() -> None:
+    sport = get_source_registry().require_sport("womens-basketball")
+
+    assert sport.source_patterns.roster_url == "/sports/womens-basketball/roster"
+    assert "roster_html" in sport.supported_source_types
+    assert "player_bio_html" in sport.supported_source_types
 
 
 def test_source_registry_can_load_from_explicit_path(tmp_path) -> None:

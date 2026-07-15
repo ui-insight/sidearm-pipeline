@@ -16,6 +16,7 @@ class SourcePatterns(BaseModel):
 
     schedule_url: str
     boxscore_url_pattern: str | None = None
+    roster_url: str | None = None
 
 
 class PollingPolicy(BaseModel):

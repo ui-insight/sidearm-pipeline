@@ -192,17 +192,31 @@ class EventSource(Base):
 
 
 class SourceSnapshot(Base):
-    """A raw source payload captured for replay, auditing, and parser debugging."""
+    """A raw source payload captured for replay, auditing, and parser debugging.
+
+    Snapshots may belong to an event, but roster and season sources are retained
+    without inventing a synthetic game.
+    """
 
     __tablename__ = "source_snapshots"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    game_id: Mapped[int] = mapped_column(
+    game_id: Mapped[int | None] = mapped_column(
         ForeignKey("games.id", ondelete="CASCADE"), index=True
     )
     event_source_id: Mapped[int | None] = mapped_column(
         ForeignKey("event_sources.id", ondelete="SET NULL"), index=True
     )
+    source_system: Mapped[str] = mapped_column(
+        String(64), default="sidearm", server_default="sidearm", nullable=False
+    )
+    source_type: Mapped[str] = mapped_column(
+        String(64),
+        default="boxscore_html",
+        server_default="boxscore_html",
+        nullable=False,
+    )
+    source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
     parser_version: Mapped[str] = mapped_column(String(64), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     http_status: Mapped[int | None] = mapped_column(Integer)
@@ -211,7 +225,7 @@ class SourceSnapshot(Base):
     )
     raw_body: Mapped[str | None] = mapped_column(Text)
 
-    game: Mapped[Game] = relationship(back_populates="source_snapshots")
+    game: Mapped[Game | None] = relationship(back_populates="source_snapshots")
     event_source: Mapped[EventSource | None] = relationship(back_populates="snapshots")
 
 

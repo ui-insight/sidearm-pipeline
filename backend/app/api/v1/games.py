@@ -333,6 +333,9 @@ def _build_game(
     game.source_snapshots = [
         SourceSnapshot(
             event_source=source,
+            source_system="sidearm",
+            source_type="boxscore_html",
+            source_url=parsed.source_url,
             parser_version=PARSER_VERSION,
             content_hash=_content_hash(parsed.raw_html),
             http_status=200,
@@ -391,6 +394,9 @@ def _refresh_game(
     game.source_snapshots.append(
         SourceSnapshot(
             event_source=source,
+            source_system="sidearm",
+            source_type="boxscore_html",
+            source_url=parsed.source_url,
             parser_version=PARSER_VERSION,
             content_hash=_content_hash(parsed.raw_html),
             http_status=200,
