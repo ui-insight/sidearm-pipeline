@@ -71,6 +71,80 @@ describe("HomePage", () => {
     );
   });
 
+  it("syncs the current WBB season and shows the bounded run evidence", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation(async (input, init) => {
+      const endpoint = String(input);
+      if (
+        endpoint ===
+          "/api/v1/sources/womens-basketball/seasons/2025-26/sync?correction_lookback=2" &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse({
+          run_id: 14,
+          sport_slug: "womens-basketball",
+          season: "2025-26",
+          status: "succeeded",
+          correction_lookback: 2,
+          started_at: "2026-07-15T22:00:00Z",
+          finished_at: "2026-07-15T22:00:04Z",
+          roster: {
+            source_url: "https://govandals.com/roster/2025-26",
+            season: "2025-26",
+            source_snapshot_id: 8,
+            players_seen: 15,
+            players_created: 0,
+            identities_created: 0,
+            player_seasons_created: 0,
+            player_seasons_updated: 15,
+            quality_issues_created: 0,
+          },
+          schedule_events_seen: 30,
+          schedule_games_created: 1,
+          schedule_games_changed: 0,
+          schedule_games_unchanged: 29,
+          final_boxscores_seen: 18,
+          boxscores_selected: 2,
+          boxscores_refreshed: 2,
+          boxscores_skipped: 16,
+          boxscores_failed: 0,
+          open_identity_issues: 3,
+          games: [
+            {
+              game_id: 42,
+              title: "Idaho vs Idaho State",
+              source_url: "https://govandals.com/boxscore/9968",
+              reasons: ["not_yet_ingested", "correction_lookback"],
+              status: "refreshed",
+              error: null,
+            },
+          ],
+        });
+      }
+      return jsonResponse([]);
+    });
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Sync current season" }));
+
+    expect(await screen.findByText("Season sync complete")).toBeInTheDocument();
+    expect(screen.getByText("Run 14")).toBeInTheDocument();
+    expect(screen.getByText(/30 events, 1 new/)).toBeInTheDocument();
+    expect(screen.getByText(/2 refreshed, 16 skipped/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review queue" })).toHaveAttribute(
+      "href",
+      "/identity-queue",
+    );
+    expect(
+      screen.getByRole("link", { name: "Idaho vs Idaho State" }),
+    ).toHaveAttribute("href", "/games/42");
+    expect(screen.getByText("new final, correction check")).toBeInTheDocument();
+  });
+
   it("loads discovered schedule events and ingests a boxscore", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation(async (input, init) => {

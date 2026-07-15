@@ -263,3 +263,28 @@ async def test_ingest_records_retry_exhaustion(client, db_session, monkeypatch):
     assert ingest_run.attempt_count == 3
     assert ingest_run.max_attempts == 3
     assert ingest_run.run_metadata["retry_exhausted"] is True
+
+
+async def test_ingest_records_parser_failure(client, db_session, monkeypatch):
+    async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
+        raise ValueError("No Sidearm player tables were found")
+
+    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+
+    response = await client.post(
+        "/api/v1/games",
+        json={
+            "url": "https://govandals.com/sports/womens-basketball/stats/"
+            "2025-26/idaho-state/boxscore/9968"
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == (
+        "Failed to parse Sidearm page: No Sidearm player tables were found"
+    )
+    ingest_run = await db_session.scalar(select(IngestRun))
+    assert ingest_run is not None
+    assert ingest_run.status == "failed"
+    assert ingest_run.error_type == "ValueError"
+    assert ingest_run.run_metadata["failure_phase"] == "parse_boxscore"

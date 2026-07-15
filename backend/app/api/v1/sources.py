@@ -7,15 +7,63 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
+from app.schemas.current_season import CurrentSeasonSyncRead
 from app.schemas.game import GameSummary
 from app.schemas.roster import RosterImportRead, RosterPlayerRead
 from app.schemas.schedule import ScheduleEventRead
+from app.services.current_season_sync import (
+    SeasonSyncAlreadyRunning,
+    SeasonSyncFailed,
+    sync_current_wbb_season,
+)
 from app.services.roster_import import import_roster
 from app.services.schedule_import import import_schedule_events
 from app.services.sidearm_roster import discover_roster
 from app.services.sidearm_schedule import discover_schedule_events
 
 router = APIRouter()
+
+
+@router.post(
+    "/{sport_slug}/seasons/{season}/sync",
+    response_model=CurrentSeasonSyncRead,
+    summary="Synchronize the current WBB season into normalized facts",
+)
+async def sync_current_season(
+    sport_slug: str,
+    season: str,
+    correction_lookback: int = Query(default=2, ge=0, le=5),
+    db: AsyncSession = Depends(get_db),
+) -> CurrentSeasonSyncRead:
+    """Run a bounded roster, schedule, and final-boxscore synchronization."""
+    if sport_slug != "womens-basketball":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current-season synchronization currently supports WBB only",
+        )
+    try:
+        result = await sync_current_wbb_season(
+            db,
+            season=season,
+            correction_lookback=correction_lookback,
+        )
+    except SeasonSyncAlreadyRunning as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except SeasonSyncFailed as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Current-season synchronization failed: {exc}",
+        ) from exc
+
+    return CurrentSeasonSyncRead.model_validate(result, from_attributes=True)
 
 
 @router.get(
