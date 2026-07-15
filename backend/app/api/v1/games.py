@@ -39,7 +39,7 @@ from app.services.sidearm_scraper import (
 from app.services.source_registry import SportSource, get_source_registry
 
 router = APIRouter()
-PARSER_VERSION = "sidearm-html-v1"
+PARSER_VERSION = "sidearm-html-v2"
 
 
 @router.post(

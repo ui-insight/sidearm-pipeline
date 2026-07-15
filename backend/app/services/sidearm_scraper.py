@@ -13,6 +13,7 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -40,6 +41,41 @@ PLAYER_CATEGORY_KEYWORDS = {
     "punt return": "punt_returns",
     "returns": "returns",
     "interception": "interceptions",
+}
+
+BASKETBALL_SPORTS = {"mens-basketball", "womens-basketball"}
+BASKETBALL_PLAYER_COLUMNS = {
+    "##",
+    "Player",
+    "GS",
+    "MIN",
+    "FG",
+    "3PT",
+    "FT",
+    "ORB-DRB",
+    "REB",
+    "PF",
+    "A",
+    "TO",
+    "BLK",
+    "STL",
+    "PTS",
+}
+BASKETBALL_SINGLE_VALUE_STATS = {
+    "MIN": "minutes_played",
+    "REB": "total_rebounds",
+    "PF": "personal_fouls",
+    "A": "assists",
+    "TO": "turnovers",
+    "BLK": "blocks",
+    "STL": "steals",
+    "PTS": "points",
+}
+BASKETBALL_PAIRED_VALUE_STATS = {
+    "FG": ("field_goals_made", "field_goals_attempted"),
+    "3PT": ("three_point_field_goals_made", "three_point_field_goals_attempted"),
+    "FT": ("free_throws_made", "free_throws_attempted"),
+    "ORB-DRB": ("offensive_rebounds", "defensive_rebounds"),
 }
 
 
@@ -101,7 +137,9 @@ class ParsedBoxscore:
     away_score: int | None = None
     team_stats: list[dict] = field(default_factory=list)
     player_stats: list[dict] = field(default_factory=list)
+    player_stat_rows: list[dict] = field(default_factory=list)
     scoring_plays: list[dict] = field(default_factory=list)
+    parser_warnings: list[str] = field(default_factory=list)
     raw_html: str = ""
     fetch_attempt_count: int = 1
     fetch_max_attempts: int = 1
@@ -230,6 +268,7 @@ def parse_boxscore(url: str, html: str) -> ParsedBoxscore:
     result = ParsedBoxscore(source_url=url, raw_html=html)
 
     _extract_metadata(soup, url, result)
+    _derive_teams_from_title(result)
     tables = _collect_labelled_tables(soup)
 
     for table in tables:
@@ -240,6 +279,22 @@ def parse_boxscore(url: str, html: str) -> ParsedBoxscore:
             _ingest_scoring_summary(table, result)
         elif _is_team_stats(heading_lower):
             result.team_stats.extend(_team_stat_rows(table))
+        elif _is_basketball_player_stats(table):
+            team = _basketball_team_from_heading(table.heading)
+            result.player_stats.append(
+                {
+                    "category": "boxscore",
+                    "team": team,
+                    "columns": table.columns,
+                    "rows": table.rows,
+                }
+            )
+            result.player_stat_rows.extend(_basketball_player_rows(table, team, result))
+        elif _is_unsupported_basketball_player_table(table, result.sport):
+            result.parser_warnings.append(
+                "Unsupported basketball player table "
+                f"'{table.heading}' with columns {table.columns}"
+            )
         else:
             category = _player_category(heading_lower)
             if category:
@@ -252,7 +307,6 @@ def parse_boxscore(url: str, html: str) -> ParsedBoxscore:
                     }
                 )
 
-    _derive_teams_from_title(result)
     return result
 
 
@@ -350,6 +404,182 @@ def _player_category(heading: str) -> str | None:
         if keyword in heading:
             return category
     return None
+
+
+def _is_basketball_player_stats(table: ParsedTable) -> bool:
+    """Return whether a table has Sidearm's complete basketball player shape."""
+    return BASKETBALL_PLAYER_COLUMNS.issubset(table.columns)
+
+
+def _is_unsupported_basketball_player_table(
+    table: ParsedTable,
+    sport: str | None,
+) -> bool:
+    """Identify player-like basketball tables that must not be silently ignored."""
+    return sport in BASKETBALL_SPORTS and "Player" in table.columns
+
+
+def _basketball_team_from_heading(heading: str) -> str | None:
+    """Remove the final score from a Sidearm basketball table caption."""
+    team = re.sub(r"\s+\d+\s*$", "", heading).strip()
+    return team or None
+
+
+def _basketball_player_rows(
+    table: ParsedTable,
+    team: str | None,
+    result: ParsedBoxscore,
+) -> Iterable[dict]:
+    """Parse athlete identity and atomic stats from a basketball player table."""
+    if table.raw_table is None:
+        return
+
+    for tr in table.raw_table.select("tbody > tr"):
+        cells = tr.find_all(["td", "th"], recursive=False)
+        if len(cells) != len(table.columns):
+            result.parser_warnings.append(
+                f"Basketball player row for '{team}' has {len(cells)} cells; "
+                f"expected {len(table.columns)}"
+            )
+            continue
+
+        source_values = {
+            column: _cell_text(cell)
+            for column, cell in zip(table.columns, cells, strict=True)
+        }
+        jersey_number = source_values["##"] or None
+        if jersey_number == "TM":
+            continue
+
+        player_cell = cells[table.columns.index("Player")]
+        player_name, player_bio_url, source_player_id = _basketball_player_identity(
+            player_cell,
+            jersey_number,
+            result.source_url,
+        )
+        if not player_name or player_name.lower() in {"team", "totals"}:
+            continue
+
+        stats = _basketball_atomic_stats(
+            source_values,
+            result.parser_warnings,
+            team=team,
+            player_name=player_name,
+        )
+        yield {
+            "team": team,
+            "team_role": _team_role(team, result),
+            "is_idaho": _same_team(team, _host_team_from_title(result.title or "")),
+            "jersey_number": jersey_number,
+            "player_name": player_name,
+            "player_bio_url": player_bio_url,
+            "source_player_id": source_player_id,
+            "starter": source_values["GS"] == "*",
+            "stats": stats,
+            "source_values": source_values,
+        }
+
+
+def _basketball_player_identity(
+    player_cell: Tag,
+    jersey_number: str | None,
+    source_url: str,
+) -> tuple[str, str | None, str | None]:
+    """Extract the displayed name and optional Sidearm bio identity from a cell."""
+    bio_link = player_cell.find("a", href=re.compile(r"/roster/"))
+    if bio_link:
+        player_name = _cell_text(bio_link)
+        player_bio_url = urljoin(source_url, str(bio_link.get("href")))
+        source_player_id = _source_player_id(player_bio_url)
+        return player_name, player_bio_url, source_player_id
+
+    player_name = _cell_text(player_cell)
+    if jersey_number:
+        player_name = re.sub(
+            rf"^{re.escape(jersey_number)}\s+",
+            "",
+            player_name,
+        )
+    return player_name, None, None
+
+
+def _source_player_id(player_bio_url: str) -> str | None:
+    """Return the terminal numeric id from a Sidearm player bio URL."""
+    path = urlparse(player_bio_url).path.rstrip("/")
+    match = re.search(r"/(\d+)$", path)
+    return match.group(1) if match else None
+
+
+def _basketball_atomic_stats(
+    source_values: dict[str, str],
+    warnings: list[str],
+    *,
+    team: str | None,
+    player_name: str,
+) -> dict[str, int]:
+    """Expand Sidearm basketball cells into additive, integer stat values."""
+    stats: dict[str, int] = {}
+
+    for source_column, stat_key in BASKETBALL_SINGLE_VALUE_STATS.items():
+        value = _safe_int(source_values[source_column])
+        if value is None:
+            _warn_unparsed_basketball_stat(
+                warnings,
+                team,
+                player_name,
+                source_column,
+                source_values[source_column],
+            )
+            continue
+        stats[stat_key] = value
+
+    for source_column, stat_keys in BASKETBALL_PAIRED_VALUE_STATS.items():
+        match = re.fullmatch(r"(\d+)-(\d+)", source_values[source_column].strip())
+        if match is None:
+            _warn_unparsed_basketball_stat(
+                warnings,
+                team,
+                player_name,
+                source_column,
+                source_values[source_column],
+            )
+            continue
+        stats[stat_keys[0]] = int(match.group(1))
+        stats[stat_keys[1]] = int(match.group(2))
+
+    return stats
+
+
+def _warn_unparsed_basketball_stat(
+    warnings: list[str],
+    team: str | None,
+    player_name: str,
+    source_column: str,
+    source_value: str,
+) -> None:
+    warnings.append(
+        f"Unable to parse basketball stat {source_column}='{source_value}' "
+        f"for {team or 'unknown team'} player {player_name}"
+    )
+
+
+def _team_role(team: str | None, result: ParsedBoxscore) -> str:
+    if _same_team(team, result.home_team):
+        return "home"
+    if _same_team(team, result.away_team):
+        return "away"
+    return "unknown"
+
+
+def _same_team(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    return _normalized_team_name(left) == _normalized_team_name(right)
+
+
+def _normalized_team_name(value: str) -> str:
+    value = re.sub(r"\bstate\b", "st", value.lower())
+    return re.sub(r"[^a-z0-9]", "", value)
 
 
 def _team_stat_rows(table: ParsedTable) -> Iterable[dict]:
@@ -548,11 +778,14 @@ async def scrape_boxscore(
     parsed.fetch_max_attempts = fetch_result.max_attempts
     parsed.fetch_retryable_failures = fetch_result.retryable_failures
     logger.info(
-        "Scraped boxscore url=%s attempts=%d team_stats=%d player_groups=%d scoring=%d",
+        "Scraped boxscore url=%s attempts=%d team_stats=%d player_groups=%d "
+        "player_rows=%d scoring=%d warnings=%d",
         url,
         parsed.fetch_attempt_count,
         len(parsed.team_stats),
         len(parsed.player_stats),
+        len(parsed.player_stat_rows),
         len(parsed.scoring_plays),
+        len(parsed.parser_warnings),
     )
     return parsed
