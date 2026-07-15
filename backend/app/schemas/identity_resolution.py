@@ -5,6 +5,13 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class IdentityCandidateRead(BaseModel):
+    """One canonical player candidate attached to a review item."""
+
+    id: int
+    display_name: str
+
+
 class IdentityQueueItemRead(BaseModel):
     """One inspectable unresolved-player data-quality issue."""
 
@@ -23,6 +30,8 @@ class IdentityQueueItemRead(BaseModel):
     detected_at: datetime
     resolved_at: datetime | None = None
     resolution_notes: str | None = None
+    candidate_players: list[IdentityCandidateRead] = []
+    resolved_player_name: str | None = None
 
 
 class IdentityIssueResolveRequest(BaseModel):

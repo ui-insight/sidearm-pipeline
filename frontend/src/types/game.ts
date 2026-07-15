@@ -12,6 +12,21 @@ export interface PlayerStatGroup {
   rows: string[][];
 }
 
+export interface NormalizedPlayerGameStat {
+  player_id: number;
+  player_name: string;
+  team_id: number | null;
+  team_name: string | null;
+  stat_key: string;
+  display_label: string;
+  value: string;
+  value_type: string;
+  display_format: string | null;
+  source_field: string | null;
+  source_value: string | null;
+  source_snapshot_id: number | null;
+}
+
 export interface ScoringPlay {
   period: string | null;
   clock: string | null;
@@ -65,6 +80,10 @@ export interface EventSource {
 }
 
 export interface SourceSnapshot {
+  id: number;
+  source_system: string;
+  source_type: string;
+  source_url: string;
   parser_version: string;
   content_hash: string;
   http_status: number | null;
