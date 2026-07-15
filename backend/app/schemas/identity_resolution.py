@@ -1,8 +1,18 @@
 """Pydantic schemas for the unresolved-player review queue."""
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+CanonicalPlayerName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
+]
+ResolutionNotes = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+]
 
 
 class IdentityCandidateRead(BaseModel):
@@ -38,7 +48,14 @@ class IdentityIssueResolveRequest(BaseModel):
     """A human decision assigning an unresolved source row to a player."""
 
     player_id: int = Field(gt=0)
-    resolution_notes: str = Field(min_length=1, max_length=2000)
+    resolution_notes: ResolutionNotes
+
+
+class IdentityIssueCreatePlayerRequest(BaseModel):
+    """A human decision creating a player for an unmatched source row."""
+
+    display_name: CanonicalPlayerName
+    resolution_notes: ResolutionNotes
 
 
 class IdentityIssueResolutionRead(BaseModel):

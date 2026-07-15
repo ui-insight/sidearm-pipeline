@@ -223,6 +223,57 @@ async def resolve_identity_issue(
     return resolution
 
 
+async def create_player_for_identity_issue(
+    db: AsyncSession,
+    *,
+    issue_id: int,
+    display_name: str,
+    resolution_notes: str,
+) -> PlayerIdentityResolution:
+    """Create the missing canonical player and resolve one identity issue."""
+    issue = await db.get(DataQualityIssue, issue_id)
+    if issue is None or issue.issue_type != "unresolved_identity":
+        raise LookupError(f"Unresolved identity issue {issue_id} was not found")
+    if issue.status not in {"open", "in_review"}:
+        raise ValueError(f"Identity issue {issue_id} has already been resolved")
+
+    canonical_name = display_name.strip()
+    if not canonical_name:
+        raise ValueError("Canonical player name is required")
+
+    details = issue.details or {}
+    if details.get("reason") != "unmatched":
+        raise ValueError(
+            "This identity issue has roster candidates and must link to an existing "
+            "canonical player"
+        )
+    season = str(details.get("season") or "").strip()
+    if not season:
+        raise ValueError("The source row does not include a season")
+
+    player = Player(display_name=canonical_name)
+    db.add(player)
+    await db.flush()
+    db.add(
+        PlayerSeason(
+            player_id=player.id,
+            sport_program_id=issue.sport_program_id,
+            team_id=issue.team_id,
+            source_snapshot_id=issue.source_snapshot_id,
+            season=season,
+            jersey_number=normalize_jersey_number(details.get("jersey_number")),
+            bio_url=_clean_optional(details.get("source_url")),
+        )
+    )
+
+    return await resolve_identity_issue(
+        db,
+        issue_id=issue.id,
+        player_id=player.id,
+        resolution_notes=resolution_notes,
+    )
+
+
 def normalize_player_name(value: str) -> str:
     """Normalize exact display-name variants without fuzzy similarity matching."""
     text = value.strip()

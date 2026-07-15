@@ -13,11 +13,15 @@ from app.models.data_quality_issue import DataQualityIssue
 from app.models.player import Player
 from app.schemas.identity_resolution import (
     IdentityCandidateRead,
+    IdentityIssueCreatePlayerRequest,
     IdentityIssueResolutionRead,
     IdentityIssueResolveRequest,
     IdentityQueueItemRead,
 )
-from app.services.player_identity import resolve_identity_issue
+from app.services.player_identity import (
+    create_player_for_identity_issue,
+    resolve_identity_issue,
+)
 
 router = APIRouter()
 IssueStatus = Literal["open", "in_review", "resolved", "accepted_gap"]
@@ -101,6 +105,45 @@ async def resolve_identity_queue_item(
             db,
             issue_id=issue_id,
             player_id=request.player_id,
+            resolution_notes=request.resolution_notes,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    await db.commit()
+    return IdentityIssueResolutionRead(
+        issue_id=issue_id,
+        player_id=resolution.player_id,
+        match_key=resolution.match_key,
+        status="resolved",
+    )
+
+
+@router.post(
+    "/queue/{issue_id}/create-player",
+    response_model=IdentityIssueResolutionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a canonical player and resolve an unmatched identity",
+)
+async def create_player_from_identity_queue_item(
+    issue_id: int,
+    request: IdentityIssueCreatePlayerRequest,
+    db: AsyncSession = Depends(get_db),
+) -> IdentityIssueResolutionRead:
+    """Create a canonical player from source evidence and persist the decision."""
+    try:
+        resolution = await create_player_for_identity_issue(
+            db,
+            issue_id=issue_id,
+            display_name=request.display_name,
             resolution_notes=request.resolution_notes,
         )
     except LookupError as exc:
