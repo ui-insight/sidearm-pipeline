@@ -171,6 +171,41 @@ async def test_range_backfill_continues_after_a_season_failure(
     assert failed["error_message"] == "Unsupported historical table"
 
 
+async def test_range_backfill_checkpoints_after_child_expires_parent_state(
+    client,
+    monkeypatch,
+) -> None:
+    async def fake_backfill(
+        db,
+        *,
+        season,
+        boxscore_delay_seconds,
+        parent_range_run_id,
+    ):
+        db.expire_all()
+        raise RuntimeError("Child transaction failed")
+
+    monkeypatch.setattr(
+        "app.services.historical_range_backfill.backfill_historical_wbb_season",
+        fake_backfill,
+    )
+
+    response = await client.post(
+        "/api/v1/sources/womens-basketball/historical-backfill",
+        params={
+            "start_season": "2023-24",
+            "end_season": "2023-24",
+            "boxscore_delay_seconds": 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "failed"
+    assert payload["seasons_failed"] == 1
+    assert payload["seasons"][0]["error_message"] == "Child transaction failed"
+
+
 async def test_range_backfill_resume_retries_only_failed_seasons(
     client,
     db_session,
