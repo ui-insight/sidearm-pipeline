@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.auth.prototype import PrototypeAuthMiddleware
 from app.config import settings
 from app.db.engine import init_db
 from app.logging import (
@@ -37,6 +38,7 @@ app = FastAPI(
 )
 
 configure_rate_limiting(app)
+app.add_middleware(PrototypeAuthMiddleware)
 
 
 @app.middleware("http")

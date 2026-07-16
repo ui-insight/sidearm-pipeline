@@ -130,7 +130,11 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(url, { ...init, headers });
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    ...init,
+    headers,
+  });
   const data = await parseResponseBody(response);
 
   if (!response.ok) {

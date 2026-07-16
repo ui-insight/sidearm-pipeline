@@ -1,5 +1,5 @@
 """Authentication and authorization.
 
-This package is a template extension point. Add JWT/session handling,
-password hashing, and role enforcement here when a project needs them.
+This package provides the shared-credential prototype session gate and remains
+the extension point for individual accounts, SSO, and role enforcement.
 """
