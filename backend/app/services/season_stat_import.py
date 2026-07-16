@@ -246,6 +246,11 @@ async def import_cumulative_stats(
         parsed_stat_keys=parsed_stat_keys,
         completeness=coverage_completeness,
     )
+    issue_counts["resolved"] += await resolve_cumulative_parser_failure(
+        db,
+        sport_program_slug=program.slug,
+        season=source.season,
+    )
     await db.commit()
     return CumulativeStatsImportResult(
         source_url=source.source_url,
@@ -335,6 +340,19 @@ async def record_cumulative_parser_failure(
     return ParserFailureResult(
         source_snapshot_id=snapshot.id,
         quality_issue_id=issue.id,
+    )
+
+
+async def resolve_cumulative_parser_failure(
+    db: AsyncSession,
+    *,
+    sport_program_slug: str,
+    season: str,
+) -> int:
+    """Resolve prior cumulative parser drift after a successful rerun."""
+    return await _resolve_issue(
+        db,
+        f"cumulative-parser:{sport_program_slug}:{season}",
     )
 
 

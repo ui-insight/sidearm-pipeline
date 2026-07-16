@@ -14,7 +14,10 @@ from app.models.player_season_stat import PlayerSeasonStat
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.models.team import Team
-from app.services.season_stat_import import import_cumulative_stats
+from app.services.season_stat_import import (
+    import_cumulative_stats,
+    record_cumulative_parser_failure,
+)
 from app.services.sidearm_cumulative_stats import (
     ParsedCumulativePlayer,
     ParsedCumulativeStats,
@@ -145,6 +148,27 @@ async def test_import_is_idempotent_and_clean_facts_reconcile(db_session) -> Non
     assert fact.value == Decimal("25")
     assert fact.source_field == "PTS"
     assert fact.source_snapshot_id == second.source_snapshot_id
+
+
+async def test_successful_import_resolves_prior_parser_failure(db_session) -> None:
+    await _seed_player_with_games(db_session, "10", "15")
+    failure = await record_cumulative_parser_failure(
+        db_session,
+        sport_program_slug="womens-basketball",
+        season="2025-26",
+        source_url=SOURCE_URL,
+        raw_html="<html>unsupported</html>",
+        http_status=200,
+        error="Overall table is unavailable",
+    )
+
+    result = await import_cumulative_stats(db_session, _parsed_source(_player_row()))
+
+    issue = await db_session.get(DataQualityIssue, failure.quality_issue_id)
+    assert issue is not None
+    assert issue.status == "resolved"
+    assert issue.resolved_at is not None
+    assert result.quality_issues_resolved == 1
 
 
 async def test_mismatch_issue_is_deduplicated_then_resolved(db_session) -> None:

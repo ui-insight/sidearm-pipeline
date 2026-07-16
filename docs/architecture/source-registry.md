@@ -85,6 +85,20 @@ coverage with the source totals, and records Coverage Windows and reviewable
 data-quality issues. Missing game coverage is reported before metric mismatches
 so an incomplete backfill does not create false reconciliation failures.
 
+### Historical season backfill
+
+`POST /api/v1/sources/womens-basketball/seasons/{season}/backfill` runs one
+bounded season at a time. It reuses the idempotent roster, schedule, and final
+boxscore synchronizer with no correction lookback, then imports cumulative
+season statistics and performs sum-to-season reconciliation.
+
+The response includes an explicit coverage report for final games, missing
+boxscore links, failed boxscore ingests, unresolved identities, and other open
+quality issues. Each run upserts a game-grain `CoverageWindow`; missing links and
+parser failures remain reviewable `DataQualityIssue` records until a successful
+rerun resolves them. Public GoVandals HTML remains a documented fallback rather
+than a permanent authoritative-source assumption.
+
 This public GoVandals HTML is a publication-surface fallback while Athletics and
 Sidearm confirm the supported authoritative file, feed, or API. It must not be
 represented as an all-time or permanent source contract.
