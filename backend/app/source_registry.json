@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "source_system": "sidearm",
   "base_url": "https://govandals.com",
   "sports": [
@@ -69,11 +69,13 @@
       "source_patterns": {
         "schedule_url": "/sports/womens-basketball/schedule",
         "boxscore_url_pattern": "/sports/womens-basketball/stats/{season}/{opponent_slug}/boxscore/{source_event_id}",
-        "roster_url": "/sports/womens-basketball/roster"
+        "roster_url": "/sports/womens-basketball/roster",
+        "cumulative_stats_url": "/sports/womens-basketball/stats/{season}"
       },
       "supported_source_types": [
         "schedule_html",
         "boxscore_html",
+        "cumulative_stats_html",
         "roster_html",
         "player_bio_html",
         "recap_html",

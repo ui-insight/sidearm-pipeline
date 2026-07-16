@@ -35,7 +35,8 @@ Each sport entry includes:
 - `release_scope`: release inclusion marker, currently `release_1`
 - `event_shape`: canonical event shape from the athletic event model
 - `parser_strategy`: parser family that should handle the source
-- `source_patterns`: schedule and boxscore URL templates
+- `source_patterns`: schedule, boxscore, roster, and cumulative-statistics URL
+  templates when supported
 - `supported_source_types`: source kinds expected for the sport
 - `polling_policy`: final-only and future near-live cadence settings
 - `notes`: sport-specific caveats for parser and display work
@@ -66,6 +67,27 @@ known source URLs such as boxscore, recap, live stats, and gamefile links.
 Pass `?season=YYYY` to preview a historical Sidearm schedule URL such as
 `/sports/football/schedule/2025`. This is useful for finding completed events
 that already expose final boxscore links.
+
+## Women's Basketball Cumulative Statistics
+
+The women's basketball registry entry also exposes the public cumulative-season
+page as a characterized fallback source:
+
+```text
+GET  /api/v1/sources/womens-basketball/season-stats?season=2025-26
+POST /api/v1/sources/womens-basketball/season-stats/import?season=2025-26
+```
+
+The preview parses the overall player table, preserving Sidearm player-bio ids,
+source field names, and atomic season totals. The import writes idempotent
+`PlayerSeasonStat` facts, retains a raw snapshot, compares complete game-grain
+coverage with the source totals, and records Coverage Windows and reviewable
+data-quality issues. Missing game coverage is reported before metric mismatches
+so an incomplete backfill does not create false reconciliation failures.
+
+This public GoVandals HTML is a publication-surface fallback while Athletics and
+Sidearm confirm the supported authoritative file, feed, or API. It must not be
+represented as an all-time or permanent source contract.
 
 ## Next Uses
 
