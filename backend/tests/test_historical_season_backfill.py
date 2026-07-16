@@ -170,7 +170,12 @@ async def test_historical_backfill_reports_complete_coverage_idempotently(
     run_id, _ = await _seed_backfill_context(db_session, with_boxscore=True)
 
     async def fake_sync(*args, **kwargs) -> CurrentSeasonSyncResult:
-        assert kwargs == {"season": SEASON, "correction_lookback": 0}
+        assert kwargs == {
+            "season": SEASON,
+            "correction_lookback": 0,
+            "boxscore_delay_seconds": 0.0,
+            "parent_range_run_id": None,
+        }
         return _sync_result(run_id, final_boxscores_seen=1)
 
     async def fake_discover(*args, **kwargs) -> ParsedCumulativeStats:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -82,11 +83,18 @@ async def sync_current_wbb_season(
     *,
     season: str,
     correction_lookback: int = 2,
+    boxscore_delay_seconds: float = 0.0,
+    parent_range_run_id: int | None = None,
 ) -> CurrentSeasonSyncResult:
     """Synchronize one WBB season without refetching every historical boxscore."""
-    _validate_inputs(season, correction_lookback)
+    _validate_inputs(season, correction_lookback, boxscore_delay_seconds)
     started_at = datetime.now(UTC)
-    await _claim_sync_run(db, season=season, started_at=started_at)
+    await _claim_sync_run(
+        db,
+        season=season,
+        started_at=started_at,
+        parent_range_run_id=parent_range_run_id,
+    )
     sync_run = IngestRun(
         trigger_type="operator_sync",
         source_system="sidearm",
@@ -101,6 +109,8 @@ async def sync_current_wbb_season(
         run_metadata={
             "season": season,
             "correction_lookback": correction_lookback,
+            "boxscore_delay_seconds": boxscore_delay_seconds,
+            "parent_range_run_id": parent_range_run_id,
         },
     )
     db.add(sync_run)
@@ -148,7 +158,9 @@ async def sync_current_wbb_season(
             selected.append((event, game, reasons))
 
     outcomes: list[CurrentSeasonGameRefresh] = []
-    for event, game, reasons in selected:
+    for index, (event, game, reasons) in enumerate(selected):
+        if index > 0 and boxscore_delay_seconds > 0:
+            await asyncio.sleep(boxscore_delay_seconds)
         assert event.boxscore_url is not None
         game_id = game.id
         game_title = game.title or "Untitled game"
@@ -212,11 +224,17 @@ async def sync_current_wbb_season(
     return result
 
 
-def _validate_inputs(season: str, correction_lookback: int) -> None:
+def _validate_inputs(
+    season: str,
+    correction_lookback: int,
+    boxscore_delay_seconds: float,
+) -> None:
     if not re.fullmatch(r"20\d{2}-\d{2}", season):
         raise ValueError("WBB season must be an academic year like 2025-26")
     if correction_lookback < 0 or correction_lookback > 5:
         raise ValueError("Correction lookback must be between 0 and 5 games")
+    if boxscore_delay_seconds < 0 or boxscore_delay_seconds > 10:
+        raise ValueError("Boxscore delay must be between 0 and 10 seconds")
 
 
 async def _claim_sync_run(
@@ -224,6 +242,7 @@ async def _claim_sync_run(
     *,
     season: str,
     started_at: datetime,
+    parent_range_run_id: int | None,
 ) -> None:
     running = await db.scalar(
         select(IngestRun)
@@ -236,6 +255,20 @@ async def _claim_sync_run(
         .order_by(IngestRun.started_at.desc())
     )
     if running is None:
+        return
+    if (
+        parent_range_run_id is not None
+        and running.run_metadata.get("parent_range_run_id") == parent_range_run_id
+    ):
+        running.status = "failed"
+        running.finished_at = started_at
+        running.error_type = "InterruptedHistoricalRangeSeason"
+        running.error_message = "Reclaimed by an explicit resume of its parent range"
+        running.run_metadata = {
+            **running.run_metadata,
+            "reclaimed_by_parent_resume": True,
+        }
+        await db.commit()
         return
     if _as_utc(running.started_at) >= started_at - ACTIVE_RUN_WINDOW:
         raise SeasonSyncAlreadyRunning(running.id)
@@ -368,6 +401,11 @@ async def _finish_sync_run(
     run.run_metadata = {
         "season": result.season,
         "correction_lookback": result.correction_lookback,
+        "boxscore_delay_seconds": run.run_metadata.get(
+            "boxscore_delay_seconds",
+            0.0,
+        ),
+        "parent_range_run_id": run.run_metadata.get("parent_range_run_id"),
         "schedule_events_seen": result.schedule_events_seen,
         "schedule_games_created": result.schedule_games_created,
         "schedule_games_changed": result.schedule_games_changed,

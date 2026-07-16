@@ -10,6 +10,7 @@ from app.db.engine import get_db
 from app.schemas.current_season import CurrentSeasonSyncRead
 from app.schemas.game import GameSummary
 from app.schemas.historical_backfill import HistoricalSeasonBackfillRead
+from app.schemas.historical_range_backfill import HistoricalRangeBackfillRead
 from app.schemas.roster import RosterImportRead, RosterPlayerRead
 from app.schemas.schedule import ScheduleEventRead
 from app.schemas.season_stats import (
@@ -20,6 +21,10 @@ from app.services.current_season_sync import (
     SeasonSyncAlreadyRunning,
     SeasonSyncFailed,
     sync_current_wbb_season,
+)
+from app.services.historical_range_backfill import (
+    HistoricalRangeAlreadyRunning,
+    backfill_historical_wbb_range,
 )
 from app.services.historical_season_backfill import backfill_historical_wbb_season
 from app.services.roster_import import import_roster
@@ -36,6 +41,57 @@ from app.services.sidearm_roster import discover_roster
 from app.services.sidearm_schedule import discover_schedule_events
 
 router = APIRouter()
+
+
+@router.post(
+    "/{sport_slug}/historical-backfill",
+    response_model=HistoricalRangeBackfillRead,
+    summary="Backfill and checkpoint a historical WBB season range",
+)
+async def backfill_historical_range(
+    sport_slug: str,
+    start_season: str = Query(
+        description="First academic season in the inclusive range, such as 2017-18.",
+    ),
+    end_season: str = Query(
+        description="Last academic season in the inclusive range, such as 2023-24.",
+    ),
+    boxscore_delay_seconds: float = Query(default=1.0, ge=0.25, le=10),
+    resume_run_id: int | None = Query(default=None, ge=1),
+    db: AsyncSession = Depends(get_db),
+) -> HistoricalRangeBackfillRead:
+    """Run sequential seasons with pacing, durable checkpoints, and resume support."""
+    if sport_slug != "womens-basketball":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Historical range backfill currently supports WBB only",
+        )
+    try:
+        result = await backfill_historical_wbb_range(
+            db,
+            start_season=start_season,
+            end_season=end_season,
+            boxscore_delay_seconds=boxscore_delay_seconds,
+            resume_run_id=resume_run_id,
+        )
+    except HistoricalRangeAlreadyRunning as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return HistoricalRangeBackfillRead.model_validate(result, from_attributes=True)
 
 
 @router.post(
