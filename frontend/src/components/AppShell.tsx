@@ -48,6 +48,9 @@ function AppShell({ children }: { children: ReactNode }) {
             <NavLink to="/identity-queue" className={navClass}>
               Identity queue
             </NavLink>
+            <NavLink to="/backfills" className={navClass}>
+              Backfills
+            </NavLink>
           </nav>
         </div>
       </header>

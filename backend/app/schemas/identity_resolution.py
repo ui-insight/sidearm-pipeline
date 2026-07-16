@@ -44,6 +44,17 @@ class IdentityQueueItemRead(BaseModel):
     resolved_player_name: str | None = None
 
 
+class IdentityQueuePageRead(BaseModel):
+    """One filtered page plus the queue facets needed by the operator UI."""
+
+    items: list[IdentityQueueItemRead]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    available_seasons: list[str]
+    available_institutions: list[str]
+
+
 class IdentityIssueResolveRequest(BaseModel):
     """A human decision assigning an unresolved source row to a player."""
 

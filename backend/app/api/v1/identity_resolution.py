@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
@@ -17,6 +17,7 @@ from app.schemas.identity_resolution import (
     IdentityIssueResolutionRead,
     IdentityIssueResolveRequest,
     IdentityQueueItemRead,
+    IdentityQueuePageRead,
 )
 from app.services.player_identity import (
     create_player_for_identity_issue,
@@ -49,6 +50,80 @@ async def list_identity_queue(
             .limit(limit)
         )
     )
+    return await _serialize_identity_issues(db, issues)
+
+
+@router.get(
+    "/queue/page",
+    response_model=IdentityQueuePageRead,
+    summary="List a filtered page of player identity reviews",
+)
+async def page_identity_queue(
+    status_filter: IssueStatus = Query(default="open", alias="status"),
+    season: str | None = Query(default=None, min_length=1, max_length=16),
+    institution: str | None = Query(default=None, min_length=1, max_length=255),
+    game_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> IdentityQueuePageRead:
+    """Return a totalled queue page with season and institution filter facets."""
+    base_filters = (
+        DataQualityIssue.issue_type == "unresolved_identity",
+        DataQualityIssue.status == status_filter,
+    )
+    season_value = DataQualityIssue.details["season"].as_string()
+    institution_value = DataQualityIssue.details["institution"].as_string()
+    filters = list(base_filters)
+    if season is not None:
+        filters.append(season_value == season)
+    if institution is not None:
+        filters.append(institution_value == institution)
+    if game_id is not None:
+        filters.append(DataQualityIssue.game_id == game_id)
+
+    total = await db.scalar(select(func.count(DataQualityIssue.id)).where(*filters))
+    issues = list(
+        await db.scalars(
+            select(DataQualityIssue)
+            .where(*filters)
+            .order_by(DataQualityIssue.detected_at.desc(), DataQualityIssue.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    )
+    available_seasons = list(
+        await db.scalars(
+            select(season_value)
+            .where(*base_filters, season_value.is_not(None))
+            .distinct()
+            .order_by(season_value)
+        )
+    )
+    available_institutions = list(
+        await db.scalars(
+            select(institution_value)
+            .where(*base_filters, institution_value.is_not(None))
+            .distinct()
+            .order_by(institution_value)
+        )
+    )
+
+    return IdentityQueuePageRead(
+        items=await _serialize_identity_issues(db, issues),
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+        available_seasons=available_seasons,
+        available_institutions=available_institutions,
+    )
+
+
+async def _serialize_identity_issues(
+    db: AsyncSession,
+    issues: list[DataQualityIssue],
+) -> list[IdentityQueueItemRead]:
+    """Attach canonical player names to queue issue records."""
     player_ids = {
         player_id
         for issue in issues

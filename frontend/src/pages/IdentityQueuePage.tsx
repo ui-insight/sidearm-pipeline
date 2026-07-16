@@ -7,6 +7,8 @@ import type {
   IdentityQueueStatus,
 } from "../types/identityResolution";
 
+const PAGE_SIZE = 25;
+
 const STATUS_OPTIONS: { value: IdentityQueueStatus; label: string }[] = [
   { value: "open", label: "Open review" },
   { value: "resolved", label: "Resolved" },
@@ -46,6 +48,14 @@ function apiErrorMessage(error: unknown): string {
 function IdentityQueuePage() {
   const [status, setStatus] = useState<IdentityQueueStatus>("open");
   const [items, setItems] = useState<IdentityQueueItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [season, setSeason] = useState("");
+  const [institution, setInstitution] = useState("");
+  const [gameId, setGameId] = useState("");
+  const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
+  const [availableInstitutions, setAvailableInstitutions] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -55,8 +65,20 @@ function IdentityQueuePage() {
 
     async function loadQueue() {
       try {
-        const loadedItems = await identityResolutionApi.list(status);
-        if (active) setItems(loadedItems);
+        const loadedPage = await identityResolutionApi.list({
+          status,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+          season: season || undefined,
+          institution: institution || undefined,
+          gameId: gameId || undefined,
+        });
+        if (active) {
+          setItems(loadedPage.items);
+          setTotal(loadedPage.total);
+          setAvailableSeasons(loadedPage.available_seasons);
+          setAvailableInstitutions(loadedPage.available_institutions);
+        }
       } catch (loadError) {
         if (active) setError(apiErrorMessage(loadError));
       } finally {
@@ -68,13 +90,51 @@ function IdentityQueuePage() {
     return () => {
       active = false;
     };
-  }, [status]);
+  }, [gameId, institution, page, reloadKey, season, status]);
 
   function changeStatus(nextStatus: IdentityQueueStatus) {
     setLoading(true);
     setError(null);
     setStatus(nextStatus);
+    setPage(0);
+    setSeason("");
+    setInstitution("");
+    setGameId("");
     setSuccess(null);
+  }
+
+  function changeSeason(nextSeason: string) {
+    setLoading(true);
+    setPage(0);
+    setSeason(nextSeason);
+  }
+
+  function changeInstitution(nextInstitution: string) {
+    setLoading(true);
+    setPage(0);
+    setInstitution(nextInstitution);
+  }
+
+  function changeGameId(nextGameId: string) {
+    setLoading(true);
+    setPage(0);
+    setGameId(nextGameId);
+  }
+
+  function clearFilters() {
+    setLoading(true);
+    setPage(0);
+    setSeason("");
+    setInstitution("");
+    setGameId("");
+  }
+
+  function refreshAfterDecision() {
+    if (items.length === 1 && page > 0) {
+      setPage((current) => current - 1);
+    } else {
+      setReloadKey((current) => current + 1);
+    }
   }
 
   async function resolveItem(
@@ -86,8 +146,8 @@ function IdentityQueuePage() {
     setSuccess(null);
     try {
       await identityResolutionApi.resolve(item.id, playerId, resolutionNotes);
-      setItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setSuccess(`${displayPlayerName(item)} was linked to a canonical player.`);
+      refreshAfterDecision();
     } catch (resolveError) {
       setError(apiErrorMessage(resolveError));
     }
@@ -105,10 +165,10 @@ function IdentityQueuePage() {
         displayName,
         resolutionNotes,
       });
-      setItems((current) => current.filter((candidate) => candidate.id !== item.id));
       setSuccess(
         `${displayName} was created and linked. Future ingests will use this identity.`,
       );
+      refreshAfterDecision();
     } catch (createError) {
       setError(apiErrorMessage(createError));
     }
@@ -154,6 +214,59 @@ function IdentityQueuePage() {
         ))}
       </div>
 
+      <div className="mb-5 grid gap-3 border-y border-gray-200 bg-white px-4 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_9rem_auto] lg:items-end">
+        <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-gray-600">
+          Season
+          <select
+            value={season}
+            onChange={(event) => changeSeason(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 outline-none focus:border-gray-950 focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+          >
+            <option value="">All seasons</option>
+            {availableSeasons.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-gray-600">
+          Institution
+          <select
+            value={institution}
+            onChange={(event) => changeInstitution(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 outline-none focus:border-gray-950 focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+          >
+            <option value="">All institutions</option>
+            {availableInstitutions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-gray-600">
+          Game ID
+          <input
+            type="number"
+            min="1"
+            inputMode="numeric"
+            value={gameId}
+            onChange={(event) => changeGameId(event.target.value)}
+            placeholder="Any game"
+            className="min-w-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 outline-none placeholder:text-gray-400 focus:border-gray-950 focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={clearFilters}
+          disabled={!season && !institution && !gameId}
+          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:text-gray-400"
+        >
+          Clear filters
+        </button>
+      </div>
+
       {error && (
         <p
           role="alert"
@@ -184,7 +297,7 @@ function IdentityQueuePage() {
           </h2>
           {!loading && (
             <span className="text-xs tabular-nums text-gray-500">
-              {items.length} item{items.length === 1 ? "" : "s"}
+              {total} item{total === 1 ? "" : "s"}
             </span>
           )}
         </div>
@@ -213,6 +326,38 @@ function IdentityQueuePage() {
               />
             ))}
           </ol>
+        )}
+        {!loading && total > 0 && (
+          <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="text-xs tabular-nums text-gray-600">
+              Showing {page * PAGE_SIZE + 1}–
+              {Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  setPage((current) => current - 1);
+                }}
+                disabled={page === 0}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:text-gray-400"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  setPage((current) => current + 1);
+                }}
+                disabled={(page + 1) * PAGE_SIZE >= total}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:text-gray-400"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </section>
     </div>

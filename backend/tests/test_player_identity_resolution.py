@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 
 from app.db.seed import seed_warehouse_reference_data
 from app.models.data_quality_issue import DataQualityIssue
+from app.models.game import Game
 from app.models.player import Player, PlayerExternalIdentity, PlayerSeason
 from app.models.player_identity_resolution import PlayerIdentityResolution
 from app.models.sport_program import SportProgram
@@ -173,6 +174,81 @@ async def test_ambiguous_fallback_is_deduplicated_in_review_queue(
     ]
 
 
+async def test_queue_page_reports_totals_facets_and_filters(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    game = Game(
+        source_url="https://govandals.com/boxscore/queue-filter",
+        canonical_uid="sidearm:womens-basketball:queue-filter",
+    )
+    db_session.add(game)
+    await db_session.flush()
+
+    await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Montana",
+            season="2023-24",
+            player_name="Lincoln, Adria",
+            jersey_number="33",
+            game_id=game.id,
+        ),
+    )
+    await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Montana",
+            season="2024-25",
+            player_name="Huard, Haley",
+            jersey_number="10",
+        ),
+    )
+    await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Weber State",
+            season="2023-24",
+            player_name="Lovell, Emri",
+            jersey_number="10",
+        ),
+    )
+    await db_session.commit()
+
+    page_response = await client.get(
+        "/api/v1/identity-resolution/queue/page",
+        params={"status": "open", "limit": 2, "offset": 1},
+    )
+
+    assert page_response.status_code == 200
+    page = page_response.json()
+    assert page["total"] == 3
+    assert len(page["items"]) == 2
+    assert page["limit"] == 2
+    assert page["offset"] == 1
+    assert page["available_seasons"] == ["2023-24", "2024-25"]
+    assert page["available_institutions"] == ["Montana", "Weber State"]
+
+    filtered_response = await client.get(
+        "/api/v1/identity-resolution/queue/page",
+        params={
+            "status": "open",
+            "season": "2023-24",
+            "institution": "Montana",
+            "game_id": game.id,
+        },
+    )
+
+    assert filtered_response.status_code == 200
+    filtered = filtered_response.json()
+    assert filtered["total"] == 1
+    assert filtered["items"][0]["details"]["player_name"] == "Lincoln, Adria"
+
+
 async def test_queue_api_resolution_is_reused_for_future_signature_rows(
     client,
     db_session,
@@ -217,6 +293,102 @@ async def test_queue_api_resolution_is_reused_for_future_signature_rows(
     )
     assert resolved_queue.status_code == 200
     assert resolved_queue.json()[0]["player_id"] == player.id
+
+
+async def test_unique_reviewed_signature_is_reused_across_seasons(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    future_row = _source_row(
+        program,
+        institution="Montana",
+        season="2024-25",
+        player_name="Huard, Haley",
+        jersey_number="10",
+    )
+    future_issue = await resolve_player_identity(db_session, future_row)
+    prior_issue = await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Montana",
+            season="2023-24",
+            player_name="Haley Huard",
+            jersey_number="10",
+        ),
+    )
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/identity-resolution/queue/{prior_issue.issue_id}/create-player",
+        json={
+            "display_name": "Haley Huard",
+            "resolution_notes": "SID verified the 2023-24 Montana source row.",
+        },
+    )
+    assert response.status_code == 201
+
+    match = await resolve_player_identity(db_session, future_row)
+
+    assert match.player_id == response.json()["player_id"]
+    assert match.method == "reviewed_history"
+    refreshed_future_issue = await db_session.get(
+        DataQualityIssue, future_issue.issue_id
+    )
+    assert refreshed_future_issue is not None
+    assert refreshed_future_issue.status == "resolved"
+    assert refreshed_future_issue.player_id == match.player_id
+    memberships = list(
+        await db_session.scalars(
+            select(PlayerSeason).where(PlayerSeason.player_id == match.player_id)
+        )
+    )
+    assert {membership.season for membership in memberships} == {
+        "2023-24",
+        "2024-25",
+    }
+    assert await db_session.scalar(select(func.count(PlayerIdentityResolution.id))) == 2
+
+
+async def test_reviewed_history_requires_the_same_jersey(
+    client,
+    db_session,
+) -> None:
+    program = await _seed_program(db_session)
+    prior_issue = await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Montana",
+            season="2023-24",
+            player_name="Haley Huard",
+            jersey_number="10",
+        ),
+    )
+    await db_session.commit()
+    response = await client.post(
+        f"/api/v1/identity-resolution/queue/{prior_issue.issue_id}/create-player",
+        json={
+            "display_name": "Haley Huard",
+            "resolution_notes": "SID verified the 2023-24 Montana source row.",
+        },
+    )
+    assert response.status_code == 201
+
+    changed_jersey = await resolve_player_identity(
+        db_session,
+        _source_row(
+            program,
+            institution="Montana",
+            season="2024-25",
+            player_name="Huard, Haley",
+            jersey_number="11",
+        ),
+    )
+
+    assert changed_jersey.player_id is None
+    assert changed_jersey.method == "unresolved"
 
 
 async def test_manual_source_id_resolution_creates_future_exact_identity(
