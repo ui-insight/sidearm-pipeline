@@ -111,6 +111,8 @@ async def backfill_historical_wbb_range(
             boxscore_delay_seconds=boxscore_delay_seconds,
         )
 
+    run_id = run.id
+    run_started_at = _as_utc(run.started_at)
     outcomes = _stored_outcomes(run)
     seasons_attempted = 0
     for season in seasons:
@@ -126,7 +128,7 @@ async def backfill_historical_wbb_range(
                 db,
                 season=season,
                 boxscore_delay_seconds=boxscore_delay_seconds,
-                parent_range_run_id=run.id,
+                parent_range_run_id=run_id,
             )
             outcome = HistoricalRangeSeasonResult(
                 season=season,
@@ -151,7 +153,7 @@ async def backfill_historical_wbb_range(
         outcomes[season] = outcome
         await _checkpoint_range_run(
             db,
-            run_id=run.id,
+            run_id=run_id,
             season_order=seasons,
             outcomes=outcomes,
         )
@@ -165,7 +167,7 @@ async def backfill_historical_wbb_range(
     seasons_skipped = len(seasons) - seasons_attempted
     await _finish_range_run(
         db,
-        run_id=run.id,
+        run_id=run_id,
         status=status,
         finished_at=finished_at,
         season_order=seasons,
@@ -175,14 +177,14 @@ async def backfill_historical_wbb_range(
         seasons_failed=failed,
     )
     return HistoricalRangeBackfillResult(
-        run_id=run.id,
+        run_id=run_id,
         sport_slug=WBB_SPORT_SLUG,
         start_season=start_season,
         end_season=end_season,
         status=status,
         boxscore_delay_seconds=boxscore_delay_seconds,
         resumed=resumed,
-        started_at=_as_utc(run.started_at),
+        started_at=run_started_at,
         finished_at=finished_at,
         seasons_total=len(seasons),
         seasons_attempted=seasons_attempted,
