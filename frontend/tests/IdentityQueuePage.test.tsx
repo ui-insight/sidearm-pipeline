@@ -14,6 +14,17 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
+function queuePage(items: unknown[], total = items.length) {
+  return {
+    items,
+    total,
+    limit: 25,
+    offset: 0,
+    available_seasons: ["2023-24", "2025-26"],
+    available_institutions: ["Idaho State University", "University of Idaho"],
+  };
+}
+
 const queueItem = {
   id: 9,
   sport_program_id: 3,
@@ -62,10 +73,11 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (input, init) => {
     const endpoint = String(input);
     if (
-      endpoint === "/api/v1/identity-resolution/queue?status=open" &&
+      endpoint ===
+        "/api/v1/identity-resolution/queue/page?status=open&limit=25&offset=0" &&
       init?.method === "GET"
     ) {
-      return jsonResponse([queueItem]);
+      return jsonResponse(queuePage([queueItem]));
     }
     if (
       endpoint === "/api/v1/identity-resolution/queue/9/resolve" &&
@@ -101,7 +113,7 @@ describe("IdentityQueuePage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "K. Gardner" })).toBeInTheDocument();
-    expect(screen.getByText("University of Idaho")).toBeInTheDocument();
+    expect(screen.getAllByText("University of Idaho")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "View source" })).toHaveAttribute(
       "href",
       "https://govandals.com/boxscore/9968",
@@ -133,10 +145,11 @@ describe("IdentityQueuePage", () => {
     fetchMock.mockImplementation(async (input, init) => {
       const endpoint = String(input);
       if (
-        endpoint === "/api/v1/identity-resolution/queue?status=open" &&
+        endpoint ===
+          "/api/v1/identity-resolution/queue/page?status=open&limit=25&offset=0" &&
         init?.method === "GET"
       ) {
-        return jsonResponse([unmatchedQueueItem]);
+        return jsonResponse(queuePage([unmatchedQueueItem]));
       }
       if (
         endpoint === "/api/v1/identity-resolution/queue/10/create-player" &&
@@ -186,6 +199,44 @@ describe("IdentityQueuePage", () => {
           resolution_notes: "SID verified the opponent bio and jersey number.",
         }),
       }),
+    );
+  });
+
+  it("filters the full queue and moves between pages", async () => {
+    fetchMock.mockImplementation(async (_input, init) => {
+      if (init?.method === "GET") {
+        return jsonResponse(queuePage([queueItem], 26));
+      }
+      return jsonResponse({});
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <IdentityQueuePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Showing 1–25 of 26")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Season"), "2025-26");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/identity-resolution/queue/page?status=open&limit=25&offset=0&season=2025-26",
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    await user.selectOptions(
+      screen.getByLabelText("Institution"),
+      "University of Idaho",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/identity-resolution/queue/page?status=open&limit=25&offset=0&season=2025-26&institution=University+of+Idaho",
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/identity-resolution/queue/page?status=open&limit=25&offset=25",
+      expect.objectContaining({ method: "GET" }),
     );
   });
 });

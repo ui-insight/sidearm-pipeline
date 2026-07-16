@@ -20,6 +20,7 @@ ResolutionMethod = Literal[
     "source_player_id",
     "manual_resolution",
     "roster_name_jersey",
+    "reviewed_history",
     "unresolved",
 ]
 
@@ -107,6 +108,22 @@ async def resolve_player_identity(
             player_id=candidates[0],
             method="roster_name_jersey",
         )
+
+    if not candidates and source_player_id is None and jersey_number is not None:
+        reviewed_player_id = await _reuse_unique_reviewed_history(
+            db,
+            row=row,
+            source_system=source_system,
+            institution=institution,
+            normalized_name=normalized_name,
+            jersey_number=jersey_number,
+            match_key=match_key,
+        )
+        if reviewed_player_id is not None:
+            return PlayerIdentityMatch(
+                player_id=reviewed_player_id,
+                method="reviewed_history",
+            )
 
     reason = "ambiguous" if candidates else "unmatched"
     issue = await _upsert_unresolved_issue(
@@ -347,6 +364,91 @@ async def _roster_candidates(
         if normalize_player_name(player.display_name) == normalized_name
         and normalize_jersey_number(player_season.jersey_number) == jersey_number
     )
+
+
+async def _reuse_unique_reviewed_history(
+    db: AsyncSession,
+    *,
+    row: PlayerIdentityRow,
+    source_system: str,
+    institution: str,
+    normalized_name: str,
+    jersey_number: str,
+    match_key: str,
+) -> int | None:
+    """Reuse one unambiguous prior SID decision for an exact player signature."""
+    prior_player_ids = set(
+        await db.scalars(
+            select(PlayerIdentityResolution.player_id).where(
+                PlayerIdentityResolution.sport_program_id == row.sport_program_id,
+                PlayerIdentityResolution.source_system == source_system,
+                PlayerIdentityResolution.institution == institution,
+                PlayerIdentityResolution.season != row.season,
+                PlayerIdentityResolution.normalized_name == normalized_name,
+                PlayerIdentityResolution.jersey_number == jersey_number,
+            )
+        )
+    )
+    if len(prior_player_ids) != 1:
+        return None
+
+    player_id = prior_player_ids.pop()
+    note = (
+        "Automatically reused the only prior SID-reviewed institution, name, "
+        "and jersey signature."
+    )
+    existing_issue = await db.scalar(
+        select(DataQualityIssue).where(
+            DataQualityIssue.deduplication_key == f"identity:{match_key}"
+        )
+    )
+    now = datetime.now(UTC)
+    db.add(
+        PlayerIdentityResolution(
+            match_key=match_key,
+            sport_program_id=row.sport_program_id,
+            player_id=player_id,
+            source_system=source_system,
+            institution=institution,
+            season=row.season,
+            source_player_id=None,
+            normalized_name=normalized_name,
+            jersey_number=jersey_number,
+            created_from_issue_id=existing_issue.id if existing_issue else None,
+            resolution_notes=note,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    membership = await db.scalar(
+        select(PlayerSeason).where(
+            PlayerSeason.player_id == player_id,
+            PlayerSeason.sport_program_id == row.sport_program_id,
+            PlayerSeason.season == row.season,
+        )
+    )
+    if membership is None:
+        db.add(
+            PlayerSeason(
+                player_id=player_id,
+                sport_program_id=row.sport_program_id,
+                team_id=row.team_id,
+                source_snapshot_id=row.source_snapshot_id,
+                season=row.season,
+                jersey_number=jersey_number,
+                bio_url=row.source_url,
+            )
+        )
+
+    if existing_issue is not None:
+        existing_issue.player_id = player_id
+        existing_issue.status = "resolved"
+        existing_issue.resolved_at = now
+        existing_issue.resolution_notes = note
+
+    await db.flush()
+    return player_id
 
 
 async def _upsert_unresolved_issue(

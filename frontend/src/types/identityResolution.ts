@@ -27,6 +27,24 @@ export interface IdentityQueueItem {
   resolved_player_name: string | null;
 }
 
+export interface IdentityQueuePage {
+  items: IdentityQueueItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  available_seasons: string[];
+  available_institutions: string[];
+}
+
+export interface IdentityQueueFilters {
+  status: IdentityQueueStatus;
+  limit: number;
+  offset: number;
+  season?: string;
+  institution?: string;
+  gameId?: string;
+}
+
 export interface IdentityResolution {
   issue_id: number;
   player_id: number;

@@ -98,6 +98,16 @@ async def test_ingest_creates_canonical_event_metadata(
     assert history_payload[0]["run_metadata"]["canonical_uid"] == (
         "sidearm:football:2025:8467"
     )
+    filtered_history = await client.get(
+        "/api/v1/ingest-runs",
+        params={"source_type": "boxscore_html", "sport": "football"},
+    )
+    assert len(filtered_history.json()) == 1
+    unrelated_history = await client.get(
+        "/api/v1/ingest-runs",
+        params={"source_type": "historical_range_backfill"},
+    )
+    assert unrelated_history.json() == []
 
     game = await db_session.scalar(select(Game))
     assert game is not None
