@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.engine import get_db
 from app.schemas.current_season import CurrentSeasonSyncRead
 from app.schemas.game import GameSummary
+from app.schemas.historical_backfill import HistoricalSeasonBackfillRead
 from app.schemas.roster import RosterImportRead, RosterPlayerRead
 from app.schemas.schedule import ScheduleEventRead
 from app.schemas.season_stats import (
@@ -20,6 +21,7 @@ from app.services.current_season_sync import (
     SeasonSyncFailed,
     sync_current_wbb_season,
 )
+from app.services.historical_season_backfill import backfill_historical_wbb_season
 from app.services.roster_import import import_roster
 from app.services.schedule_import import import_schedule_events
 from app.services.season_stat_import import (
@@ -34,6 +36,44 @@ from app.services.sidearm_roster import discover_roster
 from app.services.sidearm_schedule import discover_schedule_events
 
 router = APIRouter()
+
+
+@router.post(
+    "/{sport_slug}/seasons/{season}/backfill",
+    response_model=HistoricalSeasonBackfillRead,
+    summary="Backfill and reconcile one historical WBB season",
+)
+async def backfill_historical_season(
+    sport_slug: str,
+    season: str,
+    db: AsyncSession = Depends(get_db),
+) -> HistoricalSeasonBackfillRead:
+    """Ingest one completed WBB season and persist its coverage evidence."""
+    if sport_slug != "womens-basketball":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Historical season backfill currently supports WBB only",
+        )
+    try:
+        result = await backfill_historical_wbb_season(db, season=season)
+    except SeasonSyncAlreadyRunning as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except SeasonSyncFailed as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Historical season backfill failed: {exc}",
+        ) from exc
+
+    return HistoricalSeasonBackfillRead.model_validate(result, from_attributes=True)
 
 
 @router.get(
