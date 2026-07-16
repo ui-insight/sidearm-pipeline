@@ -34,11 +34,20 @@ the cheap seed for the Record Book's season and career aggregates, without recon
 history game-by-game. A distinct source from the Boxscore, doing a distinct job.
 
 **Player Bio (identity anchor)**:
-The Sidearm player bio page each stats-table name links to. Its URL carries a **stable
-numeric player id** (e.g. `/roster/kyra-gardner/8435`) present on *both* boxscore and
-season-stats pages. This id is the **primary** anchor for identity resolution — joining
-stat lines to one canonical **Player** across games and seasons — with name/jersey fuzzy
-matching demoted to a fallback for edge cases (missing link, transfers, id changes).
+The Sidearm player bio page each stats-table name links to. Its URL carries a numeric
+player id (e.g. `/roster/kyra-gardner/8435`) present on boxscore, roster, and
+season-stats pages. This id is the **preferred Release 1 anchor** for identity
+resolution — joining stat lines to one canonical **Player** across games and seasons.
+Store it as a namespaced external identity (`source + institution + id`), not as a
+globally unique bare number. Its stability across historical seasons must be verified;
+name/jersey matching remains a reviewable fallback for missing links, transfers, and id
+changes.
+
+**Source Authority**:
+The documented priority used when sources disagree. Prefer the most structured source
+available to the University: institutional stat files first, then a supported Sidearm
+export/API, then public HTML, with PDF/manual records as explicit historical fallbacks.
+Source Authority is decided per sport, season, and grain rather than assumed globally.
 
 ### System
 
@@ -51,6 +60,19 @@ _Avoid_: "the pipeline" when you mean the whole system (ingestion is one part of
 **Record Book**:
 The accumulated career totals, season bests, and program leaderboards the warehouse
 builds up over time. The reference history a single game's stats are compared against.
+Every Record Book result has a **Coverage Window**; it is not automatically an all-time
+institutional record book.
+
+**Coverage Window**:
+The seasons, grains, metrics, and known gaps that bound a warehouse fact. Comparative
+claims must show their Coverage Window. Use "all-time" only when the underlying history
+is demonstrably complete; otherwise say "since `<season>`" or "in warehouse history."
+
+**Exploratory Workspace**:
+The SID-facing surface for filtering, charting, comparing, and exporting verified
+warehouse facts. It includes Record Book and leaders views, but also supports trends,
+splits, streaks, opponent history, venue context, and evidence-backed story discovery.
+It is curated around SID questions rather than a general-purpose chart builder.
 
 **Notable Achievement**:
 A *comparative* statement about a performance relative to the Record Book — e.g.
@@ -72,16 +94,17 @@ warehouse detects and computes; the AI ranks newsworthiness and phrases.
 
 **Notability**:
 How the system decides which true comparative facts are worth surfacing. Primarily
-*deterministic*: notability ≈ (scope of the mark: all-time record > career high >
+*deterministic*: notability ≈ (scope of the mark: verified all-time record > career high >
 season high > best-in-N-games) × (**stat-importance rubric** the SID defines per sport
 — e.g. WBB points/rebounds/assists high; minutes/fouls/turnovers low or suppressed).
 The AI ranks borderline cases and phrases survivors; it is a ranker/writer over a
-SID-defined rubric, not the arbiter of what matters.
+SID-defined rubric, not the arbiter of what matters. Scope is capped by the applicable
+Coverage Window.
 
 **Verdict**:
 The SID's approve/reject decision on a suggested achievement. Beyond gating what ships,
-verdicts are the **tuning signal** — rejections down-weight that pattern's Notability so
-the tool sharpens with use.
+verdicts are a **tuning signal** for an explicit, versioned Notability-policy revision.
+They do not silently mutate metric meaning or rewrite prior decisions.
 _Avoid_: "review" (the act is a verdict; "review view" is where verdicts happen)
 
 **Ask-a-Question (NLQ)**:
@@ -107,6 +130,8 @@ _Avoid_: "text-to-SQL" (the rejected alternative — see ADR-005)
 - **Integrity check:** a **Player**'s per-game **Boxscore** stats summed over a season
   should reconcile to that player's row on the **Cumulative Season Statistics** page;
   a mismatch flags a parsing or identity-resolution error.
+- Every Record Book answer, Notable Achievement, chart, and NLQ response carries its
+  **Coverage Window** and source provenance.
 - The **Athletic Data Warehouse** is the single system of record; the AI features
   read from it rather than maintaining their own separate stores.
 
@@ -120,10 +145,12 @@ _Avoid_: "text-to-SQL" (the rejected alternative — see ADR-005)
   backfillable from Sidearm. **Season/career** aggregates come from Cumulative Season
   Statistics pages; **single-game** records come from per-game Boxscores (~30/season,
   ~300 for one sport over a decade — bounded, and the intern parser already exists).
-  Both anchor on the stable Player id. Remaining constraint: **older seasons
-  (pre-2017-18) use an "HTML version" markup** the current parser likely won't handle —
+  Both should anchor on verified, namespaced Player identities. Remaining constraint:
+  the **pre-2017-18 HTML version markup** likely will not work with the current parser —
   game-grain backfill may reach back only ~8 seasons, with older seasons falling back to
-  cumulative season aggregates. Depth is a parser-coverage question, not a design blocker.
+  cumulative season aggregates. Depth is both a parser-coverage question and a
+  product-truth constraint: claims outside the verified Coverage Window must not be
+  described as all-time.
 - NLQ approach: free text-to-SQL (interns' ADR-003/004 direction) vs. curated
   semantic layer. Resolved: **curated semantic layer** — facts must be trustworthy
   because the SID may quote them publicly. See ADR-005.

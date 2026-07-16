@@ -33,6 +33,22 @@ does double duty (typing stats and encoding notability).
 - `value` is loosely typed (numeric); stat semantics (summable, higher-is-better) live in
   `stat_definition`, not in column types. Validation must lean on `stat_definition` rather
   than the schema.
-- Sport fan-out becomes primarily data entry plus parser coverage, not schema work.
+- For a sport whose event and participant shape is already supported, stat-schema fan-out
+  becomes primarily `stat_definition` data plus parser coverage rather than a new typed
+  table.
 - The notability rubric has a natural home (`stat_definition.importance_weight`) instead of
   a separate bolt-on structure.
+
+## Scope clarification (July 14, 2026)
+
+This ADR governs the storage shape for atomic player statistics. It does **not** imply
+that every sport can be added through stat definitions alone. Tennis matches, swimming
+and diving meets, track and field results, cross country meets, and golf tournaments may
+also require participant, placement, round, heat, attempt, and parent/child event models.
+See the revised
+[Reboot Implementation Plan](../architecture/reboot-implementation-plan.md).
+
+The revised plan also calls for a follow-on decision on whether editorial
+`importance_weight` remains coupled to `StatDefinition` or moves to a separate,
+versioned `NotabilityPolicy`. The long-form storage decision remains accepted either
+way.
