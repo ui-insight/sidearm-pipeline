@@ -72,12 +72,16 @@ async def backfill_historical_wbb_season(
     db: AsyncSession,
     *,
     season: str,
+    boxscore_delay_seconds: float = 0.0,
+    parent_range_run_id: int | None = None,
 ) -> HistoricalSeasonBackfillResult:
     """Backfill one WBB season, then reconcile and persist its coverage report."""
     game_sync = await sync_current_wbb_season(
         db,
         season=season,
         correction_lookback=0,
+        boxscore_delay_seconds=boxscore_delay_seconds,
+        parent_range_run_id=parent_range_run_id,
     )
 
     season_stats: CumulativeStatsImportResult | None = None

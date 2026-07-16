@@ -99,6 +99,28 @@ parser failures remain reviewable `DataQualityIssue` records until a successful
 rerun resolves them. Public GoVandals HTML remains a documented fallback rather
 than a permanent authoritative-source assumption.
 
+For an operator-controlled multi-season run, use the inclusive range endpoint:
+
+```text
+POST /api/v1/sources/womens-basketball/historical-backfill
+     ?start_season=2017-18
+     &end_season=2023-24
+     &boxscore_delay_seconds=1
+```
+
+Range runs are limited to ten academic seasons. They execute one season at a
+time, pause between selected boxscore requests and between seasons, and reuse
+the same one-season workflow above. A parent `IngestRun` checkpoints the result
+of every season before continuing, including explicit error type and message
+when a season fails. A failed season does not prevent later seasons in the range
+from being attempted.
+
+The response's parent `run_id` can resume interrupted or partial work. Submit
+the same start and end seasons with `resume_run_id={run_id}`; seasons previously
+recorded as succeeded or partial are skipped, while failed or missing seasons
+are attempted again. New overlapping range requests return `409 Conflict` while
+the existing parent run is active.
+
 This public GoVandals HTML is a publication-surface fallback while Athletics and
 Sidearm confirm the supported authoritative file, feed, or API. It must not be
 represented as an all-time or permanent source contract.

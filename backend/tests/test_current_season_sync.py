@@ -1,6 +1,7 @@
 """Tests for bounded, observable current-season WBB synchronization."""
 
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 
 from sqlalchemy import func, select
 
@@ -8,6 +9,7 @@ from app.db.seed import seed_warehouse_reference_data
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import Game, IngestRun
 from app.models.sport_program import SportProgram
+from app.services.current_season_sync import sync_current_wbb_season
 from app.services.sidearm_roster import ParsedRoster, ParsedRosterPlayer
 from app.services.sidearm_schedule import ParsedScheduleEvent
 from app.services.sidearm_scraper import ParsedBoxscore
@@ -305,6 +307,45 @@ async def test_season_sync_rejects_an_overlapping_active_run(
     )
 
 
+async def test_parent_range_resume_reclaims_its_interrupted_season_run(
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    active = IngestRun(
+        trigger_type="operator_sync",
+        source_system="sidearm",
+        source_type="season_sync",
+        source_url=("https://govandals.com/sports/womens-basketball/schedule/2025-26"),
+        sport="womens-basketball",
+        season=SEASON,
+        status="running",
+        started_at=datetime.now(UTC),
+        run_metadata={"parent_range_run_id": 44},
+    )
+    db_session.add(active)
+    await db_session.commit()
+    scrape_calls: list[str] = []
+    await _configure_sync_fakes(monkeypatch, _schedule_event(), scrape_calls)
+
+    result = await sync_current_wbb_season(
+        db_session,
+        season=SEASON,
+        correction_lookback=0,
+        parent_range_run_id=44,
+    )
+
+    await db_session.refresh(active)
+    resumed = await db_session.get(IngestRun, result.run_id)
+    assert active.status == "failed"
+    assert active.error_type == "InterruptedHistoricalRangeSeason"
+    assert active.run_metadata["reclaimed_by_parent_resume"] is True
+    assert resumed is not None
+    assert resumed.status == "succeeded"
+    assert resumed.run_metadata["parent_range_run_id"] == 44
+    assert scrape_calls == [BOXSCORE_URL]
+
+
 async def test_season_sync_returns_partial_evidence_when_one_boxscore_fails(
     client,
     db_session,
@@ -374,3 +415,69 @@ async def test_season_sync_returns_partial_evidence_when_one_boxscore_fails(
     assert sync_run is not None
     assert sync_run.status == "partial"
     assert sync_run.run_metadata["boxscores_failed"] == 1
+
+
+async def test_season_sync_paces_selected_boxscores(
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+    first_event = _schedule_event()
+    second_event = _schedule_event()
+    second_event.source_event_id = "9969"
+    second_event.opponent_name = "Montana"
+    second_event.event_date = date(2025, 11, 22)
+    second_url = (
+        "https://govandals.com/sports/womens-basketball/stats/2025-26/"
+        "montana/boxscore/9969"
+    )
+    second_event.source_urls = {"boxscore_html": second_url}
+    events: list[tuple[str, str | float]] = []
+
+    async def fake_discover_roster(sport_slug: str, season: str) -> ParsedRoster:
+        return _roster()
+
+    async def fake_discover_schedule(
+        sport_slug: str,
+        season: str | None = None,
+    ) -> list[ParsedScheduleEvent]:
+        return [first_event, second_event]
+
+    async def fake_ingest_boxscore(db, url, **kwargs):
+        events.append(("boxscore", url))
+        return SimpleNamespace(id=len(events), title=f"Boxscore {url}")
+
+    async def fake_sleep(seconds: float) -> None:
+        events.append(("sleep", seconds))
+
+    monkeypatch.setattr(
+        "app.services.current_season_sync.discover_roster",
+        fake_discover_roster,
+    )
+    monkeypatch.setattr(
+        "app.services.current_season_sync.discover_schedule_events",
+        fake_discover_schedule,
+    )
+    monkeypatch.setattr(
+        "app.services.current_season_sync.ingest_boxscore",
+        fake_ingest_boxscore,
+    )
+    monkeypatch.setattr(
+        "app.services.current_season_sync.asyncio.sleep",
+        fake_sleep,
+    )
+
+    result = await sync_current_wbb_season(
+        db_session,
+        season=SEASON,
+        correction_lookback=0,
+        boxscore_delay_seconds=0.5,
+    )
+
+    assert result.boxscores_refreshed == 2
+    assert events == [
+        ("boxscore", BOXSCORE_URL),
+        ("sleep", 0.5),
+        ("boxscore", second_url),
+    ]
