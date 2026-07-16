@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import AuthenticationBoundary from "./components/AuthenticationBoundary";
 import AppShell from "./components/AppShell";
 import HomePage from "./pages/HomePage";
 import GamePage from "./pages/GamePage";
@@ -8,14 +9,23 @@ import HistoricalBackfillPage from "./pages/HistoricalBackfillPage";
 function App() {
   return (
     <BrowserRouter>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/games/:id" element={<GamePage />} />
-          <Route path="/identity-queue" element={<IdentityQueuePage />} />
-          <Route path="/backfills" element={<HistoricalBackfillPage />} />
-        </Routes>
-      </AppShell>
+      <AuthenticationBoundary>
+        {({ username, logoutPending, logoutError, onLogout }) => (
+          <AppShell
+            username={username}
+            logoutPending={logoutPending}
+            logoutError={logoutError}
+            onLogout={onLogout}
+          >
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/games/:id" element={<GamePage />} />
+              <Route path="/identity-queue" element={<IdentityQueuePage />} />
+              <Route path="/backfills" element={<HistoricalBackfillPage />} />
+            </Routes>
+          </AppShell>
+        )}
+      </AuthenticationBoundary>
     </BrowserRouter>
   );
 }

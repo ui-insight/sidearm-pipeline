@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/app"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    PROTOTYPE_AUTH_ENABLED: bool = False
+    PROTOTYPE_AUTH_USERNAME: str = "prototype"
+    PROTOTYPE_AUTH_PASSWORD: str = ""
     DEV_MODE: bool = True
     UPLOAD_DIR: str = "./uploads"
     CORS_ORIGINS: str = '["http://localhost:5173", "http://localhost:9200"]'
@@ -112,6 +115,18 @@ class Settings(BaseSettings):
 
     def check_security(self) -> None:
         """Raise if default secrets are used in production."""
+        if self.PROTOTYPE_AUTH_ENABLED:
+            if not self.PROTOTYPE_AUTH_USERNAME.strip():
+                raise RuntimeError(
+                    "PROTOTYPE_AUTH_USERNAME is required when "
+                    "prototype auth is enabled."
+                )
+            if not self.PROTOTYPE_AUTH_PASSWORD:
+                raise RuntimeError(
+                    "PROTOTYPE_AUTH_PASSWORD is required when "
+                    "prototype auth is enabled."
+                )
+
         if self.DEV_MODE:
             return
 

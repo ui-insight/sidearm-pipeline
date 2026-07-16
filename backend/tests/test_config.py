@@ -92,6 +92,17 @@ def test_security_check_rejects_default_secret_in_production() -> None:
         settings.check_security()
 
 
+def test_security_check_requires_prototype_credentials_when_enabled() -> None:
+    settings = build_settings(
+        PROTOTYPE_AUTH_ENABLED=True,
+        PROTOTYPE_AUTH_USERNAME="prototype",
+        PROTOTYPE_AUTH_PASSWORD="",
+    )
+
+    with pytest.raises(RuntimeError, match="PROTOTYPE_AUTH_PASSWORD"):
+        settings.check_security()
+
+
 def test_security_check_rejects_wildcard_cors_in_production() -> None:
     settings = build_settings(
         DEV_MODE=False,
