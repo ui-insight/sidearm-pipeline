@@ -62,6 +62,9 @@ function AppShell({
             <NavLink to="/" end className={navClass}>
               Games
             </NavLink>
+            <NavLink to="/record-book" className={navClass}>
+              Record Book
+            </NavLink>
             <NavLink to="/identity-queue" className={navClass}>
               Identity queue
             </NavLink>

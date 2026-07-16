@@ -16,6 +16,7 @@ The project currently provides:
 - **Tech Stack**: React 19 + TypeScript + Tailwind CSS frontend, FastAPI + SQLAlchemy backend, PostgreSQL standard database
 - **Structured ingestion**: Sidearm scraping and normalized storage for games, team stats, player stat groups, and scoring plays
 - **Internal review UI**: list and detail views for ingested games
+- **Record Book preview**: evidence-backed WBB points leaders with explicit coverage windows
 - **Documentation Standards**: MkDocs Material site with architecture, governance, and security docs
 - **Data Governance**: classification, lineage, retention, and schema-versioning guidance
 - **Security Standards**: dependency scanning, configuration checks, and launch-readiness guidance
