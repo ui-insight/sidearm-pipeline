@@ -10,8 +10,13 @@ athletics website syndication.
 
 - [Architecture Overview](architecture/overview.md) — system design and tech stack
 - [Data Model](architecture/data-model.md) — current schema, relationships, and near-term model gaps
-- [Core Functionality Roadmap](architecture/core-functionality-roadmap.md) — phased plan for live Sidearm ingestion, normalization, and website publishing
-- [Epic Drafts](architecture/epic-drafts.md) — GitHub-ready epic drafts for the core Sidearm-to-website integration work
+- [Reboot Implementation Plan](architecture/reboot-implementation-plan.md) —
+  current plan for the WBB warehouse pilot, exploratory workspace, and later
+  sport expansion
+- [Core Functionality Roadmap](architecture/core-functionality-roadmap.md) —
+  legacy website-delivery roadmap retained for Release 2 context
+- [Epic Drafts](architecture/epic-drafts.md) — legacy website-integration epics
+  retained for later backlog work
 - [Deployment Quick Start](deployment/quickstart.md) — run the app locally and validate the scaffold
 - [Production Readiness Gate](deployment/production-readiness.md) — explicit launch checklist for deployed projects
 - [Security](security/overview.md) — authentication, authorization, and security practices

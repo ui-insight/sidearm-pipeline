@@ -47,8 +47,8 @@ environment problems compound.
    *Always Do* lists are normative. Read them carefully. The same file
    briefs the agent and briefs you.
 6. **[Architecture Decision Records](adr/index.md)** — every non-obvious
-   decision in the codebase has a short ADR. Two exist today; you will
-   probably write more.
+   decision in the codebase has a short ADR. Read the index and any ADRs
+   referenced by the current implementation plan.
 7. **[Data Classification](governance/data-classification.md)** — before
    you store or expose data, classify it. The matrix on this page is the
    rulebook.
@@ -59,13 +59,13 @@ By the end of this hour you should know what you are *not* allowed to do.
 
 ## Hour 4 — see what's open
 
-8. **[Core Functionality Roadmap](architecture/core-functionality-roadmap.md)**
-   — what is shipped, what is in flight, what is open, and which issues
-   are recommended to close.
-9. **[Epic #61 — Foundation for agentic capabilities](https://github.com/ui-insight/sidearm-pipeline/issues/61)**
-   — the candidate scoping moves for the agentic foundation. The five
-   child issues are options, not assignments. Read each one and form an
-   opinion.
+8. **[Reboot Implementation Plan](architecture/reboot-implementation-plan.md)**
+   — the current source-to-warehouse-to-exploration sequence, Release 1
+   acceptance gates, sport-expansion cohorts, and first-day checklist.
+9. **[Epic #81 — WBB athletics data warehouse and internal SID tool](https://github.com/ui-insight/sidearm-pipeline/issues/81)**
+   — the current Release 1 backlog. Compare its child issues against the
+   revised plan before starting implementation; backlog alignment is the
+   first project-management task.
 10. **[Open issues](https://github.com/ui-insight/sidearm-pipeline/issues)**
     — the broader backlog.
 
