@@ -14,6 +14,14 @@ class LeaderboardScope(StrEnum):
     SEASON = "season"
 
 
+class LeaderboardStat(StrEnum):
+    """Record Book metrics exposed in the first multi-stat preview."""
+
+    POINTS = "points"
+    TOTAL_REBOUNDS = "total_rebounds"
+    ASSISTS = "assists"
+
+
 class RecordBookCoverageRead(BaseModel):
     """Coverage boundary and limitations attached to a leaderboard result."""
 
@@ -35,7 +43,7 @@ class LeaderSeasonEvidenceRead(BaseModel):
     source_url: str | None = None
 
 
-class PointsLeaderRead(BaseModel):
+class LeaderboardLeaderRead(BaseModel):
     """One ranked player with the season evidence behind the total."""
 
     rank: int
@@ -46,12 +54,12 @@ class PointsLeaderRead(BaseModel):
     season_breakdown: list[LeaderSeasonEvidenceRead]
 
 
-class PointsLeaderboardRead(BaseModel):
-    """A points leaderboard with scope, coverage, and quality context."""
+class LeaderboardRead(BaseModel):
+    """A leaderboard with scope, coverage, evidence, and quality context."""
 
     program_slug: str
     program_name: str
-    stat_key: str
+    stat_key: LeaderboardStat
     stat_label: str
     scope: LeaderboardScope
     season: str | None = None
@@ -59,4 +67,4 @@ class PointsLeaderboardRead(BaseModel):
     total_players: int
     open_quality_issue_count: int
     coverage: RecordBookCoverageRead
-    leaders: list[PointsLeaderRead]
+    leaders: list[LeaderboardLeaderRead]

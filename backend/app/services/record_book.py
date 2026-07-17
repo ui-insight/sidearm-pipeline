@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.seed import WBB_PROGRAM_SLUG
@@ -17,36 +17,42 @@ from app.models.player_season_stat import PlayerSeasonStat
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.schemas.record_book import (
+    LeaderboardLeaderRead,
+    LeaderboardRead,
     LeaderboardScope,
+    LeaderboardStat,
     LeaderSeasonEvidenceRead,
-    PointsLeaderboardRead,
-    PointsLeaderRead,
     RecordBookCoverageRead,
 )
 
-POINTS_STAT_KEY = "points"
 DEFAULT_PROGRAM_NAME = "Women's Basketball"
+STAT_LABELS = {
+    LeaderboardStat.POINTS: "Points",
+    LeaderboardStat.TOTAL_REBOUNDS: "Rebounds",
+    LeaderboardStat.ASSISTS: "Assists",
+}
 
 
-async def build_points_leaderboard(
+async def build_leaderboard(
     db: AsyncSession,
     *,
+    stat_key: LeaderboardStat,
     scope: LeaderboardScope,
     season: str | None,
     limit: int,
-) -> PointsLeaderboardRead:
-    """Build a WBB points leaderboard from authoritative season facts."""
+) -> LeaderboardRead:
+    """Build a WBB leaderboard from authoritative cumulative season facts."""
     program = await db.scalar(
         select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
     )
     if program is None:
-        return _empty_leaderboard(scope=scope, season=season)
+        return _empty_leaderboard(stat_key=stat_key, scope=scope, season=season)
 
     definition = await db.scalar(
         select(StatDefinition).where(
             StatDefinition.sport_program_id == program.id,
             StatDefinition.entity_scope == "player",
-            StatDefinition.stat_key == POINTS_STAT_KEY,
+            StatDefinition.stat_key == stat_key,
             StatDefinition.record_book_eligible.is_(True),
         )
     )
@@ -54,6 +60,7 @@ async def build_points_leaderboard(
         return _empty_leaderboard(
             scope=scope,
             season=season,
+            stat_key=stat_key,
             program=program,
         )
 
@@ -103,6 +110,7 @@ async def build_points_leaderboard(
         db,
         program_id=program.id,
         definition_id=definition.id,
+        stat_label=definition.display_label,
         scope=scope,
         selected_season=selected_season,
         available_seasons=available_seasons,
@@ -111,9 +119,14 @@ async def build_points_leaderboard(
         db,
         program_id=program.id,
         definition_id=definition.id,
+        selected_seasons=(
+            [selected_season]
+            if scope == LeaderboardScope.SEASON and selected_season is not None
+            else available_seasons
+        ),
     )
 
-    return PointsLeaderboardRead(
+    return LeaderboardRead(
         program_slug=program.slug,
         program_name=program.display_name,
         stat_key=definition.stat_key,
@@ -216,15 +229,15 @@ async def _season_evidence(
     return dict(grouped)
 
 
-def _rank_leaders(rows, evidence) -> list[PointsLeaderRead]:
-    leaders: list[PointsLeaderRead] = []
+def _rank_leaders(rows, evidence) -> list[LeaderboardLeaderRead]:
+    leaders: list[LeaderboardLeaderRead] = []
     previous_total: Decimal | None = None
     previous_rank = 0
     for index, row in enumerate(rows, start=1):
         total = Decimal(row.total_value)
         rank = previous_rank if previous_total == total else index
         leaders.append(
-            PointsLeaderRead(
+            LeaderboardLeaderRead(
                 rank=rank,
                 player_id=row.player_id,
                 player_name=row.player_name,
@@ -264,6 +277,7 @@ async def _coverage_summary(
     *,
     program_id: int,
     definition_id: int,
+    stat_label: str,
     scope: LeaderboardScope,
     selected_season: str | None,
     available_seasons: list[str],
@@ -319,6 +333,7 @@ async def _coverage_summary(
         known_limitations=limitations,
         verified_at=verified_at,
         statement=_coverage_statement(
+            stat_label=stat_label,
             scope=scope,
             first_season=first_season,
             last_season=last_season,
@@ -329,13 +344,14 @@ async def _coverage_summary(
 
 def _coverage_statement(
     *,
+    stat_label: str,
     scope: LeaderboardScope,
     first_season: str | None,
     last_season: str | None,
     completeness: str,
 ) -> str:
     if first_season is None or last_season is None:
-        return "No verified points coverage is available yet."
+        return f"No verified {stat_label.lower()} coverage is available yet."
     season_range = (
         first_season
         if first_season == last_season
@@ -361,29 +377,45 @@ async def _open_quality_issue_count(
     *,
     program_id: int,
     definition_id: int,
+    selected_seasons: list[str],
 ) -> int:
-    statement = select(func.count(DataQualityIssue.id)).where(
-        DataQualityIssue.sport_program_id == program_id,
-        DataQualityIssue.status.in_(("open", "in_review")),
-        or_(
-            DataQualityIssue.stat_definition_id == definition_id,
-            DataQualityIssue.stat_definition_id.is_(None),
-        ),
+    if not selected_seasons:
+        return 0
+    statement = (
+        select(func.count(DataQualityIssue.id))
+        .outerjoin(
+            SourceSnapshot,
+            SourceSnapshot.id == DataQualityIssue.source_snapshot_id,
+        )
+        .where(
+            DataQualityIssue.sport_program_id == program_id,
+            DataQualityIssue.status.in_(("open", "in_review")),
+            DataQualityIssue.details["season"].as_string().in_(selected_seasons),
+            or_(
+                DataQualityIssue.stat_definition_id == definition_id,
+                and_(
+                    DataQualityIssue.stat_definition_id.is_(None),
+                    SourceSnapshot.source_type == "cumulative_stats_html",
+                ),
+            ),
+        )
     )
     return int(await db.scalar(statement) or 0)
 
 
 def _empty_leaderboard(
     *,
+    stat_key: LeaderboardStat,
     scope: LeaderboardScope,
     season: str | None,
     program: SportProgram | None = None,
-) -> PointsLeaderboardRead:
-    return PointsLeaderboardRead(
+) -> LeaderboardRead:
+    stat_label = STAT_LABELS[stat_key]
+    return LeaderboardRead(
         program_slug=program.slug if program else WBB_PROGRAM_SLUG,
         program_name=program.display_name if program else DEFAULT_PROGRAM_NAME,
-        stat_key=POINTS_STAT_KEY,
-        stat_label="Points",
+        stat_key=stat_key,
+        stat_label=stat_label,
         scope=scope,
         season=season,
         available_seasons=[],
@@ -393,7 +425,7 @@ def _empty_leaderboard(
             completeness="unknown",
             source_systems=[],
             known_limitations=[],
-            statement="No verified points coverage is available yet.",
+            statement=f"No verified {stat_label.lower()} coverage is available yet.",
         ),
         leaders=[],
     )
