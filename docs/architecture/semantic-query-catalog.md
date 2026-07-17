@@ -107,12 +107,15 @@ makes a copied workspace URL a complete, reproducible view of the governed
 question.
 
 Users can also give that same route-and-filter configuration a name. These saved
-views are stored only in the current browser, are limited to 20 validated
-entries, and do not contain result facts or source evidence. They are explicitly
-not account-synced or team-shared; opening one still executes the current
-governed query. Account-backed sharing, multi-player comparisons, multi-season
-opponent leaderboards, and free-form questions remain later Phase 6 work built on
-the same bounded catalog.
+views can be stored in a deployment-wide shared collection or only in the
+current browser. The shared API returns at most 100 validated entries; the local
+fallback retains at most 20. Neither form contains result facts or source
+evidence, and opening either reruns the current governed query. The current
+prototype session uses a shared credential, so `created_by` is context rather
+than ownership and every authenticated operator can delete a shared entry. True
+per-person accounts and RBAC, multi-player comparisons, multi-season opponent
+leaderboards, and free-form questions remain later work built on the same
+bounded catalog.
 
 ## Deterministic boundary
 

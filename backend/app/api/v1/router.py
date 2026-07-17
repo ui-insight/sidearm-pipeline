@@ -13,6 +13,7 @@ from app.api.v1 import (
     record_book,
     semantic_queries,
     sources,
+    workspace_views,
 )
 from app.db.engine import get_db
 from app.schemas.health import HealthResponse, ReadinessResponse
@@ -36,6 +37,11 @@ api_router.include_router(
     tags=["ingest-runs"],
 )
 api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
+api_router.include_router(
+    workspace_views.router,
+    prefix="/workspace-views",
+    tags=["workspace-views"],
+)
 api_router.include_router(
     identity_resolution.router,
     prefix="/identity-resolution",

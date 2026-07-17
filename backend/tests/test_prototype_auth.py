@@ -22,6 +22,7 @@ def enable_prototype_auth(monkeypatch):
 async def test_protected_api_requires_a_session_but_health_stays_public(client):
     session = await client.get("/api/v1/auth/session")
     protected = await client.get("/api/v1/games")
+    shared_views = await client.get("/api/v1/workspace-views")
     health = await client.get("/api/v1/health")
 
     assert session.status_code == 200
@@ -29,6 +30,7 @@ async def test_protected_api_requires_a_session_but_health_stays_public(client):
     assert session.headers["cache-control"] == "no-store"
     assert protected.status_code == 401
     assert protected.json() == {"detail": "Authentication required"}
+    assert shared_views.status_code == 401
     assert health.status_code == 200
 
 
@@ -61,6 +63,23 @@ async def test_login_cookie_unlocks_the_api_and_logout_clears_it(client):
 
     protected = await client.get("/api/v1/games")
     assert protected.status_code == 200
+
+    shared_view = await client.post(
+        "/api/v1/workspace-views",
+        json={
+            "name": "Authenticated view",
+            "view": "season",
+            "params": {
+                "season": "2025-26",
+                "stat": "points",
+                "scope": "all",
+                "opponent": "all",
+                "limit": "10",
+            },
+        },
+    )
+    assert shared_view.status_code == 201
+    assert shared_view.json()["created_by"] == "prototype-user"
 
     logout = await client.post("/api/v1/auth/logout")
     assert logout.status_code == 200

@@ -2,17 +2,16 @@
 
 This document describes the security architecture and practices for Vandals Stats Pipeline.
 
-The template includes auth-related dependencies and a reserved `backend/app/auth/`
-package, but it does not ship a complete JWT login flow, user model, or RBAC
-enforcement out of the box. Treat authentication and authorization as project
-extension points that must be implemented and reviewed before launch when the
-app is not fully public.
+The application includes a small shared-credential session gate for internal
+prototype deployments. It does not yet include individual accounts, a user
+model, or RBAC enforcement. Treat the prototype gate as a temporary access
+boundary, not a production identity system.
 
 ## Authentication
 
-- **Status**: not implemented by default in the starter template
-- **Suggested baseline**: JWT (HS256) or another documented approach appropriate
-  to your deployment environment
+- **Status**: optional shared prototype credential configured by environment
+  variables
+- **Session**: short-lived HS256 token held in an HttpOnly, same-site cookie
 - **Password storage**: use bcrypt or an equivalent adaptive password hasher if
   you add username/password login
 - **Token/session lifetime**: keep expiration configurable via environment
@@ -23,6 +22,9 @@ app is not fully public.
 ## Authorization
 
 - **Status**: RBAC is an extension point, not a built-in feature
+- **Shared-view implication**: all authenticated operators can create, open,
+  and delete deployment-wide workspace views; the recorded creator is context,
+  not an ownership check
 - **Suggested baseline**: define roles appropriate to your application and
   enforce them with FastAPI dependencies on protected endpoints
 - **Documentation**: record your chosen role model and protected resources in
@@ -104,8 +106,8 @@ may require network access to install audit or SBOM tooling.
 !!! warning "Development Defaults"
     The following are acceptable for development but must be addressed before production:
 
-    - Authentication and RBAC are not implemented by default; add and review
-      them before launch if the app is not fully public
+    - The shared prototype credential does not provide individual identity or
+      RBAC; replace it before a production launch that requires accountability
     - If a project stores bearer tokens in localStorage during development,
       replace that with a safer production approach such as httpOnly cookies or
       another documented strategy

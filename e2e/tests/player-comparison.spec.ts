@@ -250,7 +250,7 @@ test("player comparison keeps shared filters, evidence, and export together", as
 
   await page.goto("/workspace");
   await expect(page.getByRole("heading", { name: "Season desk" })).toBeVisible();
-  const savedViews = page.getByLabel("Saved in this browser");
+  const savedViews = page.getByLabel("Saved views");
   await savedViews.selectOption({ label: "Comparison: Deadline check" });
   await page.getByRole("button", { name: "Open" }).click();
   await expect(page).toHaveURL(
@@ -259,14 +259,14 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await expect(
     page.getByRole("heading", { name: "Alice Adams vs. Bobbi Brown" }),
   ).toBeVisible();
-  await page.getByLabel("Saved in this browser").selectOption({
+  await page.getByLabel("Saved views").selectOption({
     label: "Comparison: Deadline check",
   });
   const deleteSavedView = page.getByRole("button", { name: "Delete" });
   await expect(deleteSavedView).toBeEnabled();
   await deleteSavedView.click();
   await expect(page.getByText("Deleted Deadline check.")).toBeVisible();
-  await expect(page.getByLabel("Saved in this browser")).toHaveCount(0);
+  await expect(page.getByLabel("Saved views")).toHaveCount(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
   const overflowState = await page.evaluate(() => ({

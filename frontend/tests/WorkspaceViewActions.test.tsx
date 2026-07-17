@@ -2,6 +2,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createSharedWorkspaceView,
+  deleteSharedWorkspaceView,
+  listSharedWorkspaceViews,
+  type SharedWorkspaceView,
+} from "../src/api/workspaceViews";
 import WorkspaceViewActions from "../src/components/WorkspaceViewActions";
 import {
   MAX_SAVED_WORKSPACE_VIEWS,
@@ -13,6 +19,31 @@ import {
 } from "../src/utils/savedWorkspaceViews";
 
 const clipboardWriteMock = vi.fn<(text: string) => Promise<void>>();
+
+vi.mock("../src/api/workspaceViews", () => ({
+  listSharedWorkspaceViews: vi.fn(),
+  createSharedWorkspaceView: vi.fn(),
+  deleteSharedWorkspaceView: vi.fn(),
+}));
+
+const listSharedViewsMock = vi.mocked(listSharedWorkspaceViews);
+const createSharedViewMock = vi.mocked(createSharedWorkspaceView);
+const deleteSharedViewMock = vi.mocked(deleteSharedWorkspaceView);
+
+const sharedView: SharedWorkspaceView = {
+  id: "shared-1",
+  name: "Deadline handoff",
+  view: "season",
+  params: {
+    season: "2025-26",
+    stat: "points",
+    scope: "conference",
+    opponent: "all",
+    limit: "10",
+  },
+  created_by: "prototype-user",
+  created_at: "2026-07-17T18:00:00Z",
+};
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -39,9 +70,11 @@ function LocationProbe() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.stubGlobal("localStorage", createMemoryStorage());
-  clipboardWriteMock.mockReset();
   clipboardWriteMock.mockResolvedValue();
+  listSharedViewsMock.mockResolvedValue([]);
+  deleteSharedViewMock.mockResolvedValue();
 });
 
 afterEach(() => {
@@ -100,11 +133,10 @@ describe("WorkspaceViewActions", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      screen.getByText(/saved views stay in this browser/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/shared views are available/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save view" }));
     expect(screen.getByRole("textbox", { name: "View name" })).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Save to"), "local");
     await user.type(
       screen.getByRole("textbox", { name: "View name" }),
       "Home points check",
@@ -118,8 +150,8 @@ describe("WorkspaceViewActions", () => {
       view: "comparison",
       params: { venue: "home", opponent: "all", left: "4", right: "8" },
     });
-    expect(screen.getByLabelText("Saved in this browser")).toHaveValue(
-      stored[0]?.id,
+    expect(screen.getByLabelText("Saved views")).toHaveValue(
+      `local:${stored[0]?.id}`,
     );
 
     await user.click(screen.getByRole("button", { name: "Open" }));
@@ -130,7 +162,7 @@ describe("WorkspaceViewActions", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(loadSavedWorkspaceViews()).toEqual([]);
     expect(
-      screen.queryByLabelText("Saved in this browser"),
+      screen.queryByLabelText("Saved views"),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Deleted Home points check.")).toBeInTheDocument();
   });
@@ -149,6 +181,109 @@ describe("WorkspaceViewActions", () => {
       "Enter a view name between 1 and 60 characters.",
     );
     expect(loadSavedWorkspaceViews()).toEqual([]);
+  });
+
+  it("saves a deployment-wide view and identifies it as shared", async () => {
+    const user = userEvent.setup();
+    createSharedViewMock.mockResolvedValue(sharedView);
+    render(
+      <MemoryRouter>
+        <WorkspaceViewActions view="season" params={sharedView.params} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/shared views are available/i);
+    await user.click(screen.getByRole("button", { name: "Save view" }));
+    await user.type(screen.getByLabelText("View name"), "Deadline handoff");
+    await user.click(screen.getByRole("button", { name: "Save", exact: true }));
+
+    expect(createSharedViewMock).toHaveBeenCalledWith({
+      name: "Deadline handoff",
+      view: "season",
+      params: sharedView.params,
+    });
+    expect(await screen.findByLabelText("Saved views")).toHaveValue(
+      "shared:shared-1",
+    );
+    expect(
+      screen.getByText("Shared view saved for everyone signed in."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/shared by prototype-user/i)).toBeInTheDocument();
+  });
+
+  it("keeps a new shared save when the initial list resolves afterward", async () => {
+    const user = userEvent.setup();
+    let resolveInitialList: (views: SharedWorkspaceView[]) => void = () => {};
+    listSharedViewsMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInitialList = resolve;
+        }),
+    );
+    createSharedViewMock.mockResolvedValue(sharedView);
+    render(
+      <MemoryRouter>
+        <WorkspaceViewActions view="season" params={sharedView.params} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save view" }));
+    await user.type(screen.getByLabelText("View name"), "Deadline handoff");
+    await user.click(screen.getByRole("button", { name: "Save", exact: true }));
+    expect(await screen.findByLabelText("Saved views")).toHaveValue(
+      "shared:shared-1",
+    );
+
+    resolveInitialList([{ ...sharedView, id: "shared-older", name: "Older view" }]);
+
+    expect(
+      await screen.findByRole("option", { name: "Season: Older view" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Saved views")).toHaveValue("shared:shared-1");
+  });
+
+  it("requires inline confirmation before deleting a shared view", async () => {
+    const user = userEvent.setup();
+    listSharedViewsMock.mockResolvedValue([sharedView]);
+    render(
+      <MemoryRouter>
+        <WorkspaceViewActions view="season" params={sharedView.params} />
+      </MemoryRouter>,
+    );
+
+    const chooser = await screen.findByLabelText("Saved views");
+    await user.selectOptions(chooser, "shared:shared-1");
+    expect(screen.getByText(/deleting removes it for everyone/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(deleteSharedViewMock).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Confirm delete" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/delete deadline handoff for everyone/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+    expect(deleteSharedViewMock).toHaveBeenCalledWith("shared-1");
+    expect(
+      await screen.findByText("Deleted shared view Deadline handoff."),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Saved views")).not.toBeInTheDocument();
+  });
+
+  it("falls back to browser storage when shared views are unavailable", async () => {
+    const user = userEvent.setup();
+    listSharedViewsMock.mockRejectedValue(new Error("offline"));
+    render(
+      <MemoryRouter>
+        <WorkspaceViewActions view="season" params={sharedView.params} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText(/browser-local views still work/i),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save view" }));
+    expect(screen.getByLabelText("Save to")).toHaveValue("local");
   });
 });
 
