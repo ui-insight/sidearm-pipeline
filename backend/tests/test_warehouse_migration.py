@@ -51,6 +51,10 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
             column["name"]
             for column in inspect(connection).get_columns("player_identity_resolutions")
         }
+        workspace_view_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("workspace_views")
+        }
         definition_count = connection.scalar(
             select(func.count()).select_from(stat_definitions)
         )
@@ -71,6 +75,7 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "team_season_stats",
         "coverage_windows",
         "data_quality_issues",
+        "workspace_views",
     }.issubset(tables)
     assert definition_count == 16
     assert program_slug == "womens-basketball"
@@ -87,6 +92,42 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "normalized_name",
         "created_from_issue_id",
     }.issubset(identity_resolution_columns)
+    assert {
+        "id",
+        "name",
+        "view_kind",
+        "params",
+        "created_by",
+        "created_at",
+    }.issubset(workspace_view_columns)
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "downgrade",
+            "0006_player_identity_resolutions",
+        ],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    tables = set(inspect(engine).get_table_names())
+    engine.dispose()
+    assert "workspace_views" not in tables
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     subprocess.run(
         [
@@ -179,6 +220,7 @@ def test_engine_registers_normalized_models_in_a_fresh_process() -> None:
         "team_season_stats",
         "coverage_windows",
         "data_quality_issues",
+        "workspace_views",
     }
     script = (
         "from app.db.engine import Base; "

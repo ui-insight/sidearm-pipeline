@@ -26,6 +26,7 @@ from app.models.stat_definition import StatDefinition
 from app.models.team import OpponentAlias, Team
 from app.models.team_game_stat import TeamGameStat
 from app.models.team_season_stat import TeamSeasonStat
+from app.models.workspace_view import WorkspaceView
 
 __all__ = [
     "CoverageWindow",
@@ -51,4 +52,5 @@ __all__ = [
     "TeamGameStat",
     "TeamSeasonStat",
     "TeamStat",
+    "WorkspaceView",
 ]
