@@ -3,9 +3,11 @@ import type {
   LeaderboardScope,
   Leaderboard,
   LeaderboardStat,
+  RecordBookMetricCatalog,
 } from "../types/recordBook";
 
 export const recordBookApi = {
+  metrics: () => api.get<RecordBookMetricCatalog>("/record-book/metrics"),
   leaders: (statKey: LeaderboardStat, scope: LeaderboardScope, season?: string) => {
     const params: Record<string, string> = {
       scope,

@@ -14,12 +14,24 @@ class LeaderboardScope(StrEnum):
     SEASON = "season"
 
 
-class LeaderboardStat(StrEnum):
-    """Record Book metrics exposed in the first multi-stat preview."""
+class RecordBookMetricRead(BaseModel):
+    """One aggregable player metric available to the Record Book."""
 
-    POINTS = "points"
-    TOTAL_REBOUNDS = "total_rebounds"
-    ASSISTS = "assists"
+    stat_key: str
+    display_label: str
+    value_type: str
+    unit: str | None = None
+    aggregation_method: str
+    comparison_direction: str
+    display_format: str | None = None
+
+
+class RecordBookMetricCatalogRead(BaseModel):
+    """The program metric catalog that drives Record Book controls."""
+
+    program_slug: str
+    program_name: str
+    metrics: list[RecordBookMetricRead]
 
 
 class RecordBookCoverageRead(BaseModel):
@@ -59,7 +71,7 @@ class LeaderboardRead(BaseModel):
 
     program_slug: str
     program_name: str
-    stat_key: LeaderboardStat
+    stat_key: str
     stat_label: str
     scope: LeaderboardScope
     season: str | None = None

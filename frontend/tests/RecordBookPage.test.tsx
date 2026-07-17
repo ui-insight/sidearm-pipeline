@@ -84,6 +84,49 @@ const careerLeaderboard = {
   ],
 };
 
+const metricCatalog = {
+  program_slug: "womens-basketball",
+  program_name: "Women's Basketball",
+  metrics: [
+    {
+      stat_key: "assists",
+      display_label: "Assists",
+      value_type: "integer",
+      unit: "count",
+      aggregation_method: "sum",
+      comparison_direction: "higher",
+      display_format: "0",
+    },
+    {
+      stat_key: "points",
+      display_label: "Points",
+      value_type: "integer",
+      unit: "count",
+      aggregation_method: "sum",
+      comparison_direction: "higher",
+      display_format: "0",
+    },
+    {
+      stat_key: "total_rebounds",
+      display_label: "Rebounds",
+      value_type: "integer",
+      unit: "count",
+      aggregation_method: "sum",
+      comparison_direction: "higher",
+      display_format: "0",
+    },
+    {
+      stat_key: "steals",
+      display_label: "Steals",
+      value_type: "integer",
+      unit: "count",
+      aggregation_method: "sum",
+      comparison_direction: "higher",
+      display_format: "0",
+    },
+  ],
+};
+
 const seasonLeaderboard = {
   ...careerLeaderboard,
   scope: "season",
@@ -136,6 +179,12 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (input, init) => {
     const endpoint = String(input);
     if (
+      endpoint === "/api/v1/record-book/metrics" &&
+      init?.method === "GET"
+    ) {
+      return jsonResponse(metricCatalog);
+    }
+    if (
       endpoint === "/api/v1/record-book/leaders/points?scope=career&limit=10" &&
       init?.method === "GET"
     ) {
@@ -184,7 +233,10 @@ describe("RecordBookPage", () => {
         name: "Women's basketball leaders",
       }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Statistic")).toHaveValue("points");
+    expect(screen.getByRole("option", { name: "Steals" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Career Points" })).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Alice Adams" });
     expect(screen.getByText(/not all-time history/i)).toBeInTheDocument();
     expect(screen.getByText("Scoped reviews")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "1" })).not.toBeInTheDocument();
@@ -220,7 +272,7 @@ describe("RecordBookPage", () => {
     );
 
     await screen.findByRole("button", { name: "Alice Adams" });
-    await user.click(screen.getByRole("button", { name: "Rebounds" }));
+    await user.selectOptions(screen.getByLabelText("Statistic"), "total_rebounds");
 
     expect(
       await screen.findByRole("heading", { name: "Career Rebounds" }),

@@ -1,5 +1,22 @@
 export type LeaderboardScope = "career" | "season";
-export type LeaderboardStat = "points" | "total_rebounds" | "assists";
+
+export interface RecordBookMetric {
+  stat_key: string;
+  display_label: string;
+  value_type: "integer" | "decimal" | "duration";
+  unit: string | null;
+  aggregation_method: "sum" | "maximum" | "minimum" | "average";
+  comparison_direction: "higher" | "lower";
+  display_format: string | null;
+}
+
+export interface RecordBookMetricCatalog {
+  program_slug: string;
+  program_name: string;
+  metrics: RecordBookMetric[];
+}
+
+export type LeaderboardStat = RecordBookMetric["stat_key"];
 
 export interface RecordBookCoverage {
   first_season: string | null;
