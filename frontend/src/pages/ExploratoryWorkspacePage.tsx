@@ -9,6 +9,7 @@ import type {
   TeamSeasonRecord,
 } from "../types/semanticQuery";
 import { buildWorkspaceCsv } from "../utils/workspaceCsv";
+import WorkspaceViewNav from "../components/WorkspaceViewNav";
 
 const RECORD_SCOPES: { value: ConferenceScope; label: string }[] = [
   { value: "all", label: "All games" },
@@ -213,6 +214,7 @@ function ExploratoryWorkspacePage() {
           and source evidence kept together on one working surface.
         </p>
       </header>
+      <WorkspaceViewNav />
 
       {options && !isEmpty ? (
         <section

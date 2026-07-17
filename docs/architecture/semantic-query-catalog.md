@@ -32,9 +32,11 @@ model. Consumers should use this response to discover supported questions rather
 than construct arbitrary database requests.
 
 `GET /api/v1/semantic-queries/options` returns the women's basketball seasons,
-Record Book metrics, and supported leaderboard sizes that currently have
-warehouse evidence. The Exploratory Workspace uses these server-governed options
-instead of maintaining a second list of available filters in the frontend.
+Record Book metrics, canonical players with vetted game evidence, and supported
+leaderboard sizes that currently have warehouse evidence. Each player option
+includes its available game-fact seasons. The Exploratory Workspace uses these
+server-governed options instead of maintaining a second list of available filters
+in the frontend.
 
 `POST /api/v1/semantic-queries/execute` accepts a discriminated request. For
 example, a conference-only player split is:
@@ -83,9 +85,17 @@ ledger and each leader retain direct source links; coverage statements and open
 quality-issue counts remain visible alongside the result. The same assembled
 evidence can be exported as CSV.
 
-This slice intentionally does not provide saved views, player comparisons, or
-free-form questions. Those remain later Phase 6 work built on the same bounded
-catalog.
+The **Player comparison** at `/workspace/compare` applies one shared season,
+metric, conference, and venue filter set to two distinct canonical players. It
+executes `player_game_split` independently for each player, then aligns the
+returned evidence by canonical game ID for inspection. The frontend does not
+derive a new authoritative aggregate: displayed totals, games reviewed, coverage,
+quality counts, and source links all come from the governed responses. The
+comparison and aligned evidence can also be exported as CSV.
+
+The workspace intentionally does not yet provide saved views, opponent-specific
+filtering, multi-player comparisons, or free-form questions. Those remain later
+Phase 6 work built on the same bounded catalog.
 
 ## Deterministic boundary
 

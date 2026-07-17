@@ -106,13 +106,22 @@ class SemanticQueryCatalogRead(BaseModel):
     queries: list[SemanticQueryDefinitionRead]
 
 
+class SemanticWorkspacePlayerRead(BaseModel):
+    """Canonical player with vetted game evidence available to the workspace."""
+
+    player_id: int
+    player_name: str
+    seasons: list[str]
+
+
 class SemanticWorkspaceOptionsRead(BaseModel):
-    """Filter options available to the first Exploratory Workspace slice."""
+    """Warehouse-backed filter options for Exploratory Workspace views."""
 
     program_slug: str
     program_name: str
     seasons: list[str]
     metrics: list[RecordBookMetricRead]
+    players: list[SemanticWorkspacePlayerRead]
     leader_limits: list[int]
     default_season: str | None = None
     default_stat_key: str | None = None
