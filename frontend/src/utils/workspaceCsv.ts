@@ -1,5 +1,6 @@
 import type { Leaderboard } from "../types/recordBook";
 import type {
+  OpponentStatLeaderboard,
   PlayerGameSplit,
   PlayerGameSplitGame,
   TeamSeasonRecord,
@@ -29,13 +30,14 @@ function csvRow(values: (string | number | null | undefined)[]): string {
 
 export function buildWorkspaceCsv(
   record: TeamSeasonRecord,
-  leaderboard: Leaderboard,
+  leaderboard: Leaderboard | OpponentStatLeaderboard,
 ): string {
   const rows = [
     csvRow(["Vandals season desk"]),
     csvRow(["Program", record.program_name]),
     csvRow(["Season", record.season]),
     csvRow(["Record scope", record.conference_scope]),
+    csvRow(["Opponent", record.opponent ?? "all"]),
     csvRow(["Record", `${record.wins}-${record.losses}-${record.ties}`]),
     csvRow(["Leader statistic", leaderboard.stat_label]),
     "",
@@ -65,15 +67,21 @@ export function buildWorkspaceCsv(
     ),
     "",
     csvRow(["Leaders", "Rank", "Player", leaderboard.stat_label, "Source"]),
-    ...leaderboard.leaders.map((leader) =>
-      csvRow([
+    ...leaderboard.leaders.map((leader) => {
+      const sources = "games" in leader
+        ? leader.games
+            .map((game) => game.source_url)
+            .filter((source): source is string => Boolean(source))
+            .join(" | ")
+        : leader.season_breakdown[0]?.source_url;
+      return csvRow([
         "Leader",
         leader.rank,
         leader.player_name,
         leader.total,
-        leader.season_breakdown[0]?.source_url,
-      ]),
-    ),
+        sources,
+      ]);
+    }),
   ];
 
   return `${rows.join("\n")}\n`;

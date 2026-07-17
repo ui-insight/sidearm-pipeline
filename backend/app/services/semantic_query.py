@@ -20,6 +20,10 @@ from app.models.stat_definition import StatDefinition
 from app.models.team import Team
 from app.schemas.semantic_query import (
     ConferenceScope,
+    OpponentLeaderboardLeaderRead,
+    OpponentStatLeaderboardRead,
+    OpponentStatLeadersQuery,
+    OpponentStatLeadersQueryResult,
     PlayerCareerTotalQuery,
     PlayerCareerTotalQueryResult,
     PlayerCareerTotalRead,
@@ -241,6 +245,19 @@ def get_semantic_query_catalog() -> SemanticQueryCatalogRead:
                 parameter_schema=StatLeadersQuery.model_json_schema(),
             ),
             SemanticQueryDefinitionRead(
+                query_id=SemanticQueryId.OPPONENT_STAT_LEADERS,
+                display_name="Opponent statistical leaders",
+                description=(
+                    "Rank players from vetted final game facts against one opponent."
+                ),
+                question_templates=[
+                    "Who led Idaho in {stat_key} against {opponent} in {season}?",
+                    "Who are Idaho's conference {stat_key} leaders against "
+                    "{opponent} in {season}?",
+                ],
+                parameter_schema=OpponentStatLeadersQuery.model_json_schema(),
+            ),
+            SemanticQueryDefinitionRead(
                 query_id=SemanticQueryId.PLAYER_CAREER_TOTAL,
                 display_name="Player career total",
                 description=(
@@ -287,6 +304,10 @@ async def execute_semantic_query(
                 season=request.season,
                 limit=request.limit,
             )
+        )
+    if isinstance(request, OpponentStatLeadersQuery):
+        return OpponentStatLeadersQueryResult(
+            result=await _opponent_stat_leaders(db, request)
         )
     if isinstance(request, PlayerCareerTotalQuery):
         return PlayerCareerTotalQueryResult(
@@ -429,6 +450,8 @@ async def _team_season_record(
         opponent_score.is_not(None),
     )
     statement = _apply_conference_scope(statement, request.conference_scope)
+    if request.opponent is not None:
+        statement = statement.where(func.lower(opponent) == request.opponent.lower())
     game_facts = statement.subquery()
     counts = (
         await db.execute(
@@ -466,6 +489,9 @@ async def _team_season_record(
         db,
         program_id=program.id,
         seasons=[request.season],
+        game_ids=(
+            [game.game_id for game in games] if request.opponent is not None else None
+        ),
     )
     coverage = await _coverage_summary(
         db,
@@ -473,13 +499,18 @@ async def _team_season_record(
         definition_id=None,
         grain="game",
         selected_seasons=[request.season],
-        subject="team record",
+        subject=(
+            f"team record against {request.opponent}"
+            if request.opponent is not None
+            else "team record"
+        ),
     )
     return TeamSeasonRecordRead(
         program_slug=program.slug,
         program_name=program.display_name,
         season=request.season,
         conference_scope=request.conference_scope,
+        opponent=request.opponent,
         games_played=int(counts.games_played or 0),
         wins=int(counts.wins or 0),
         losses=int(counts.losses or 0),
@@ -498,6 +529,170 @@ def _aggregate_expression(method: str, column):
         "average": func.avg,
     }
     return functions[method](column)
+
+
+async def _opponent_stat_leaders(
+    db: AsyncSession,
+    request: OpponentStatLeadersQuery,
+) -> OpponentStatLeaderboardRead:
+    program, idaho = await _program_and_idaho_team(db)
+    definition = await _metric_definition(
+        db,
+        program_id=program.id,
+        stat_key=request.stat_key,
+    )
+    _, _, opponent = _idaho_game_expressions(idaho.canonical_name)
+    filters = [
+        PlayerGameStat.team_id == idaho.id,
+        PlayerGameStat.stat_definition_id == definition.id,
+        Game.sport == program.slug,
+        Game.season == request.season,
+        Game.event_status == "final",
+        Game.exhibition.is_(False),
+        func.lower(opponent) == request.opponent.lower(),
+    ]
+    if request.conference_scope == ConferenceScope.CONFERENCE:
+        filters.append(Game.conference_event.is_(True))
+    elif request.conference_scope == ConferenceScope.NON_CONFERENCE:
+        filters.append(Game.conference_event.is_(False))
+
+    aggregate_value = _aggregate_expression(
+        definition.aggregation_method,
+        PlayerGameStat.value,
+    ).label("total_value")
+    games_count = func.count(func.distinct(Game.id)).label("games_count")
+    leader_statement = (
+        select(
+            Player.id.label("player_id"),
+            Player.display_name.label("player_name"),
+            aggregate_value,
+            games_count,
+        )
+        .select_from(PlayerGameStat)
+        .join(Player, Player.id == PlayerGameStat.player_id)
+        .join(Game, Game.id == PlayerGameStat.game_id)
+        .where(*filters)
+        .group_by(Player.id, Player.display_name)
+        .order_by(
+            aggregate_value.asc()
+            if definition.comparison_direction == "lower"
+            else aggregate_value.desc(),
+            Player.display_name,
+            Player.id,
+        )
+        .limit(request.limit)
+    )
+    leader_rows = (await db.execute(leader_statement)).all()
+    player_ids = [row.player_id for row in leader_rows]
+
+    grouped_evidence: dict[int, list[SemanticGameEvidenceRead]] = {}
+    if player_ids:
+        evidence_rows = (
+            await db.execute(
+                select(
+                    PlayerGameStat.player_id,
+                    Game.id.label("game_id"),
+                    Game.game_date,
+                    Game.season,
+                    opponent.label("opponent"),
+                    Game.home_away_neutral.label("venue"),
+                    Game.conference_event,
+                    PlayerGameStat.value,
+                    PlayerGameStat.source_snapshot_id,
+                    SourceSnapshot.source_url,
+                )
+                .select_from(PlayerGameStat)
+                .join(Game, Game.id == PlayerGameStat.game_id)
+                .outerjoin(
+                    SourceSnapshot,
+                    SourceSnapshot.id == PlayerGameStat.source_snapshot_id,
+                )
+                .where(*filters, PlayerGameStat.player_id.in_(player_ids))
+                .order_by(PlayerGameStat.player_id, Game.game_date, Game.id)
+            )
+        ).all()
+        for row in evidence_rows:
+            grouped_evidence.setdefault(row.player_id, []).append(
+                SemanticGameEvidenceRead(
+                    game_id=row.game_id,
+                    game_date=row.game_date,
+                    season=row.season,
+                    opponent=row.opponent or "Unknown opponent",
+                    venue=row.venue,
+                    conference_event=row.conference_event,
+                    value=row.value,
+                    source_snapshot_id=row.source_snapshot_id,
+                    source_url=row.source_url,
+                )
+            )
+
+    leaders: list[OpponentLeaderboardLeaderRead] = []
+    previous_total: Decimal | None = None
+    previous_rank = 0
+    for index, row in enumerate(leader_rows, start=1):
+        total = Decimal(row.total_value)
+        rank = previous_rank if total == previous_total else index
+        leaders.append(
+            OpponentLeaderboardLeaderRead(
+                rank=rank,
+                player_id=row.player_id,
+                player_name=row.player_name,
+                total=total,
+                games_count=int(row.games_count or 0),
+                games=grouped_evidence.get(row.player_id, []),
+            )
+        )
+        previous_total = total
+        previous_rank = rank
+
+    total_players = int(
+        await db.scalar(
+            select(func.count(func.distinct(PlayerGameStat.player_id)))
+            .select_from(PlayerGameStat)
+            .join(Game, Game.id == PlayerGameStat.game_id)
+            .where(*filters)
+        )
+        or 0
+    )
+    selected_game_ids = list(
+        await db.scalars(
+            select(PlayerGameStat.game_id)
+            .join(Game, Game.id == PlayerGameStat.game_id)
+            .where(*filters)
+            .distinct()
+        )
+    )
+    quality_count = await _open_quality_issue_count(
+        db,
+        program_id=program.id,
+        seasons=[request.season],
+        definition_id=definition.id,
+        game_ids=selected_game_ids,
+    )
+    coverage = await _coverage_summary(
+        db,
+        program_id=program.id,
+        definition_id=definition.id,
+        grain="game",
+        selected_seasons=[request.season],
+        subject=(
+            f"{definition.display_label.lower()} leaderboard against {request.opponent}"
+        ),
+    )
+    return OpponentStatLeaderboardRead(
+        program_slug=program.slug,
+        program_name=program.display_name,
+        stat_key=definition.stat_key,
+        stat_label=definition.display_label,
+        aggregation_method=definition.aggregation_method,
+        season=request.season,
+        conference_scope=request.conference_scope,
+        opponent=request.opponent,
+        total_players=total_players,
+        open_quality_issue_count=quality_count,
+        coverage=coverage,
+        leaders=leaders,
+    )
 
 
 async def _player_career_total(
@@ -836,6 +1031,7 @@ async def _open_quality_issue_count(
     seasons: Sequence[str],
     definition_id: int | None = None,
     player_id: int | None = None,
+    game_ids: Sequence[int] | None = None,
 ) -> int:
     statement = (
         select(func.count(DataQualityIssue.id))
@@ -864,6 +1060,13 @@ async def _open_quality_issue_count(
             or_(
                 DataQualityIssue.player_id == player_id,
                 DataQualityIssue.player_id.is_(None),
+            )
+        )
+    if game_ids is not None:
+        statement = statement.where(
+            or_(
+                DataQualityIssue.game_id.in_(game_ids),
+                DataQualityIssue.game_id.is_(None),
             )
         )
     return int(await db.scalar(statement) or 0)

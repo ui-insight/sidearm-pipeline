@@ -58,6 +58,7 @@ export interface TeamSeasonRecord {
   program_name: string;
   season: string;
   conference_scope: ConferenceScope;
+  opponent: string | null;
   games_played: number;
   wins: number;
   losses: number;
@@ -75,6 +76,35 @@ export interface TeamSeasonRecordResult {
 export interface StatLeadersResult {
   query_id: "stat_leaders";
   result: Leaderboard;
+}
+
+export interface OpponentLeaderboardLeader {
+  rank: number;
+  player_id: number;
+  player_name: string;
+  total: string;
+  games_count: number;
+  games: PlayerGameSplitGame[];
+}
+
+export interface OpponentStatLeaderboard {
+  program_slug: string;
+  program_name: string;
+  stat_key: LeaderboardStat;
+  stat_label: string;
+  aggregation_method: string;
+  season: string;
+  conference_scope: ConferenceScope;
+  opponent: string;
+  total_players: number;
+  open_quality_issue_count: number;
+  coverage: SemanticCoverage;
+  leaders: OpponentLeaderboardLeader[];
+}
+
+export interface OpponentStatLeadersResult {
+  query_id: "opponent_stat_leaders";
+  result: OpponentStatLeaderboard;
 }
 
 export interface PlayerGameSplitGame {

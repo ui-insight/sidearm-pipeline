@@ -64,6 +64,7 @@ describe("WorkspaceViewActions", () => {
             season: "2025-26",
             stat: "points",
             scope: "conference",
+            opponent: "all",
             limit: "10",
           }}
         />
@@ -74,7 +75,7 @@ describe("WorkspaceViewActions", () => {
 
     expect(clipboardWriteMock).toHaveBeenCalledOnce();
     expect(clipboardWriteMock.mock.calls[0]?.[0]).toMatch(
-      /\/workspace\?season=2025-26&stat=points&scope=conference&limit=10$/,
+      /\/workspace\?season=2025-26&stat=points&scope=conference&opponent=all&limit=10$/,
     );
     expect(screen.getByText("Share link copied.")).toBeInTheDocument();
   });
