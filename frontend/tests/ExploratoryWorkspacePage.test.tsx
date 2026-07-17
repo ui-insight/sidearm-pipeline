@@ -321,9 +321,11 @@ describe("ExploratoryWorkspacePage", () => {
     expect(screen.getByLabelText("Statistic")).toHaveValue("total_rebounds");
     expect(screen.getByLabelText("Record scope")).toHaveValue("conference");
     expect(screen.getByLabelText("Leaders")).toHaveValue("10");
-    expect(screen.getByLabelText("Current location")).toHaveTextContent(
-      "/workspace?season=2024-25&stat=total_rebounds&scope=conference&limit=10",
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("Current location")).toHaveTextContent(
+        "/workspace?season=2024-25&stat=total_rebounds&scope=conference&limit=10",
+      );
+    });
 
     const postBodies = fetchMock.mock.calls
       .filter(([, init]) => init?.method === "POST")
