@@ -90,6 +90,7 @@ describe("WorkspaceViewActions", () => {
             stat: "points",
             conference: "all",
             venue: "home",
+            opponent: "all",
             left: "4",
             right: "8",
           }}
@@ -114,7 +115,7 @@ describe("WorkspaceViewActions", () => {
     expect(stored[0]).toMatchObject({
       name: "Home points check",
       view: "comparison",
-      params: { venue: "home", left: "4", right: "8" },
+      params: { venue: "home", opponent: "all", left: "4", right: "8" },
     });
     expect(screen.getByLabelText("Saved in this browser")).toHaveValue(
       stored[0]?.id,
@@ -122,7 +123,7 @@ describe("WorkspaceViewActions", () => {
 
     await user.click(screen.getByRole("button", { name: "Open" }));
     expect(screen.getByLabelText("Current location")).toHaveTextContent(
-      "/workspace/compare?season=2025-26&stat=points&conference=all&venue=home&left=4&right=8",
+      "/workspace/compare?season=2025-26&stat=points&conference=all&venue=home&opponent=all&left=4&right=8",
     );
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -151,6 +152,32 @@ describe("WorkspaceViewActions", () => {
 });
 
 describe("saved workspace storage", () => {
+  it("keeps comparison views saved before opponent filtering was added", () => {
+    localStorage.setItem(
+      SAVED_WORKSPACE_VIEWS_KEY,
+      JSON.stringify([
+        {
+          id: "legacy-comparison",
+          name: "Legacy comparison",
+          view: "comparison",
+          params: {
+            season: "2025-26",
+            stat: "points",
+            conference: "all",
+            venue: "all",
+            left: "4",
+            right: "8",
+          },
+          created_at: "2026-07-17T18:00:00Z",
+        },
+      ]),
+    );
+
+    expect(loadSavedWorkspaceViews()).toMatchObject([
+      { id: "legacy-comparison" },
+    ]);
+  });
+
   it("rejects incomplete filter configurations before persisting them", () => {
     expect(() =>
       createSavedWorkspaceView(

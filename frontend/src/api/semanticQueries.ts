@@ -35,6 +35,7 @@ export const semanticQueriesApi = {
     statKey: LeaderboardStat,
     conferenceScope: ConferenceScope,
     venueScope: VenueScope,
+    opponent: string | null,
   ) =>
     api.post<PlayerGameSplitResult>("/semantic-queries/execute", {
       query_id: "player_game_split",
@@ -43,5 +44,6 @@ export const semanticQueriesApi = {
       season,
       conference_scope: conferenceScope,
       venue_scope: venueScope,
+      ...(opponent ? { opponent } : {}),
     }),
 };

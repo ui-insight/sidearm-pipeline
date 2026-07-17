@@ -188,6 +188,23 @@ function PlayerComparisonPage() {
       ),
     [options, season],
   );
+  const availableOpponents = useMemo(
+    () =>
+      (options?.opponents ?? []).filter((opponent) =>
+        opponent.seasons.includes(season),
+      ),
+    [options, season],
+  );
+  const requestedOpponent = searchParams.get("opponent");
+  const opponent =
+    requestedOpponent &&
+    (requestedOpponent === "all" ||
+      availableOpponents.some(
+        (candidate) => candidate.opponent_name === requestedOpponent,
+      ))
+      ? requestedOpponent
+      : "all";
+  const opponentName = opponent === "all" ? null : opponent;
   const requestedLeftPlayerId = Number(searchParams.get("left"));
   const leftPlayerId =
     availablePlayers.find(
@@ -210,6 +227,7 @@ function PlayerComparisonPage() {
     stat: statKey,
     conference: conferenceScope,
     venue: venueScope,
+    opponent,
     left: String(leftPlayerId),
     right: String(rightPlayerId),
   };
@@ -264,6 +282,7 @@ function PlayerComparisonPage() {
             statKey,
             conferenceScope,
             venueScope,
+            opponentName,
           ),
           semanticQueriesApi.playerGameSplit(
             rightPlayerId,
@@ -271,6 +290,7 @@ function PlayerComparisonPage() {
             statKey,
             conferenceScope,
             venueScope,
+            opponentName,
           ),
         ]);
         if (!active) return;
@@ -293,6 +313,7 @@ function PlayerComparisonPage() {
   }, [
     conferenceScope,
     leftPlayerId,
+    opponentName,
     reloadKey,
     rightPlayerId,
     season,
@@ -309,6 +330,7 @@ function PlayerComparisonPage() {
       stat: statKey,
       conference: conferenceScope,
       venue: venueScope,
+      opponent,
       left: String(leftPlayerId),
       right: String(rightPlayerId),
     };
@@ -319,6 +341,7 @@ function PlayerComparisonPage() {
   }, [
     conferenceScope,
     leftPlayerId,
+    opponent,
     options,
     rightPlayerId,
     searchParams,
@@ -345,8 +368,17 @@ function PlayerComparisonPage() {
           player.player_id === rightPlayerId &&
           player.player_id !== nextLeft?.player_id,
       ) ?? nextPlayers.find((player) => player.player_id !== nextLeft?.player_id);
+    const nextOpponents = (options?.opponents ?? []).filter((candidate) =>
+      candidate.seasons.includes(nextSeason),
+    );
+    const nextOpponent =
+      opponent === "all" ||
+      nextOpponents.some((candidate) => candidate.opponent_name === opponent)
+        ? opponent
+        : "all";
     updateViewParams({
       season: nextSeason,
+      opponent: nextOpponent,
       left: String(nextLeft?.player_id ?? 0),
       right: String(nextRight?.player_id ?? 0),
     });
@@ -397,6 +429,9 @@ function PlayerComparisonPage() {
   const selectedMetric = options?.metrics.find(
     (metric) => metric.stat_key === statKey,
   );
+  const selectedOpponent = availableOpponents.find(
+    (candidate) => candidate.opponent_name === opponentName,
+  );
   const canCompare =
     leftPlayerId > 0 &&
     rightPlayerId > 0 &&
@@ -437,8 +472,8 @@ function PlayerComparisonPage() {
           Player comparison
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-gray-600">
-          Put two players under the same season, competition, venue, and
-          statistic filters, with the game evidence kept in view.
+          Put two players under the same season, competition, venue, statistic,
+          and opponent filters, with the game evidence kept in view.
         </p>
       </header>
       <WorkspaceViewNav />
@@ -452,7 +487,7 @@ function PlayerComparisonPage() {
           aria-label="Comparison filters"
           className="mt-8 border-y border-gray-300 bg-white px-4 py-4 sm:px-5"
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.2fr_1.2fr_0.75fr_1fr_1fr_0.75fr_auto] xl:items-end">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[1fr_1fr_0.7fr_0.85fr_0.85fr_0.9fr_1fr_auto] xl:items-end">
             <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600">
               Player A
               <select
@@ -559,6 +594,26 @@ function PlayerComparisonPage() {
                 ))}
               </select>
             </label>
+            <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600">
+              Opponent
+              <select
+                value={opponent}
+                onChange={(event) =>
+                  updateViewParams({ opponent: event.target.value })
+                }
+                className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
+              >
+                <option value="all">All opponents</option>
+                {availableOpponents.map((candidate) => (
+                  <option
+                    key={candidate.opponent_name}
+                    value={candidate.opponent_name}
+                  >
+                    {candidate.opponent_name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               onClick={exportCsv}
@@ -625,13 +680,18 @@ function PlayerComparisonPage() {
           <header className="border-b border-gray-300 px-5 py-6 sm:px-7 sm:py-7">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
               {season} · {conferenceLabel} · {venueLabel}
+              {selectedOpponent
+                ? ` · ${selectedOpponent.opponent_name}`
+                : " · All opponents"}
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
               {leftResult.player_name} vs. {rightResult.player_name}
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              {selectedMetric?.display_label ?? leftResult.stat_label} from the
-              same governed game filters.
+              {selectedMetric?.display_label ?? leftResult.stat_label}
+              {selectedOpponent
+                ? ` against ${selectedOpponent.opponent_name}`
+                : ""} from the same governed game filters.
             </p>
           </header>
 

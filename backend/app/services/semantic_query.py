@@ -34,6 +34,7 @@ from app.schemas.semantic_query import (
     SemanticQueryRequest,
     SemanticQueryResult,
     SemanticSeasonEvidenceRead,
+    SemanticWorkspaceOpponentRead,
     SemanticWorkspaceOptionsRead,
     SemanticWorkspacePlayerRead,
     StatLeadersQuery,
@@ -73,6 +74,7 @@ async def get_semantic_workspace_options(
             seasons=[],
             metrics=metric_catalog.metrics,
             players=[],
+            opponents=[],
             leader_limits=[5, 10, 15, 25],
         )
 
@@ -148,6 +150,45 @@ async def get_semantic_workspace_options(
         )
         for (player_id, player_name), available_seasons in player_seasons.items()
     ]
+    idaho = await db.scalar(select(Team).where(Team.slug == IDAHO_TEAM_SLUG))
+    opponent_seasons: dict[str, list[str]] = {}
+    if idaho is not None:
+        _, _, opponent = _idaho_game_expressions(idaho.canonical_name)
+        opponent_rows = (
+            await db.execute(
+                select(opponent.label("opponent_name"), Game.season)
+                .select_from(PlayerGameStat)
+                .join(Game, Game.id == PlayerGameStat.game_id)
+                .join(Team, Team.id == PlayerGameStat.team_id)
+                .join(
+                    StatDefinition,
+                    StatDefinition.id == PlayerGameStat.stat_definition_id,
+                )
+                .where(
+                    Team.slug == IDAHO_TEAM_SLUG,
+                    Game.sport == program.slug,
+                    Game.event_status == "final",
+                    Game.exhibition.is_(False),
+                    Game.season.is_not(None),
+                    StatDefinition.sport_program_id == program.id,
+                    StatDefinition.record_book_eligible.is_(True),
+                    func.lower(opponent) != "unknown opponent",
+                )
+                .distinct()
+                .order_by(opponent, Game.season.desc())
+            )
+        ).all()
+        for row in opponent_rows:
+            available = opponent_seasons.setdefault(row.opponent_name, [])
+            if row.season and row.season not in available:
+                available.append(row.season)
+    opponents = [
+        SemanticWorkspaceOpponentRead(
+            opponent_name=opponent_name,
+            seasons=available_seasons,
+        )
+        for opponent_name, available_seasons in opponent_seasons.items()
+    ]
     default_stat_key = next(
         (
             metric.stat_key
@@ -162,6 +203,7 @@ async def get_semantic_workspace_options(
         seasons=seasons,
         metrics=metric_catalog.metrics,
         players=players,
+        opponents=opponents,
         leader_limits=[5, 10, 15, 25],
         default_season=seasons[0] if seasons else None,
         default_stat_key=default_stat_key,
@@ -213,12 +255,13 @@ def get_semantic_query_catalog() -> SemanticQueryCatalogRead:
                 query_id=SemanticQueryId.PLAYER_GAME_SPLIT,
                 display_name="Player game split",
                 description=(
-                    "Aggregate one player's game facts by season, conference, and "
-                    "venue."
+                    "Aggregate one player's game facts by season, conference, "
+                    "venue, and opponent."
                 ),
                 question_templates=[
                     "How many {stat_key} did {player_id} have in conference games?",
                     "What was {player_id}'s {stat_key} total at home in {season}?",
+                    "How many {stat_key} did {player_id} have against {opponent}?",
                 ],
                 parameter_schema=PlayerGameSplitQuery.model_json_schema(),
             ),
@@ -591,6 +634,8 @@ async def _player_game_split(
         filters.append(Game.conference_event.is_(False))
     if request.venue_scope != VenueScope.ALL:
         filters.append(Game.home_away_neutral == request.venue_scope.value)
+    if request.opponent is not None:
+        filters.append(func.lower(opponent) == request.opponent.lower())
 
     rows = (
         await db.execute(
@@ -659,6 +704,7 @@ async def _player_game_split(
         season=request.season,
         conference_scope=request.conference_scope,
         venue_scope=request.venue_scope,
+        opponent=request.opponent,
         value=Decimal(aggregate.value) if aggregate.value is not None else None,
         games_count=int(aggregate.games_count or 0),
         open_quality_issue_count=quality_count,

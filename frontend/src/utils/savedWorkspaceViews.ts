@@ -19,6 +19,7 @@ const WORKSPACE_VIEW_PARAM_KEYS: Record<WorkspaceViewKind, readonly string[]> = 
     "stat",
     "conference",
     "venue",
+    "opponent",
     "left",
     "right",
   ],
@@ -45,10 +46,15 @@ function isWorkspaceView(value: unknown): value is SavedWorkspaceView {
     return false;
   }
   const allowedKeys = WORKSPACE_VIEW_PARAM_KEYS[value.view];
+  const requiredKeys =
+    value.view === "comparison"
+      ? allowedKeys.filter((key) => key !== "opponent")
+      : allowedKeys;
   const paramEntries = Object.entries(value.params);
   return (
-    paramEntries.length === allowedKeys.length &&
-    allowedKeys.every((key) =>
+    paramEntries.length >= requiredKeys.length &&
+    paramEntries.length <= allowedKeys.length &&
+    requiredKeys.every((key) =>
       Object.prototype.hasOwnProperty.call(value.params, key),
     ) &&
     paramEntries.every(
@@ -104,7 +110,10 @@ export function createSavedWorkspaceView(
     params: { ...params },
     created_at: new Date().toISOString(),
   };
-  if (!isWorkspaceView(nextView)) {
+  if (
+    !isWorkspaceView(nextView) ||
+    Object.keys(params).length !== WORKSPACE_VIEW_PARAM_KEYS[view].length
+  ) {
     throw new Error("The workspace view contains invalid filters.");
   }
   return storeSavedWorkspaceViews([nextView, ...existing], storage);

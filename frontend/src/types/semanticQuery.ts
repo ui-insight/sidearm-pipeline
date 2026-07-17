@@ -13,12 +13,18 @@ export interface SemanticWorkspacePlayer {
   seasons: string[];
 }
 
+export interface SemanticWorkspaceOpponent {
+  opponent_name: string;
+  seasons: string[];
+}
+
 export interface SemanticWorkspaceOptions {
   program_slug: string;
   program_name: string;
   seasons: string[];
   metrics: RecordBookMetric[];
   players: SemanticWorkspacePlayer[];
+  opponents: SemanticWorkspaceOpponent[];
   leader_limits: number[];
   default_season: string | null;
   default_stat_key: LeaderboardStat | null;
@@ -94,6 +100,7 @@ export interface PlayerGameSplit {
   season: string | null;
   conference_scope: ConferenceScope;
   venue_scope: VenueScope;
+  opponent: string | null;
   value: string | null;
   games_count: number;
   open_quality_issue_count: number;

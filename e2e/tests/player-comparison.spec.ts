@@ -43,6 +43,16 @@ test("player comparison keeps shared filters, evidence, and export together", as
             seasons: ["2025-26"],
           },
         ],
+        opponents: [
+          {
+            opponent_name: "Montana",
+            seasons: ["2025-26"],
+          },
+          {
+            opponent_name: "Montana State",
+            seasons: ["2025-26"],
+          },
+        ],
         leader_limits: [5, 10],
         default_season: "2025-26",
         default_stat_key: "points",
@@ -57,6 +67,7 @@ test("player comparison keeps shared filters, evidence, and export together", as
       stat_key: string;
       conference_scope: string;
       venue_scope: string;
+      opponent?: string;
       limit?: number;
     };
     const coverage = {
@@ -160,6 +171,7 @@ test("player comparison keeps shared filters, evidence, and export together", as
           season: body.season,
           conference_scope: body.conference_scope,
           venue_scope: body.venue_scope,
+          opponent: body.opponent ?? null,
           value: isAlice ? "20" : "12",
           games_count: 1,
           open_quality_issue_count: 0,
@@ -192,7 +204,7 @@ test("player comparison keeps shared filters, evidence, and export together", as
   });
 
   await page.goto(
-    "/workspace/compare?season=2025-26&stat=points&conference=all&venue=all&left=4&right=8",
+    "/workspace/compare?season=2025-26&stat=points&conference=all&venue=all&opponent=all&left=4&right=8",
   );
 
   await expect(
@@ -201,7 +213,9 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await expect(
     page.getByRole("progressbar", { name: "Alice Adams: 20 Points" }),
   ).toBeVisible();
-  await expect(page.getByText("Montana", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("table").getByText("Montana", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("link", {
       name: "View Bobbi Brown source against Montana",
@@ -216,6 +230,12 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await page.goBack();
   await expect(page).toHaveURL(/venue=all/);
   await expect(page.getByLabel("Venue")).toHaveValue("all");
+
+  await page.getByLabel("Opponent").selectOption("Montana");
+  await expect(page).toHaveURL(/opponent=Montana/);
+  await expect(
+    page.getByText("Points against Montana from the same governed game filters."),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Share link" }).click();
   await expect(page.getByText("Share link copied.")).toBeVisible();
@@ -234,7 +254,7 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await savedViews.selectOption({ label: "Comparison: Deadline check" });
   await page.getByRole("button", { name: "Open" }).click();
   await expect(page).toHaveURL(
-    /\/workspace\/compare\?season=2025-26&stat=points&conference=all&venue=all&left=4&right=8$/,
+    /\/workspace\/compare\?season=2025-26&stat=points&conference=all&venue=all&opponent=Montana&left=4&right=8$/,
   );
   await expect(
     page.getByRole("heading", { name: "Alice Adams vs. Bobbi Brown" }),

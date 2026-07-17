@@ -125,6 +125,7 @@ export function buildPlayerComparisonCsv(
     csvRow(["Statistic", left.stat_label]),
     csvRow(["Conference scope", left.conference_scope]),
     csvRow(["Venue scope", left.venue_scope]),
+    csvRow(["Opponent", left.opponent ?? "all"]),
     "",
     csvRow(["Player", "Value", "Games reviewed", "Open quality issues"]),
     csvRow([
