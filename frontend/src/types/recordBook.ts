@@ -1,4 +1,5 @@
 export type LeaderboardScope = "career" | "season";
+export type LeaderboardStat = "points" | "total_rebounds" | "assists";
 
 export interface RecordBookCoverage {
   first_season: string | null;
@@ -17,7 +18,7 @@ export interface LeaderSeasonEvidence {
   source_url: string | null;
 }
 
-export interface PointsLeader {
+export interface LeaderboardLeader {
   rank: number;
   player_id: number;
   player_name: string;
@@ -26,10 +27,10 @@ export interface PointsLeader {
   season_breakdown: LeaderSeasonEvidence[];
 }
 
-export interface PointsLeaderboard {
+export interface Leaderboard {
   program_slug: string;
   program_name: string;
-  stat_key: "points";
+  stat_key: LeaderboardStat;
   stat_label: string;
   scope: LeaderboardScope;
   season: string | null;
@@ -37,5 +38,5 @@ export interface PointsLeaderboard {
   total_players: number;
   open_quality_issue_count: number;
   coverage: RecordBookCoverage;
-  leaders: PointsLeader[];
+  leaders: LeaderboardLeader[];
 }
