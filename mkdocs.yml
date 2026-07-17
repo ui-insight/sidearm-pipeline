@@ -37,6 +37,7 @@ nav:
     - Data Model: architecture/data-model.md
     - Athletic Event Model: architecture/athletic-event-model.md
     - Source Registry: architecture/source-registry.md
+    - Semantic Query Catalog: architecture/semantic-query-catalog.md
     - Core Functionality Roadmap: architecture/core-functionality-roadmap.md
     - Epic Drafts: architecture/epic-drafts.md
     - "Reboot Implementation Plan (R1)": architecture/reboot-implementation-plan.md

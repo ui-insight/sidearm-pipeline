@@ -11,6 +11,7 @@ from app.api.v1 import (
     identity_resolution,
     ingest_runs,
     record_book,
+    semantic_queries,
     sources,
 )
 from app.db.engine import get_db
@@ -22,6 +23,11 @@ api_router.include_router(
     record_book.router,
     prefix="/record-book",
     tags=["record-book"],
+)
+api_router.include_router(
+    semantic_queries.router,
+    prefix="/semantic-queries",
+    tags=["semantic-queries"],
 )
 api_router.include_router(games.router, prefix="/games", tags=["games"])
 api_router.include_router(
