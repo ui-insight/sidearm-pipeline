@@ -34,6 +34,7 @@ from app.schemas.semantic_query import (
     SemanticQueryRequest,
     SemanticQueryResult,
     SemanticSeasonEvidenceRead,
+    SemanticWorkspaceOptionsRead,
     StatLeadersQuery,
     StatLeadersQueryResult,
     TeamSeasonRecordGameRead,
@@ -48,11 +49,82 @@ from app.services.record_book import (
     SUPPORTED_COMPARISON_DIRECTIONS,
     RecordBookMetricNotFoundError,
     build_leaderboard,
+    list_record_book_metrics,
 )
 
 
 class SemanticQueryEntityNotFoundError(ValueError):
     """Raised when a typed query names an unavailable player or program."""
+
+
+async def get_semantic_workspace_options(
+    db: AsyncSession,
+) -> SemanticWorkspaceOptionsRead:
+    """Return warehouse-backed filter values for the season workspace."""
+    metric_catalog = await list_record_book_metrics(db)
+    program = await db.scalar(
+        select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
+    )
+    if program is None:
+        return SemanticWorkspaceOptionsRead(
+            program_slug=metric_catalog.program_slug,
+            program_name=metric_catalog.program_name,
+            seasons=[],
+            metrics=metric_catalog.metrics,
+            leader_limits=[5, 10, 15, 25],
+        )
+
+    game_seasons = list(
+        await db.scalars(
+            select(Game.season)
+            .where(
+                Game.sport == program.slug,
+                Game.event_status == "final",
+                Game.exhibition.is_(False),
+                Game.season.is_not(None),
+            )
+            .distinct()
+        )
+    )
+    fact_seasons = list(
+        await db.scalars(
+            select(PlayerSeason.season)
+            .join(
+                PlayerSeasonStat,
+                PlayerSeasonStat.player_season_id == PlayerSeason.id,
+            )
+            .join(
+                StatDefinition,
+                StatDefinition.id == PlayerSeasonStat.stat_definition_id,
+            )
+            .where(
+                PlayerSeason.sport_program_id == program.id,
+                StatDefinition.record_book_eligible.is_(True),
+            )
+            .distinct()
+        )
+    )
+    seasons = sorted(
+        {season for season in [*game_seasons, *fact_seasons] if season},
+        reverse=True,
+    )
+    default_stat_key = next(
+        (
+            metric.stat_key
+            for metric in metric_catalog.metrics
+            if metric.stat_key == "points"
+        ),
+        metric_catalog.metrics[0].stat_key if metric_catalog.metrics else None,
+    )
+    return SemanticWorkspaceOptionsRead(
+        program_slug=program.slug,
+        program_name=program.display_name,
+        seasons=seasons,
+        metrics=metric_catalog.metrics,
+        leader_limits=[5, 10, 15, 25],
+        default_season=seasons[0] if seasons else None,
+        default_stat_key=default_stat_key,
+    )
 
 
 def get_semantic_query_catalog() -> SemanticQueryCatalogRead:

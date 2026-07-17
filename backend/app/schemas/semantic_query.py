@@ -9,7 +9,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, PositiveInt
 
-from app.schemas.record_book import LeaderboardRead, LeaderboardScope
+from app.schemas.record_book import (
+    LeaderboardRead,
+    LeaderboardScope,
+    RecordBookMetricRead,
+)
 
 
 class SemanticQueryId(StrEnum):
@@ -100,6 +104,18 @@ class SemanticQueryCatalogRead(BaseModel):
     program_slug: str
     program_name: str
     queries: list[SemanticQueryDefinitionRead]
+
+
+class SemanticWorkspaceOptionsRead(BaseModel):
+    """Filter options available to the first Exploratory Workspace slice."""
+
+    program_slug: str
+    program_name: str
+    seasons: list[str]
+    metrics: list[RecordBookMetricRead]
+    leader_limits: list[int]
+    default_season: str | None = None
+    default_stat_key: str | None = None
 
 
 class SemanticCoverageRead(BaseModel):
