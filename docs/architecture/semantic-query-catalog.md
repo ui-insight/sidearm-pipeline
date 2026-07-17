@@ -17,7 +17,7 @@ count of unresolved quality issues in scope.
 | `team_season_record` | Idaho's overall, conference, or non-conference record in a season | `season`, `conference_scope` | Final games |
 | `stat_leaders` | Career or season leaders for a vetted Record Book metric | `stat_key`, `scope`, optional `season`, `limit` | Authoritative player-season facts |
 | `player_career_total` | One player's career aggregate for a vetted metric | `player_id`, `stat_key` | Authoritative player-season facts |
-| `player_game_split` | One player's metric aggregate by season, conference scope, or venue | `player_id`, `stat_key`, optional `season`, `conference_scope`, `venue_scope` | Player-game facts |
+| `player_game_split` | One player's metric aggregate by season, conference scope, venue, or opponent | `player_id`, `stat_key`, optional `season`, `conference_scope`, `venue_scope`, `opponent` | Player-game facts |
 
 Only player metrics whose `StatDefinition` is Record Book eligible and has a
 supported aggregation and comparison rule may be selected. The service rejects
@@ -32,11 +32,11 @@ model. Consumers should use this response to discover supported questions rather
 than construct arbitrary database requests.
 
 `GET /api/v1/semantic-queries/options` returns the women's basketball seasons,
-Record Book metrics, canonical players with vetted game evidence, and supported
-leaderboard sizes that currently have warehouse evidence. Each player option
-includes its available game-fact seasons. The Exploratory Workspace uses these
-server-governed options instead of maintaining a second list of available filters
-in the frontend.
+Record Book metrics, canonical players and observed opponents with vetted game
+evidence, and supported leaderboard sizes that currently have warehouse
+evidence. Each player and opponent option includes its available game-fact
+seasons. The Exploratory Workspace uses these server-governed options instead of
+maintaining a second list of available filters in the frontend.
 
 `POST /api/v1/semantic-queries/execute` accepts a discriminated request. For
 example, a conference-only player split is:
@@ -86,12 +86,13 @@ quality-issue counts remain visible alongside the result. The same assembled
 evidence can be exported as CSV.
 
 The **Player comparison** at `/workspace/compare` applies one shared season,
-metric, conference, and venue filter set to two distinct canonical players. It
-executes `player_game_split` independently for each player, then aligns the
-returned evidence by canonical game ID for inspection. The frontend does not
-derive a new authoritative aggregate: displayed totals, games reviewed, coverage,
-quality counts, and source links all come from the governed responses. The
-comparison and aligned evidence can also be exported as CSV.
+metric, conference, venue, and optional opponent filter set to two distinct
+canonical players. It executes `player_game_split` independently for each
+player, then aligns the returned evidence by canonical game ID for inspection.
+The frontend does not derive a new authoritative aggregate: displayed totals,
+games reviewed, coverage, quality counts, and source links all come from the
+governed responses. The comparison and aligned evidence can also be exported as
+CSV.
 
 Both workspace routes encode their complete validated filter state in canonical
 query parameters. Incoming parameters are checked against the current
@@ -103,9 +104,10 @@ Users can also give that same route-and-filter configuration a name. These saved
 views are stored only in the current browser, are limited to 20 validated
 entries, and do not contain result facts or source evidence. They are explicitly
 not account-synced or team-shared; opening one still executes the current
-governed query. Account-backed sharing, opponent-specific filtering,
-multi-player comparisons, and free-form questions remain later Phase 6 work
-built on the same bounded catalog.
+governed query. Opponent-scoped Season desk leaderboards require a separate
+game-grain leaderboard query. Account-backed sharing, multi-player comparisons,
+and free-form questions remain later Phase 6 work built on the same bounded
+catalog.
 
 ## Deterministic boundary
 

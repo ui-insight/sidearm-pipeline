@@ -77,6 +77,7 @@ class PlayerGameSplitQuery(BaseModel):
     season: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     conference_scope: ConferenceScope = ConferenceScope.ALL
     venue_scope: VenueScope = VenueScope.ALL
+    opponent: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 SemanticQueryRequest = Annotated[
@@ -114,6 +115,13 @@ class SemanticWorkspacePlayerRead(BaseModel):
     seasons: list[str]
 
 
+class SemanticWorkspaceOpponentRead(BaseModel):
+    """Observed opponent with vetted game evidence available to the workspace."""
+
+    opponent_name: str
+    seasons: list[str]
+
+
 class SemanticWorkspaceOptionsRead(BaseModel):
     """Warehouse-backed filter options for Exploratory Workspace views."""
 
@@ -122,6 +130,7 @@ class SemanticWorkspaceOptionsRead(BaseModel):
     seasons: list[str]
     metrics: list[RecordBookMetricRead]
     players: list[SemanticWorkspacePlayerRead]
+    opponents: list[SemanticWorkspaceOpponentRead]
     leader_limits: list[int]
     default_season: str | None = None
     default_stat_key: str | None = None
@@ -223,6 +232,7 @@ class PlayerGameSplitRead(BaseModel):
     season: str | None = None
     conference_scope: ConferenceScope
     venue_scope: VenueScope
+    opponent: str | None = None
     value: Decimal | None = None
     games_count: int
     open_quality_issue_count: int

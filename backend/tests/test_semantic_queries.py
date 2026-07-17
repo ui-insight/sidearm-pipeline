@@ -314,6 +314,7 @@ async def test_semantic_catalog_exposes_stable_typed_queries(client) -> None:
     assert properties["season"]["anyOf"][0]["pattern"] == r"^\d{4}-\d{2}$"
     assert "conference_scope" in properties
     assert "venue_scope" in properties
+    assert properties["opponent"]["anyOf"][0]["maxLength"] == 255
 
 
 async def test_workspace_options_come_from_available_facts_and_metrics(
@@ -340,6 +341,11 @@ async def test_workspace_options_come_from_available_facts_and_metrics(
             "player_name": "Bobbi Brown",
             "seasons": ["2025-26"],
         },
+    ]
+    assert payload["opponents"] == [
+        {"opponent_name": "Montana", "seasons": ["2025-26"]},
+        {"opponent_name": "Montana State", "seasons": ["2025-26"]},
+        {"opponent_name": "Washington State", "seasons": ["2025-26"]},
     ]
     assert payload["leader_limits"] == [5, 10, 15, 25]
     assert payload["default_season"] == "2025-26"
@@ -466,6 +472,28 @@ async def test_player_game_split_filters_conference_facts(client, db_session):
     ]
     assert all(game["conference_event"] for game in result["games"])
     assert result["games"][1]["source_url"].endswith("/game/2")
+
+
+async def test_player_game_split_filters_one_opponent(client, db_session):
+    ids = await seed_semantic_query_facts(db_session)
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={
+            "query_id": "player_game_split",
+            "player_id": ids["alice_id"],
+            "stat_key": "points",
+            "season": "2025-26",
+            "opponent": "Montana State",
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["opponent"] == "Montana State"
+    assert Decimal(result["value"]) == 15
+    assert result["games_count"] == 1
+    assert [game["opponent"] for game in result["games"]] == ["Montana State"]
 
 
 async def test_semantic_query_rejects_unknown_query_and_unvetted_metric(

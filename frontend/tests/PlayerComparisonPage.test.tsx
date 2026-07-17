@@ -64,6 +64,20 @@ const options = {
       seasons: ["2025-26", "2024-25"],
     },
   ],
+  opponents: [
+    {
+      opponent_name: "Montana",
+      seasons: ["2025-26", "2024-25"],
+    },
+    {
+      opponent_name: "Montana State",
+      seasons: ["2025-26"],
+    },
+    {
+      opponent_name: "Washington State",
+      seasons: ["2025-26"],
+    },
+  ],
   leader_limits: [5, 10, 15, 25],
   default_season: "2025-26",
   default_stat_key: "points",
@@ -132,6 +146,7 @@ function splitFor(playerId: number, overrides: Record<string, unknown> = {}) {
     season: "2025-26",
     conference_scope: "all",
     venue_scope: "all",
+    opponent: null,
     value: isAlice ? "35" : "26",
     games_count: 2,
     open_quality_issue_count: isAlice ? 1 : 0,
@@ -175,6 +190,7 @@ function installSuccessfulFetch() {
           stat_label: rebounds ? "Rebounds" : "Points",
           conference_scope: body.conference_scope,
           venue_scope: body.venue_scope,
+          opponent: body.opponent ?? null,
         }),
       });
     }
@@ -213,8 +229,11 @@ describe("PlayerComparisonPage", () => {
     expect(
       screen.getByRole("progressbar", { name: "Bobbi Brown: 26 Points" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Montana State")).toBeInTheDocument();
-    expect(screen.getByText("Washington State")).toBeInTheDocument();
+    const evidenceTable = screen.getByRole("table");
+    expect(within(evidenceTable).getByText("Montana State")).toBeInTheDocument();
+    expect(
+      within(evidenceTable).getByText("Washington State"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", {
         name: "View Alice Adams source against Montana",
@@ -263,6 +282,7 @@ describe("PlayerComparisonPage", () => {
     await user.selectOptions(screen.getByLabelText("Statistic"), "total_rebounds");
     await user.selectOptions(screen.getByLabelText("Competition"), "conference");
     await user.selectOptions(screen.getByLabelText("Venue"), "home");
+    await user.selectOptions(screen.getByLabelText("Opponent"), "Montana");
 
     await waitFor(() => {
       const bodies = fetchMock.mock.calls
@@ -276,11 +296,14 @@ describe("PlayerComparisonPage", () => {
           season: "2025-26",
           conference_scope: "conference",
           venue_scope: "home",
+          opponent: "Montana",
         });
       }
     });
     expect(
-      await screen.findByText("Rebounds from the same governed game filters."),
+      await screen.findByText(
+        "Rebounds against Montana from the same governed game filters.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -288,7 +311,7 @@ describe("PlayerComparisonPage", () => {
     render(
       <MemoryRouter
         initialEntries={[
-          "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&left=11&right=4",
+          "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&opponent=Montana&left=11&right=4",
         ]}
       >
         <PlayerComparisonPage />
@@ -306,8 +329,9 @@ describe("PlayerComparisonPage", () => {
     expect(screen.getByLabelText("Season")).toHaveValue("2024-25");
     expect(screen.getByLabelText("Competition")).toHaveValue("conference");
     expect(screen.getByLabelText("Venue")).toHaveValue("home");
+    expect(screen.getByLabelText("Opponent")).toHaveValue("Montana");
     expect(screen.getByLabelText("Current location")).toHaveTextContent(
-      "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&left=11&right=4",
+      "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&opponent=Montana&left=11&right=4",
     );
 
     const bodies = fetchMock.mock.calls
@@ -321,8 +345,40 @@ describe("PlayerComparisonPage", () => {
         season: "2024-25",
         conference_scope: "conference",
         venue_scope: "home",
+        opponent: "Montana",
       });
     }
+  });
+
+  it("falls back when a shared opponent is stale for the selected season", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/workspace/compare?season=2024-25&stat=points&conference=all&venue=all&opponent=Washington+State&left=11&right=4",
+        ]}
+      >
+        <PlayerComparisonPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Renee Rivers vs. Alice Adams",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Opponent")).toHaveValue("all");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Current location")).toHaveTextContent(
+        "/workspace/compare?season=2024-25&stat=points&conference=all&venue=all&opponent=all&left=11&right=4",
+      );
+    });
+
+    const bodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === "POST")
+      .map(([, init]) => requestBody(init));
+    expect(bodies).toHaveLength(2);
+    expect(bodies.every((body) => body.opponent === undefined)).toBe(true);
   });
 
   it("aligns unequal game sets and exports the comparison evidence", () => {
@@ -337,6 +393,7 @@ describe("PlayerComparisonPage", () => {
     const csv = buildPlayerComparisonCsv(left, right);
     expect(csv).toContain("Alice Adams,35,2,1");
     expect(csv).toContain("Bobbi Brown,26,2,0");
+    expect(csv).toContain("Opponent,all");
     expect(csv).toContain(
       "2026-01-09,Montana State,away,Yes,15,,https://govandals.com/boxscore/22,",
     );
