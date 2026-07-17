@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 test("player comparison keeps shared filters, evidence, and export together", async ({
+  context,
   page,
 }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.route("**/api/v1/auth/session", async (route) => {
     await route.fulfill({
       status: 200,
@@ -50,12 +52,97 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await page.route("**/api/v1/semantic-queries/execute", async (route) => {
     const body = route.request().postDataJSON() as {
       query_id: string;
-      player_id: number;
+      player_id?: number;
       season: string;
       stat_key: string;
       conference_scope: string;
       venue_scope: string;
+      limit?: number;
     };
+    const coverage = {
+      grain: "game",
+      first_season: "2025-26",
+      last_season: "2025-26",
+      completeness: "complete",
+      source_systems: ["sidearm"],
+      known_limitations: [],
+      verified_at: "2026-07-15T20:00:00Z",
+      statement: "Verified game evidence covers the selected season.",
+    };
+    if (body.query_id === "team_season_record") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          query_id: body.query_id,
+          result: {
+            program_slug: "womens-basketball",
+            program_name: "Women's Basketball",
+            season: body.season,
+            conference_scope: body.conference_scope,
+            games_played: 1,
+            wins: 1,
+            losses: 0,
+            ties: 0,
+            open_quality_issue_count: 0,
+            coverage,
+            games: [
+              {
+                game_id: 21,
+                game_date: "2026-01-03",
+                opponent: "Montana",
+                venue: "home",
+                conference_event: true,
+                idaho_score: 72,
+                opponent_score: 64,
+                result: "win",
+                source_url: "https://govandals.com/boxscore/21",
+              },
+            ],
+          },
+        }),
+      });
+      return;
+    }
+    if (body.query_id === "stat_leaders") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          query_id: body.query_id,
+          result: {
+            program_slug: "womens-basketball",
+            program_name: "Women's Basketball",
+            stat_key: body.stat_key,
+            stat_label: "Points",
+            scope: "season",
+            season: body.season,
+            available_seasons: ["2025-26"],
+            total_players: 2,
+            open_quality_issue_count: 0,
+            coverage,
+            leaders: [
+              {
+                rank: 1,
+                player_id: 4,
+                player_name: "Alice Adams",
+                total: "225",
+                seasons_count: 1,
+                season_breakdown: [
+                  {
+                    season: "2025-26",
+                    value: "225",
+                    source_snapshot_id: 12,
+                    source_url: "https://govandals.com/stats/wbb/2025-26",
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      });
+      return;
+    }
     const isAlice = body.player_id === 4;
     await route.fulfill({
       status: 200,
@@ -104,7 +191,9 @@ test("player comparison keeps shared filters, evidence, and export together", as
     });
   });
 
-  await page.goto("/workspace/compare");
+  await page.goto(
+    "/workspace/compare?season=2025-26&stat=points&conference=all&venue=all&left=4&right=8",
+  );
 
   await expect(
     page.getByRole("heading", { name: "Alice Adams vs. Bobbi Brown" }),
@@ -121,6 +210,43 @@ test("player comparison keeps shared filters, evidence, and export together", as
   await expect(
     page.getByRole("link", { name: "Player comparison" }),
   ).toHaveAttribute("aria-current", "page");
+
+  await page.getByLabel("Venue").selectOption("home");
+  await expect(page).toHaveURL(/venue=home/);
+  await page.goBack();
+  await expect(page).toHaveURL(/venue=all/);
+  await expect(page.getByLabel("Venue")).toHaveValue("all");
+
+  await page.getByRole("button", { name: "Share link" }).click();
+  await expect(page.getByText("Share link copied.")).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(page.url());
+
+  await page.getByRole("button", { name: "Save view" }).click();
+  await page.getByLabel("View name").fill("Deadline check");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("View saved in this browser.")).toBeVisible();
+
+  await page.goto("/workspace");
+  await expect(page.getByRole("heading", { name: "Season desk" })).toBeVisible();
+  const savedViews = page.getByLabel("Saved in this browser");
+  await savedViews.selectOption({ label: "Comparison: Deadline check" });
+  await page.getByRole("button", { name: "Open" }).click();
+  await expect(page).toHaveURL(
+    /\/workspace\/compare\?season=2025-26&stat=points&conference=all&venue=all&left=4&right=8$/,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Alice Adams vs. Bobbi Brown" }),
+  ).toBeVisible();
+  await page.getByLabel("Saved in this browser").selectOption({
+    label: "Comparison: Deadline check",
+  });
+  const deleteSavedView = page.getByRole("button", { name: "Delete" });
+  await expect(deleteSavedView).toBeEnabled();
+  await deleteSavedView.click();
+  await expect(page.getByText("Deleted Deadline check.")).toBeVisible();
+  await expect(page.getByLabel("Saved in this browser")).toHaveCount(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
   const overflowState = await page.evaluate(() => ({

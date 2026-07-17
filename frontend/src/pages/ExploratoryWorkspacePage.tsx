@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { semanticQueriesApi } from "../api/semanticQueries";
 import type { Leaderboard } from "../types/recordBook";
@@ -10,12 +10,17 @@ import type {
 } from "../types/semanticQuery";
 import { buildWorkspaceCsv } from "../utils/workspaceCsv";
 import WorkspaceViewNav from "../components/WorkspaceViewNav";
+import WorkspaceViewActions from "../components/WorkspaceViewActions";
 
 const RECORD_SCOPES: { value: ConferenceScope; label: string }[] = [
   { value: "all", label: "All games" },
   { value: "conference", label: "Conference" },
   { value: "non_conference", label: "Non-conference" },
 ];
+
+function isConferenceScope(value: string | null): value is ConferenceScope {
+  return RECORD_SCOPES.some((scope) => scope.value === value);
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -77,17 +82,43 @@ function QualitySummary({ count }: { count: number }) {
 
 function ExploratoryWorkspacePage() {
   const [options, setOptions] = useState<SemanticWorkspaceOptions | null>(null);
-  const [season, setSeason] = useState("");
-  const [statKey, setStatKey] = useState("");
-  const [conferenceScope, setConferenceScope] =
-    useState<ConferenceScope>("all");
-  const [leaderLimit, setLeaderLimit] = useState(10);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [record, setRecord] = useState<TeamSeasonRecord | null>(null);
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  const requestedSeason = searchParams.get("season");
+  const season =
+    options?.seasons.find((candidate) => candidate === requestedSeason) ??
+    options?.default_season ??
+    options?.seasons[0] ??
+    "";
+  const requestedStatKey = searchParams.get("stat");
+  const statKey =
+    options?.metrics.find((metric) => metric.stat_key === requestedStatKey)
+      ?.stat_key ??
+    options?.default_stat_key ??
+    options?.metrics[0]?.stat_key ??
+    "";
+  const requestedScope = searchParams.get("scope");
+  const conferenceScope = isConferenceScope(requestedScope)
+    ? requestedScope
+    : "all";
+  const requestedLimit = Number(searchParams.get("limit"));
+  const leaderLimit = options?.leader_limits.includes(requestedLimit)
+    ? requestedLimit
+    : (options?.leader_limits.find((limit) => limit === 10) ??
+      options?.leader_limits[0] ??
+      10);
+  const currentViewParams = {
+    season,
+    stat: statKey,
+    scope: conferenceScope,
+    limit: String(leaderLimit),
+  };
 
   const selectedMetric = useMemo(
     () => options?.metrics.find((metric) => metric.stat_key === statKey),
@@ -104,23 +135,6 @@ function ExploratoryWorkspacePage() {
         const nextOptions = await semanticQueriesApi.options();
         if (!active) return;
         setOptions(nextOptions);
-        setSeason((current) =>
-          nextOptions.seasons.includes(current)
-            ? current
-            : (nextOptions.default_season ?? nextOptions.seasons[0] ?? ""),
-        );
-        setStatKey((current) =>
-          nextOptions.metrics.some((metric) => metric.stat_key === current)
-            ? current
-            : (nextOptions.default_stat_key ??
-              nextOptions.metrics[0]?.stat_key ??
-              ""),
-        );
-        setLeaderLimit((current) =>
-          nextOptions.leader_limits.includes(current)
-            ? current
-            : (nextOptions.leader_limits[0] ?? 10),
-        );
       } catch (loadError) {
         if (!active) return;
         setOptions(null);
@@ -168,6 +182,32 @@ function ExploratoryWorkspacePage() {
       active = false;
     };
   }, [conferenceScope, leaderLimit, reloadKey, season, statKey]);
+
+  useEffect(() => {
+    if (!options || !season || !statKey) return;
+    const canonicalParams = {
+      season,
+      stat: statKey,
+      scope: conferenceScope,
+      limit: String(leaderLimit),
+    };
+    const canonicalSearch = new URLSearchParams(canonicalParams).toString();
+    if (canonicalSearch !== searchParams.toString()) {
+      setSearchParams(canonicalParams, { replace: true });
+    }
+  }, [
+    conferenceScope,
+    leaderLimit,
+    options,
+    searchParams,
+    season,
+    setSearchParams,
+    statKey,
+  ]);
+
+  function updateViewParams(changes: Record<string, string>) {
+    setSearchParams({ ...currentViewParams, ...changes });
+  }
 
   function exportCsv() {
     if (!record || !leaderboard) return;
@@ -217,6 +257,10 @@ function ExploratoryWorkspacePage() {
       <WorkspaceViewNav />
 
       {options && !isEmpty ? (
+        <WorkspaceViewActions view="season" params={currentViewParams} />
+      ) : null}
+
+      {options && !isEmpty ? (
         <section
           aria-label="Workspace filters"
           className="mt-8 border-y border-gray-300 bg-white px-4 py-4 sm:px-5"
@@ -226,7 +270,9 @@ function ExploratoryWorkspacePage() {
               Season
               <select
                 value={season}
-                onChange={(event) => setSeason(event.target.value)}
+                onChange={(event) =>
+                  updateViewParams({ season: event.target.value })
+                }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
                 {options.seasons.map((option) => (
@@ -240,7 +286,9 @@ function ExploratoryWorkspacePage() {
               Statistic
               <select
                 value={statKey}
-                onChange={(event) => setStatKey(event.target.value)}
+                onChange={(event) =>
+                  updateViewParams({ stat: event.target.value })
+                }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
                 {options.metrics.map((metric) => (
@@ -255,7 +303,7 @@ function ExploratoryWorkspacePage() {
               <select
                 value={conferenceScope}
                 onChange={(event) =>
-                  setConferenceScope(event.target.value as ConferenceScope)
+                  updateViewParams({ scope: event.target.value })
                 }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
@@ -270,7 +318,9 @@ function ExploratoryWorkspacePage() {
               Leaders
               <select
                 value={leaderLimit}
-                onChange={(event) => setLeaderLimit(Number(event.target.value))}
+                onChange={(event) =>
+                  updateViewParams({ limit: event.target.value })
+                }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
                 {options.leader_limits.map((limit) => (

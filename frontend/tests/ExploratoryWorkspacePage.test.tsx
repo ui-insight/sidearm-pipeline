@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ExploratoryWorkspacePage from "../src/pages/ExploratoryWorkspacePage";
 import { buildWorkspaceCsv } from "../src/utils/workspaceCsv";
@@ -13,6 +13,11 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
   return new Response(JSON.stringify(body), { ...init, headers });
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="Current location">{location.pathname}{location.search}</output>;
 }
 
 const options = {
@@ -293,6 +298,48 @@ describe("ExploratoryWorkspacePage", () => {
     expect(
       await screen.findByRole("heading", { name: "2025-26 Rebounds" }),
     ).toBeInTheDocument();
+  });
+
+  it("hydrates valid URL filters and falls back from a stale limit", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/workspace?season=2024-25&stat=total_rebounds&scope=conference&limit=999",
+        ]}
+      >
+        <ExploratoryWorkspacePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Idaho finished 2–1 in 2024-25.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Season")).toHaveValue("2024-25");
+    expect(screen.getByLabelText("Statistic")).toHaveValue("total_rebounds");
+    expect(screen.getByLabelText("Record scope")).toHaveValue("conference");
+    expect(screen.getByLabelText("Leaders")).toHaveValue("10");
+    expect(screen.getByLabelText("Current location")).toHaveTextContent(
+      "/workspace?season=2024-25&stat=total_rebounds&scope=conference&limit=10",
+    );
+
+    const postBodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === "POST")
+      .map(([, init]) => requestBody(init));
+    expect(postBodies).toContainEqual({
+      query_id: "team_season_record",
+      season: "2024-25",
+      conference_scope: "conference",
+    });
+    expect(postBodies).toContainEqual({
+      query_id: "stat_leaders",
+      stat_key: "total_rebounds",
+      scope: "season",
+      season: "2024-25",
+      limit: 10,
+    });
   });
 
   it("builds a spreadsheet-ready export with both evidence sections", () => {
