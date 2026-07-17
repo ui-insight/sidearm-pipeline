@@ -20,23 +20,75 @@ from app.schemas.record_book import (
     LeaderboardLeaderRead,
     LeaderboardRead,
     LeaderboardScope,
-    LeaderboardStat,
     LeaderSeasonEvidenceRead,
     RecordBookCoverageRead,
+    RecordBookMetricCatalogRead,
+    RecordBookMetricRead,
 )
 
 DEFAULT_PROGRAM_NAME = "Women's Basketball"
-STAT_LABELS = {
-    LeaderboardStat.POINTS: "Points",
-    LeaderboardStat.TOTAL_REBOUNDS: "Rebounds",
-    LeaderboardStat.ASSISTS: "Assists",
-}
+SUPPORTED_AGGREGATION_METHODS = ("sum", "maximum", "minimum", "average")
+SUPPORTED_COMPARISON_DIRECTIONS = ("higher", "lower")
+
+
+class RecordBookMetricNotFoundError(ValueError):
+    """Raised when a metric is not eligible for Record Book aggregation."""
+
+
+async def list_record_book_metrics(
+    db: AsyncSession,
+) -> RecordBookMetricCatalogRead:
+    """List aggregable WBB player metrics from their warehouse definitions."""
+    program = await db.scalar(
+        select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
+    )
+    if program is None:
+        return RecordBookMetricCatalogRead(
+            program_slug=WBB_PROGRAM_SLUG,
+            program_name=DEFAULT_PROGRAM_NAME,
+            metrics=[],
+        )
+
+    definitions = list(
+        await db.scalars(
+            _record_book_definitions(program.id).order_by(
+                StatDefinition.display_label,
+                StatDefinition.stat_key,
+            )
+        )
+    )
+    return RecordBookMetricCatalogRead(
+        program_slug=program.slug,
+        program_name=program.display_name,
+        metrics=[
+            RecordBookMetricRead(
+                stat_key=definition.stat_key,
+                display_label=definition.display_label,
+                value_type=definition.value_type,
+                unit=definition.unit,
+                aggregation_method=definition.aggregation_method,
+                comparison_direction=definition.comparison_direction,
+                display_format=definition.display_format,
+            )
+            for definition in definitions
+        ],
+    )
+
+
+def _record_book_definitions(program_id: int):
+    return select(StatDefinition).where(
+        StatDefinition.sport_program_id == program_id,
+        StatDefinition.entity_scope == "player",
+        StatDefinition.record_book_eligible.is_(True),
+        StatDefinition.aggregation_method.in_(SUPPORTED_AGGREGATION_METHODS),
+        StatDefinition.comparison_direction.in_(SUPPORTED_COMPARISON_DIRECTIONS),
+    )
 
 
 async def build_leaderboard(
     db: AsyncSession,
     *,
-    stat_key: LeaderboardStat,
+    stat_key: str,
     scope: LeaderboardScope,
     season: str | None,
     limit: int,
@@ -46,22 +98,18 @@ async def build_leaderboard(
         select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
     )
     if program is None:
-        return _empty_leaderboard(stat_key=stat_key, scope=scope, season=season)
+        raise RecordBookMetricNotFoundError(
+            f"Record Book metric '{stat_key}' is not available."
+        )
 
     definition = await db.scalar(
-        select(StatDefinition).where(
-            StatDefinition.sport_program_id == program.id,
-            StatDefinition.entity_scope == "player",
+        _record_book_definitions(program.id).where(
             StatDefinition.stat_key == stat_key,
-            StatDefinition.record_book_eligible.is_(True),
         )
     )
     if definition is None:
-        return _empty_leaderboard(
-            scope=scope,
-            season=season,
-            stat_key=stat_key,
-            program=program,
+        raise RecordBookMetricNotFoundError(
+            f"Record Book metric '{stat_key}' is not available."
         )
 
     available_seasons = list(
@@ -87,6 +135,8 @@ async def build_leaderboard(
         db,
         program_id=program.id,
         definition_id=definition.id,
+        aggregation_method=definition.aggregation_method,
+        comparison_direction=definition.comparison_direction,
         scope=scope,
         season=selected_season,
         limit=limit,
@@ -146,11 +196,21 @@ async def _leader_rows(
     *,
     program_id: int,
     definition_id: int,
+    aggregation_method: str,
+    comparison_direction: str,
     scope: LeaderboardScope,
     season: str | None,
     limit: int,
 ):
-    total_value = func.sum(PlayerSeasonStat.value).label("total_value")
+    aggregate_functions = {
+        "sum": func.sum,
+        "maximum": func.max,
+        "minimum": func.min,
+        "average": func.avg,
+    }
+    aggregate_value = aggregate_functions[aggregation_method](
+        PlayerSeasonStat.value
+    ).label("total_value")
     seasons_count = func.count(func.distinct(PlayerSeason.season)).label(
         "seasons_count"
     )
@@ -158,7 +218,7 @@ async def _leader_rows(
         select(
             Player.id.label("player_id"),
             Player.display_name.label("player_name"),
-            total_value,
+            aggregate_value,
             seasons_count,
         )
         .select_from(PlayerSeasonStat)
@@ -175,7 +235,13 @@ async def _leader_rows(
         statement = statement.where(PlayerSeason.season == season)
     statement = (
         statement.group_by(Player.id, Player.display_name)
-        .order_by(total_value.desc(), Player.display_name, Player.id)
+        .order_by(
+            aggregate_value.asc()
+            if comparison_direction == "lower"
+            else aggregate_value.desc(),
+            Player.display_name,
+            Player.id,
+        )
         .limit(limit)
     )
     return (await db.execute(statement)).all()
@@ -401,31 +467,3 @@ async def _open_quality_issue_count(
         )
     )
     return int(await db.scalar(statement) or 0)
-
-
-def _empty_leaderboard(
-    *,
-    stat_key: LeaderboardStat,
-    scope: LeaderboardScope,
-    season: str | None,
-    program: SportProgram | None = None,
-) -> LeaderboardRead:
-    stat_label = STAT_LABELS[stat_key]
-    return LeaderboardRead(
-        program_slug=program.slug if program else WBB_PROGRAM_SLUG,
-        program_name=program.display_name if program else DEFAULT_PROGRAM_NAME,
-        stat_key=stat_key,
-        stat_label=stat_label,
-        scope=scope,
-        season=season,
-        available_seasons=[],
-        total_players=0,
-        open_quality_issue_count=0,
-        coverage=RecordBookCoverageRead(
-            completeness="unknown",
-            source_systems=[],
-            known_limitations=[],
-            statement=f"No verified {stat_label.lower()} coverage is available yet.",
-        ),
-        leaders=[],
-    )

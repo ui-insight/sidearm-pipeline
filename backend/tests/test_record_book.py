@@ -3,8 +3,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import pytest
-
+from app.db.seed import seed_warehouse_reference_data
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import SourceSnapshot
@@ -17,6 +16,9 @@ STAT_CONFIG = {
     "points": ("Points", "PTS"),
     "total_rebounds": ("Rebounds", "REB"),
     "assists": ("Assists", "A"),
+    "blocks": ("Blocks", "BLK"),
+    "turnovers": ("Turnovers", "TO"),
+    "personal_fouls": ("Personal Fouls", "PF"),
 }
 
 
@@ -37,10 +39,10 @@ async def seed_record_book_facts(db_session) -> None:
             value_type="integer",
             unit="count",
             aggregation_method="sum",
-            comparison_direction="higher",
+            comparison_direction=("lower" if stat_key == "turnovers" else "higher"),
             display_format="0",
             source_field_aliases=[source_field],
-            record_book_eligible=True,
+            record_book_eligible=stat_key != "personal_fouls",
             notability_eligible=True,
         )
         for stat_key, (label, source_field) in STAT_CONFIG.items()
@@ -81,22 +83,42 @@ async def seed_record_book_facts(db_session) -> None:
         (
             alice,
             "2024-25",
-            {"points": "100", "total_rebounds": "50", "assists": "30"},
+            {
+                "points": "100",
+                "total_rebounds": "50",
+                "assists": "30",
+                "turnovers": "5",
+            },
         ),
         (
             alice,
             "2025-26",
-            {"points": "125", "total_rebounds": "75", "assists": "40"},
+            {
+                "points": "125",
+                "total_rebounds": "75",
+                "assists": "40",
+                "turnovers": "6",
+            },
         ),
         (
             bob,
             "2025-26",
-            {"points": "225", "total_rebounds": "160", "assists": "20"},
+            {
+                "points": "225",
+                "total_rebounds": "160",
+                "assists": "20",
+                "turnovers": "4",
+            },
         ),
         (
             cara,
             "2025-26",
-            {"points": "150", "total_rebounds": "120", "assists": "90"},
+            {
+                "points": "150",
+                "total_rebounds": "120",
+                "assists": "90",
+                "turnovers": "8",
+            },
         ),
     ):
         membership = PlayerSeason(
@@ -120,7 +142,8 @@ async def seed_record_book_facts(db_session) -> None:
                 )
             )
 
-    for definition in definitions.values():
+    for stat_key in ("points", "total_rebounds", "assists", "turnovers"):
+        definition = definitions[stat_key]
         for season in ("2024-25", "2025-26"):
             db_session.add(
                 CoverageWindow(
@@ -216,6 +239,56 @@ async def test_career_points_leaderboard_ranks_ties_and_attaches_evidence(
     assert alice["season_breakdown"][0]["source_url"].endswith("2025-26")
 
 
+async def test_metric_catalog_comes_from_eligible_stat_definitions(
+    client,
+    db_session,
+) -> None:
+    await seed_record_book_facts(db_session)
+
+    response = await client.get("/api/v1/record-book/metrics")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["program_slug"] == "womens-basketball"
+    assert [metric["stat_key"] for metric in payload["metrics"]] == [
+        "assists",
+        "blocks",
+        "points",
+        "total_rebounds",
+        "turnovers",
+    ]
+    assert "personal_fouls" not in {metric["stat_key"] for metric in payload["metrics"]}
+    turnovers = next(
+        metric for metric in payload["metrics"] if metric["stat_key"] == "turnovers"
+    )
+    assert turnovers["aggregation_method"] == "sum"
+    assert turnovers["comparison_direction"] == "lower"
+
+
+async def test_seeded_metric_catalog_exposes_all_record_book_statistics(
+    client,
+    db_session,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+
+    response = await client.get("/api/v1/record-book/metrics")
+
+    assert response.status_code == 200
+    assert [metric["stat_key"] for metric in response.json()["metrics"]] == [
+        "assists",
+        "blocks",
+        "defensive_rebounds",
+        "field_goals_made",
+        "free_throws_made",
+        "offensive_rebounds",
+        "points",
+        "total_rebounds",
+        "steals",
+        "three_point_field_goals_made",
+    ]
+
+
 async def test_season_leaderboard_scopes_quality_review_to_selected_window(
     client,
     db_session,
@@ -272,26 +345,39 @@ async def test_record_book_supports_rebounds_and_assists(client, db_session) -> 
     assert assists.json()["open_quality_issue_count"] == 2
 
 
-async def test_record_book_rejects_unsupported_metrics(client) -> None:
-    response = await client.get("/api/v1/record-book/leaders/steals")
+async def test_record_book_honors_lower_is_better_metrics(client, db_session) -> None:
+    await seed_record_book_facts(db_session)
 
-    assert response.status_code == 422
+    response = await client.get("/api/v1/record-book/leaders/turnovers?scope=career")
+
+    assert response.status_code == 200
+    assert response.json()["stat_label"] == "Turnovers"
+    assert [row["player_name"] for row in response.json()["leaders"]] == [
+        "Bobbi Brown",
+        "Cara Cole",
+        "Alice Adams",
+    ]
+    assert Decimal(response.json()["leaders"][0]["total"]) == 4
 
 
-@pytest.mark.parametrize(
-    ("stat_key", "statement"),
-    [
-        ("points", "No verified points coverage is available yet."),
-        ("total_rebounds", "No verified rebounds coverage is available yet."),
-        ("assists", "No verified assists coverage is available yet."),
-    ],
-)
+async def test_record_book_rejects_ineligible_metrics(client, db_session) -> None:
+    await seed_record_book_facts(db_session)
+
+    response = await client.get("/api/v1/record-book/leaders/personal_fouls")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        "Record Book metric 'personal_fouls' is not available."
+    )
+
+
 async def test_leaderboards_have_metric_specific_empty_states(
     client,
-    stat_key,
-    statement,
+    db_session,
 ) -> None:
-    response = await client.get(f"/api/v1/record-book/leaders/{stat_key}")
+    await seed_record_book_facts(db_session)
+
+    response = await client.get("/api/v1/record-book/leaders/blocks")
 
     assert response.status_code == 200
     assert response.json()["leaders"] == []
@@ -302,5 +388,5 @@ async def test_leaderboards_have_metric_specific_empty_states(
         "source_systems": [],
         "known_limitations": [],
         "verified_at": None,
-        "statement": statement,
+        "statement": "No verified blocks coverage is available yet.",
     }

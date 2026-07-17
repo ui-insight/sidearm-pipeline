@@ -7,13 +7,8 @@ import type {
   LeaderboardLeader,
   LeaderboardScope,
   LeaderboardStat,
+  RecordBookMetric,
 } from "../types/recordBook";
-
-const STATS: { value: LeaderboardStat; label: string }[] = [
-  { value: "points", label: "Points" },
-  { value: "total_rebounds", label: "Rebounds" },
-  { value: "assists", label: "Assists" },
-];
 
 const SCOPES: { value: LeaderboardScope; label: string }[] = [
   { value: "career", label: "Career" },
@@ -219,7 +214,8 @@ function PlayerFactSheet({
 }
 
 function RecordBookPage() {
-  const [statKey, setStatKey] = useState<LeaderboardStat>("points");
+  const [metrics, setMetrics] = useState<RecordBookMetric[]>([]);
+  const [statKey, setStatKey] = useState<LeaderboardStat | null>(null);
   const [scope, setScope] = useState<LeaderboardScope>("career");
   const [season, setSeason] = useState("");
   const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
@@ -230,9 +226,51 @@ function RecordBookPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const selectedStatLabel =
-    STATS.find((option) => option.value === statKey)?.label ?? "Points";
+    metrics.find((metric) => metric.stat_key === statKey)?.display_label ??
+    "Statistic";
 
   useEffect(() => {
+    let active = true;
+
+    async function loadMetrics() {
+      setLoading(true);
+      setError(null);
+      try {
+        const catalog = await recordBookApi.metrics();
+        if (!active) return;
+        setMetrics(catalog.metrics);
+        setStatKey((current) => {
+          if (catalog.metrics.some((metric) => metric.stat_key === current)) {
+            return current;
+          }
+          return (
+            catalog.metrics.find((metric) => metric.stat_key === "points")
+              ?.stat_key ??
+            catalog.metrics[0]?.stat_key ??
+            null
+          );
+        });
+        if (catalog.metrics.length === 0) setLoading(false);
+      } catch (loadError) {
+        if (active) {
+          setMetrics([]);
+          setStatKey(null);
+          setData(null);
+          setError(errorMessage(loadError));
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadMetrics();
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
+
+  useEffect(() => {
+    if (statKey === null) return;
+    const selectedStatKey = statKey;
     let active = true;
 
     async function loadLeaders() {
@@ -240,7 +278,7 @@ function RecordBookPage() {
       setError(null);
       try {
         const leaderboard = await recordBookApi.leaders(
-          statKey,
+          selectedStatKey,
           scope,
           season || undefined,
         );
@@ -308,32 +346,26 @@ function RecordBookPage() {
       </header>
 
       <div className="mb-5 grid gap-4 border-y border-gray-200 bg-white px-4 py-4 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div>
-          <span className="block text-xs font-semibold uppercase tracking-[0.06em] text-gray-500">
+        <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-gray-600 sm:max-w-sm">
+          <span>
             Statistic
           </span>
-          <div
-            role="group"
-            aria-label="Leaderboard statistic"
-            className="mt-2 flex flex-wrap gap-1"
+          <select
+            value={statKey ?? ""}
+            onChange={(event) => changeStat(event.target.value)}
+            disabled={metrics.length === 0}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-950 outline-none focus:border-gray-950 focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 disabled:bg-gray-100 disabled:text-gray-400"
           >
-            {STATS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={statKey === option.value}
-                onClick={() => changeStat(option.value)}
-                className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 ${
-                  statKey === option.value
-                    ? "bg-yellow-400 text-gray-950"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-950"
-                }`}
-              >
-                {option.label}
-              </button>
+            {metrics.length === 0 ? (
+              <option value="">No statistics available</option>
+            ) : null}
+            {metrics.map((metric) => (
+              <option key={metric.stat_key} value={metric.stat_key}>
+                {metric.display_label}
+              </option>
             ))}
-          </div>
-        </div>
+          </select>
+        </label>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div>
@@ -396,7 +428,12 @@ function RecordBookPage() {
           <p className="mt-1">{error}</p>
           <button
             type="button"
-            onClick={() => setReloadKey((current) => current + 1)}
+            onClick={() => {
+              setMetrics([]);
+              setStatKey(null);
+              setData(null);
+              setReloadKey((current) => current + 1);
+            }}
             className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:border-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
           >
             Try again
@@ -546,6 +583,16 @@ function RecordBookPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          ) : metrics.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="text-sm font-semibold text-gray-950">
+                No Record Book statistics are configured
+              </p>
+              <p className="mx-auto mt-1 max-w-lg text-sm text-gray-500">
+                Eligible women&apos;s basketball statistics will appear here when
+                they are available.
+              </p>
             </div>
           ) : (
             <div className="px-6 py-12 text-center">
