@@ -14,8 +14,9 @@ count of unresolved quality issues in scope.
 
 | Query ID | Supported questions | Typed parameters | Warehouse grain |
 | --- | --- | --- | --- |
-| `team_season_record` | Idaho's overall, conference, or non-conference record in a season | `season`, `conference_scope` | Final games |
+| `team_season_record` | Idaho's overall, conference, non-conference, or opponent-specific record in a season | `season`, `conference_scope`, optional `opponent` | Final games |
 | `stat_leaders` | Career or season leaders for a vetted Record Book metric | `stat_key`, `scope`, optional `season`, `limit` | Authoritative player-season facts |
+| `opponent_stat_leaders` | Season leaders for a vetted metric against one opponent | `stat_key`, `season`, `conference_scope`, `opponent`, `limit` | Player-game facts |
 | `player_career_total` | One player's career aggregate for a vetted metric | `player_id`, `stat_key` | Authoritative player-season facts |
 | `player_game_split` | One player's metric aggregate by season, conference scope, venue, or opponent | `player_id`, `stat_key`, optional `season`, `conference_scope`, `venue_scope`, `opponent` | Player-game facts |
 
@@ -74,16 +75,21 @@ The response repeats `query_id` and wraps the query-specific typed result:
 ```
 
 The abbreviated example omits other response fields. Source URLs and snapshot IDs
-are included on the evidence rows returned by career-total and game-split queries.
+are included on the evidence rows returned by career-total, opponent-leaderboard,
+and game-split queries.
 
 ## Exploratory Workspace consumer
 
-The first workspace slice is the **Season desk** at `/workspace`. It combines
-`team_season_record` and season-scoped `stat_leaders` results so an SID can answer
-how Idaho finished and who led a selected metric without writing SQL. The game
-ledger and each leader retain direct source links; coverage statements and open
-quality-issue counts remain visible alongside the result. The same assembled
-evidence can be exported as CSV.
+The first workspace slice is the **Season desk** at `/workspace`. For all
+opponents, it combines `team_season_record` with season-scoped `stat_leaders`, so
+the leaderboard remains grounded in authoritative cumulative season facts. When
+an SID selects one observed opponent, the desk applies the same season,
+conference scope, and opponent to `team_season_record` and
+`opponent_stat_leaders`. That second leaderboard aggregates only vetted final,
+non-exhibition player-game facts and keeps every contributing game source
+attached to the ranked player. The game ledger, coverage statements, and open
+quality-issue counts remain beside the result, and the assembled evidence can be
+exported as CSV.
 
 The **Player comparison** at `/workspace/compare` applies one shared season,
 metric, conference, venue, and optional opponent filter set to two distinct
@@ -104,10 +110,9 @@ Users can also give that same route-and-filter configuration a name. These saved
 views are stored only in the current browser, are limited to 20 validated
 entries, and do not contain result facts or source evidence. They are explicitly
 not account-synced or team-shared; opening one still executes the current
-governed query. Opponent-scoped Season desk leaderboards require a separate
-game-grain leaderboard query. Account-backed sharing, multi-player comparisons,
-and free-form questions remain later Phase 6 work built on the same bounded
-catalog.
+governed query. Account-backed sharing, multi-player comparisons, multi-season
+opponent leaderboards, and free-form questions remain later Phase 6 work built on
+the same bounded catalog.
 
 ## Deterministic boundary
 

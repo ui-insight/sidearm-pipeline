@@ -21,6 +21,7 @@ class SemanticQueryId(StrEnum):
 
     TEAM_SEASON_RECORD = "team_season_record"
     STAT_LEADERS = "stat_leaders"
+    OPPONENT_STAT_LEADERS = "opponent_stat_leaders"
     PLAYER_CAREER_TOTAL = "player_career_total"
     PLAYER_GAME_SPLIT = "player_game_split"
 
@@ -48,6 +49,7 @@ class TeamSeasonRecordQuery(BaseModel):
     query_id: Literal["team_season_record"] = "team_season_record"
     season: str = Field(pattern=r"^\d{4}-\d{2}$")
     conference_scope: ConferenceScope = ConferenceScope.ALL
+    opponent: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 class StatLeadersQuery(BaseModel):
@@ -57,6 +59,17 @@ class StatLeadersQuery(BaseModel):
     stat_key: str = Field(pattern=r"^[a-z][a-z0-9_]{0,127}$")
     scope: LeaderboardScope = LeaderboardScope.CAREER
     season: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+class OpponentStatLeadersQuery(BaseModel):
+    """Parameters for a vetted game-grain leaderboard against one opponent."""
+
+    query_id: Literal["opponent_stat_leaders"] = "opponent_stat_leaders"
+    stat_key: str = Field(pattern=r"^[a-z][a-z0-9_]{0,127}$")
+    season: str = Field(pattern=r"^\d{4}-\d{2}$")
+    conference_scope: ConferenceScope = ConferenceScope.ALL
+    opponent: str = Field(min_length=1, max_length=255)
     limit: int = Field(default=10, ge=1, le=25)
 
 
@@ -83,6 +96,7 @@ class PlayerGameSplitQuery(BaseModel):
 SemanticQueryRequest = Annotated[
     TeamSeasonRecordQuery
     | StatLeadersQuery
+    | OpponentStatLeadersQuery
     | PlayerCareerTotalQuery
     | PlayerGameSplitQuery,
     Field(discriminator="query_id"),
@@ -170,6 +184,7 @@ class TeamSeasonRecordRead(BaseModel):
     program_name: str
     season: str
     conference_scope: ConferenceScope
+    opponent: str | None = None
     games_played: int
     wins: int
     losses: int
@@ -219,6 +234,34 @@ class SemanticGameEvidenceRead(BaseModel):
     source_url: str | None = None
 
 
+class OpponentLeaderboardLeaderRead(BaseModel):
+    """One ranked player with the game evidence behind an opponent total."""
+
+    rank: int
+    player_id: int
+    player_name: str
+    total: Decimal
+    games_count: int
+    games: list[SemanticGameEvidenceRead]
+
+
+class OpponentStatLeaderboardRead(BaseModel):
+    """A game-grain leaderboard for one season, scope, and opponent."""
+
+    program_slug: str
+    program_name: str
+    stat_key: str
+    stat_label: str
+    aggregation_method: str
+    season: str
+    conference_scope: ConferenceScope
+    opponent: str
+    total_players: int
+    open_quality_issue_count: int
+    coverage: SemanticCoverageRead
+    leaders: list[OpponentLeaderboardLeaderRead]
+
+
 class PlayerGameSplitRead(BaseModel):
     """One player's aggregate over a vetted game-grain filter set."""
 
@@ -254,6 +297,13 @@ class StatLeadersQueryResult(BaseModel):
     result: LeaderboardRead
 
 
+class OpponentStatLeadersQueryResult(BaseModel):
+    """Typed result envelope for ``opponent_stat_leaders``."""
+
+    query_id: Literal["opponent_stat_leaders"] = "opponent_stat_leaders"
+    result: OpponentStatLeaderboardRead
+
+
 class PlayerCareerTotalQueryResult(BaseModel):
     """Typed result envelope for ``player_career_total``."""
 
@@ -271,6 +321,7 @@ class PlayerGameSplitQueryResult(BaseModel):
 SemanticQueryResult = Annotated[
     TeamSeasonRecordQueryResult
     | StatLeadersQueryResult
+    | OpponentStatLeadersQueryResult
     | PlayerCareerTotalQueryResult
     | PlayerGameSplitQueryResult,
     Field(discriminator="query_id"),

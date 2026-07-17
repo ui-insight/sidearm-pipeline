@@ -13,7 +13,7 @@ export const SAVED_WORKSPACE_VIEWS_KEY =
 export const MAX_SAVED_WORKSPACE_VIEWS = 20;
 
 const WORKSPACE_VIEW_PARAM_KEYS: Record<WorkspaceViewKind, readonly string[]> = {
-  season: ["season", "stat", "scope", "limit"],
+  season: ["season", "stat", "scope", "opponent", "limit"],
   comparison: [
     "season",
     "stat",
@@ -46,10 +46,9 @@ function isWorkspaceView(value: unknown): value is SavedWorkspaceView {
     return false;
   }
   const allowedKeys = WORKSPACE_VIEW_PARAM_KEYS[value.view];
-  const requiredKeys =
-    value.view === "comparison"
-      ? allowedKeys.filter((key) => key !== "opponent")
-      : allowedKeys;
+  const requiredKeys = allowedKeys.filter(
+    (key) => key !== "opponent",
+  );
   const paramEntries = Object.entries(value.params);
   return (
     paramEntries.length >= requiredKeys.length &&

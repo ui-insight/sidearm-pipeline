@@ -5,6 +5,7 @@ import { semanticQueriesApi } from "../api/semanticQueries";
 import type { Leaderboard } from "../types/recordBook";
 import type {
   ConferenceScope,
+  OpponentStatLeaderboard,
   SemanticWorkspaceOptions,
   TeamSeasonRecord,
 } from "../types/semanticQuery";
@@ -35,6 +36,13 @@ function formatValue(value: string): string {
         number,
       )
     : value;
+}
+
+function fileSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function SeasonDeskSkeleton() {
@@ -84,7 +92,9 @@ function ExploratoryWorkspacePage() {
   const [options, setOptions] = useState<SemanticWorkspaceOptions | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [record, setRecord] = useState<TeamSeasonRecord | null>(null);
-  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
+  const [leaderboard, setLeaderboard] = useState<
+    Leaderboard | OpponentStatLeaderboard | null
+  >(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,10 +123,28 @@ function ExploratoryWorkspacePage() {
     : (options?.leader_limits.find((limit) => limit === 10) ??
       options?.leader_limits[0] ??
       10);
+  const availableOpponents = useMemo(
+    () =>
+      (options?.opponents ?? []).filter((opponent) =>
+        opponent.seasons.includes(season),
+      ),
+    [options, season],
+  );
+  const requestedOpponent = searchParams.get("opponent");
+  const opponent =
+    requestedOpponent &&
+    (requestedOpponent === "all" ||
+      availableOpponents.some(
+        (candidate) => candidate.opponent_name === requestedOpponent,
+      ))
+      ? requestedOpponent
+      : "all";
+  const opponentName = opponent === "all" ? null : opponent;
   const currentViewParams = {
     season,
     stat: statKey,
     scope: conferenceScope,
+    opponent,
     limit: String(leaderLimit),
   };
 
@@ -161,8 +189,20 @@ function ExploratoryWorkspacePage() {
       setError(null);
       try {
         const [recordResponse, leadersResponse] = await Promise.all([
-          semanticQueriesApi.teamSeasonRecord(season, conferenceScope),
-          semanticQueriesApi.statLeaders(season, statKey, leaderLimit),
+          semanticQueriesApi.teamSeasonRecord(
+            season,
+            conferenceScope,
+            opponentName,
+          ),
+          opponentName
+            ? semanticQueriesApi.opponentStatLeaders(
+                season,
+                statKey,
+                conferenceScope,
+                opponentName,
+                leaderLimit,
+              )
+            : semanticQueriesApi.statLeaders(season, statKey, leaderLimit),
         ]);
         if (!active) return;
         setRecord(recordResponse.result);
@@ -181,7 +221,14 @@ function ExploratoryWorkspacePage() {
     return () => {
       active = false;
     };
-  }, [conferenceScope, leaderLimit, reloadKey, season, statKey]);
+  }, [
+    conferenceScope,
+    leaderLimit,
+    opponentName,
+    reloadKey,
+    season,
+    statKey,
+  ]);
 
   useEffect(() => {
     if (!options || !season || !statKey) return;
@@ -189,6 +236,7 @@ function ExploratoryWorkspacePage() {
       season,
       stat: statKey,
       scope: conferenceScope,
+      opponent,
       limit: String(leaderLimit),
     };
     const canonicalSearch = new URLSearchParams(canonicalParams).toString();
@@ -199,6 +247,7 @@ function ExploratoryWorkspacePage() {
     conferenceScope,
     leaderLimit,
     options,
+    opponent,
     searchParams,
     season,
     setSearchParams,
@@ -217,7 +266,8 @@ function ExploratoryWorkspacePage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `wbb-${season}-${statKey}-${conferenceScope}.csv`;
+    const opponentPart = opponentName ? `-${fileSlug(opponentName)}` : "";
+    link.download = `wbb-${season}-${statKey}-${conferenceScope}${opponentPart}.csv`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -233,6 +283,7 @@ function ExploratoryWorkspacePage() {
   const scopeLabel =
     RECORD_SCOPES.find((scope) => scope.value === conferenceScope)?.label ??
     "Selected";
+  const opponentLabel = opponentName ?? "All opponents";
   const maximumLeaderValue = Math.max(
     ...((leaderboard?.leaders ?? []).map((leader) => Number(leader.total)) || [
       0,
@@ -265,7 +316,7 @@ function ExploratoryWorkspacePage() {
           aria-label="Workspace filters"
           className="mt-8 border-y border-gray-300 bg-white px-4 py-4 sm:px-5"
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1.35fr_1.25fr_0.75fr_auto] lg:items-end">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end xl:grid-cols-[0.85fr_1.15fr_1.15fr_1.05fr_0.7fr_auto]">
             <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600">
               Season
               <select
@@ -299,7 +350,27 @@ function ExploratoryWorkspacePage() {
               </select>
             </label>
             <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600">
-              Record scope
+              Opponent
+              <select
+                value={opponent}
+                onChange={(event) =>
+                  updateViewParams({ opponent: event.target.value })
+                }
+                className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
+              >
+                <option value="all">All opponents</option>
+                {availableOpponents.map((option) => (
+                  <option
+                    key={option.opponent_name}
+                    value={option.opponent_name}
+                  >
+                    {option.opponent_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600">
+              Game scope
               <select
                 value={conferenceScope}
                 onChange={(event) =>
@@ -388,11 +459,13 @@ function ExploratoryWorkspacePage() {
         <article className="mt-8 border-y border-gray-300 bg-white">
           <header className="border-b border-gray-300 px-5 py-6 sm:px-7 sm:py-7">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
-              {scopeLabel} · {record.games_played} games reviewed
+              {scopeLabel} · {opponentLabel} · {record.games_played}{" "}
+              {record.games_played === 1 ? "game" : "games"} reviewed
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
               Idaho finished {record.wins}–{record.losses}
-              {record.ties > 0 ? `–${record.ties}` : ""} in {record.season}.
+              {record.ties > 0 ? `–${record.ties}` : ""} in {record.season}
+              {opponentName ? ` against ${opponentName}` : ""}.
             </h2>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm leading-6 text-gray-600">
               <span>{record.coverage.statement}</span>
@@ -406,18 +479,24 @@ function ExploratoryWorkspacePage() {
               className="px-5 py-6 sm:px-7"
             >
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">
-                Player leaders
+                {opponentName ? "Game-grain player leaders" : "Player leaders"}
               </p>
               <h3
                 id="leaderboard-heading"
                 className="mt-1 text-xl font-black text-gray-950"
               >
                 {record.season} {selectedMetric?.display_label ?? "Statistic"}
+                {opponentName ? ` vs ${opponentName}` : ""}
               </h3>
               {leaderboard.leaders.length > 0 ? (
                 <ol className="mt-6 space-y-5">
                   {leaderboard.leaders.map((leader) => {
-                    const source = leader.season_breakdown[0]?.source_url;
+                    const gameEvidence =
+                      "games" in leader ? leader.games : null;
+                    const seasonSource =
+                      "season_breakdown" in leader
+                        ? leader.season_breakdown[0]?.source_url
+                        : null;
                     return (
                       <li key={leader.player_id}>
                         <div className="flex items-baseline gap-3">
@@ -438,9 +517,33 @@ function ExploratoryWorkspacePage() {
                             aria-label={`${leader.player_name}: ${formatValue(leader.total)} ${leaderboard.stat_label}`}
                             className="h-2 min-w-0 flex-1 appearance-none overflow-hidden bg-gray-100 [&::-moz-progress-bar]:bg-yellow-500 [&::-webkit-progress-bar]:bg-gray-100 [&::-webkit-progress-value]:bg-yellow-500"
                           />
-                          {source ? (
+                          {gameEvidence ? (
+                            <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                              {gameEvidence.length}{" "}
+                              {gameEvidence.length === 1 ? "game" : "games"}
+                              {gameEvidence.map((game, index) =>
+                                game.source_url ? (
+                                  <a
+                                    key={game.game_id}
+                                    href={game.source_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={`View game ${index + 1} source for ${leader.player_name} against ${game.opponent}`}
+                                    className="font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-950 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
+                                  >
+                                    Source {index + 1}
+                                  </a>
+                                ) : null,
+                              )}
+                              {gameEvidence.every((game) => !game.source_url) ? (
+                                <span className="text-gray-400">
+                                  Internal source
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : seasonSource ? (
                             <a
-                              href={source}
+                              href={seasonSource}
                               target="_blank"
                               rel="noreferrer"
                               aria-label={`View source for ${leader.player_name}`}
@@ -461,6 +564,7 @@ function ExploratoryWorkspacePage() {
               ) : (
                 <p className="mt-5 text-sm leading-6 text-gray-600">
                   No player totals match this season and statistic.
+                  {opponentName ? ` No game facts match ${opponentName}.` : ""}
                 </p>
               )}
               <div className="mt-7 border-t border-gray-200 pt-4 text-xs leading-5 text-gray-500">
@@ -553,7 +657,8 @@ function ExploratoryWorkspacePage() {
                 </div>
               ) : (
                 <p className="px-5 pb-7 text-sm leading-6 text-gray-600 sm:px-7">
-                  No games match this record scope.
+                  No games match this game scope
+                  {opponentName ? ` against ${opponentName}` : ""}.
                 </p>
               )}
             </section>

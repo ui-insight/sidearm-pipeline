@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import Game, SourceSnapshot
@@ -305,10 +307,16 @@ async def test_semantic_catalog_exposes_stable_typed_queries(client) -> None:
     assert [query["query_id"] for query in payload["queries"]] == [
         "team_season_record",
         "stat_leaders",
+        "opponent_stat_leaders",
         "player_career_total",
         "player_game_split",
     ]
-    split = payload["queries"][3]
+    opponent_leaders = payload["queries"][2]
+    opponent_properties = opponent_leaders["parameter_schema"]["properties"]
+    assert opponent_properties["season"]["pattern"] == r"^\d{4}-\d{2}$"
+    assert opponent_properties["opponent"]["maxLength"] == 255
+    assert "conference_scope" in opponent_properties
+    split = payload["queries"][4]
     properties = split["parameter_schema"]["properties"]
     assert properties["player_id"]["exclusiveMinimum"] == 0
     assert properties["season"]["anyOf"][0]["pattern"] == r"^\d{4}-\d{2}$"
@@ -395,6 +403,26 @@ async def test_team_record_supports_conference_only_scope(client, db_session):
     assert all(game["conference_event"] for game in result["games"])
 
 
+async def test_team_record_filters_one_opponent(client, db_session):
+    await seed_semantic_query_facts(db_session)
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={
+            "query_id": "team_season_record",
+            "season": "2025-26",
+            "opponent": "Washington State",
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["opponent"] == "Washington State"
+    assert (result["games_played"], result["wins"], result["losses"]) == (1, 0, 1)
+    assert result["open_quality_issue_count"] == 0
+    assert [game["opponent"] for game in result["games"]] == ["Washington State"]
+
+
 async def test_stat_leaders_reuses_vetted_record_book_query(client, db_session):
     await seed_semantic_query_facts(db_session)
 
@@ -419,6 +447,103 @@ async def test_stat_leaders_reuses_vetted_record_book_query(client, db_session):
         Decimal("200"),
         Decimal("150"),
     ]
+
+
+async def test_opponent_stat_leaders_ranks_game_facts_with_evidence(
+    client,
+    db_session,
+):
+    await seed_semantic_query_facts(db_session)
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={
+            "query_id": "opponent_stat_leaders",
+            "stat_key": "points",
+            "season": "2025-26",
+            "conference_scope": "conference",
+            "opponent": "Montana State",
+            "limit": 10,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query_id"] == "opponent_stat_leaders"
+    result = payload["result"]
+    assert result["opponent"] == "Montana State"
+    assert result["conference_scope"] == "conference"
+    assert result["total_players"] == 2
+    assert result["open_quality_issue_count"] == 1
+    assert [leader["player_name"] for leader in result["leaders"]] == [
+        "Bobbi Brown",
+        "Alice Adams",
+    ]
+    assert [Decimal(leader["total"]) for leader in result["leaders"]] == [
+        Decimal("18"),
+        Decimal("15"),
+    ]
+    assert [leader["rank"] for leader in result["leaders"]] == [1, 2]
+    assert all(leader["games_count"] == 1 for leader in result["leaders"])
+    assert result["leaders"][0]["games"][0]["opponent"] == "Montana State"
+    assert result["leaders"][0]["games"][0]["source_url"].endswith("/game/2")
+
+
+async def test_opponent_stat_leaders_applies_conference_scope(client, db_session):
+    await seed_semantic_query_facts(db_session)
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={
+            "query_id": "opponent_stat_leaders",
+            "stat_key": "points",
+            "season": "2025-26",
+            "conference_scope": "non_conference",
+            "opponent": "Montana State",
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["total_players"] == 0
+    assert result["leaders"] == []
+
+
+async def test_opponent_stat_leaders_assigns_shared_ranks_for_ties(
+    client,
+    db_session,
+):
+    await seed_semantic_query_facts(db_session)
+    bob_montana_points = await db_session.scalar(
+        select(PlayerGameStat)
+        .join(Game, Game.id == PlayerGameStat.game_id)
+        .join(Player, Player.id == PlayerGameStat.player_id)
+        .where(
+            Game.canonical_uid == "semantic:game:1",
+            Player.display_name == "Bobbi Brown",
+        )
+    )
+    assert bob_montana_points is not None
+    bob_montana_points.value = Decimal("20")
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={
+            "query_id": "opponent_stat_leaders",
+            "stat_key": "points",
+            "season": "2025-26",
+            "opponent": "Montana",
+        },
+    )
+
+    assert response.status_code == 200
+    leaders = response.json()["result"]["leaders"]
+    assert [leader["player_name"] for leader in leaders] == [
+        "Alice Adams",
+        "Bobbi Brown",
+    ]
+    assert [leader["rank"] for leader in leaders] == [1, 1]
 
 
 async def test_player_career_total_returns_season_evidence(client, db_session):
