@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { semanticQueriesApi } from "../api/semanticQueries";
+import WorkspaceViewActions from "../components/WorkspaceViewActions";
 import WorkspaceViewNav from "../components/WorkspaceViewNav";
 import type {
   ConferenceScope,
@@ -25,6 +27,14 @@ const VENUE_SCOPES: { value: VenueScope; label: string }[] = [
   { value: "away", label: "Away" },
   { value: "neutral", label: "Neutral" },
 ];
+
+function isConferenceScope(value: string | null): value is ConferenceScope {
+  return CONFERENCE_SCOPES.some((scope) => scope.value === value);
+}
+
+function isVenueScope(value: string | null): value is VenueScope {
+  return VENUE_SCOPES.some((scope) => scope.value === value);
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -143,19 +153,33 @@ function PlayerResult({
 
 function PlayerComparisonPage() {
   const [options, setOptions] = useState<SemanticWorkspaceOptions | null>(null);
-  const [season, setSeason] = useState("");
-  const [statKey, setStatKey] = useState("");
-  const [leftPlayerId, setLeftPlayerId] = useState(0);
-  const [rightPlayerId, setRightPlayerId] = useState(0);
-  const [conferenceScope, setConferenceScope] =
-    useState<ConferenceScope>("all");
-  const [venueScope, setVenueScope] = useState<VenueScope>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [leftResult, setLeftResult] = useState<PlayerGameSplit | null>(null);
   const [rightResult, setRightResult] = useState<PlayerGameSplit | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  const requestedSeason = searchParams.get("season");
+  const season =
+    options?.seasons.find((candidate) => candidate === requestedSeason) ??
+    options?.default_season ??
+    options?.seasons[0] ??
+    "";
+  const requestedStatKey = searchParams.get("stat");
+  const statKey =
+    options?.metrics.find((metric) => metric.stat_key === requestedStatKey)
+      ?.stat_key ??
+    options?.default_stat_key ??
+    options?.metrics[0]?.stat_key ??
+    "";
+  const requestedConference = searchParams.get("conference");
+  const conferenceScope = isConferenceScope(requestedConference)
+    ? requestedConference
+    : "all";
+  const requestedVenue = searchParams.get("venue");
+  const venueScope = isVenueScope(requestedVenue) ? requestedVenue : "all";
 
   const availablePlayers = useMemo(
     () =>
@@ -164,6 +188,31 @@ function PlayerComparisonPage() {
       ),
     [options, season],
   );
+  const requestedLeftPlayerId = Number(searchParams.get("left"));
+  const leftPlayerId =
+    availablePlayers.find(
+      (player) => player.player_id === requestedLeftPlayerId,
+    )?.player_id ??
+    availablePlayers[0]?.player_id ??
+    0;
+  const requestedRightPlayerId = Number(searchParams.get("right"));
+  const rightPlayerId =
+    availablePlayers.find(
+      (player) =>
+        player.player_id === requestedRightPlayerId &&
+        player.player_id !== leftPlayerId,
+    )?.player_id ??
+    availablePlayers.find((player) => player.player_id !== leftPlayerId)
+      ?.player_id ??
+    0;
+  const currentViewParams = {
+    season,
+    stat: statKey,
+    conference: conferenceScope,
+    venue: venueScope,
+    left: String(leftPlayerId),
+    right: String(rightPlayerId),
+  };
 
   useEffect(() => {
     let active = true;
@@ -174,20 +223,7 @@ function PlayerComparisonPage() {
       try {
         const nextOptions = await semanticQueriesApi.options();
         if (!active) return;
-        const nextSeason =
-          nextOptions.default_season ?? nextOptions.seasons[0] ?? "";
-        const nextPlayers = nextOptions.players.filter((player) =>
-          player.seasons.includes(nextSeason),
-        );
         setOptions(nextOptions);
-        setSeason(nextSeason);
-        setStatKey(
-          nextOptions.default_stat_key ??
-            nextOptions.metrics[0]?.stat_key ??
-            "",
-        );
-        setLeftPlayerId(nextPlayers[0]?.player_id ?? 0);
-        setRightPlayerId(nextPlayers[1]?.player_id ?? 0);
       } catch (loadError) {
         if (!active) return;
         setOptions(null);
@@ -264,6 +300,38 @@ function PlayerComparisonPage() {
     venueScope,
   ]);
 
+  useEffect(() => {
+    if (!options || !season || !statKey || !leftPlayerId || !rightPlayerId) {
+      return;
+    }
+    const canonicalParams = {
+      season,
+      stat: statKey,
+      conference: conferenceScope,
+      venue: venueScope,
+      left: String(leftPlayerId),
+      right: String(rightPlayerId),
+    };
+    const canonicalSearch = new URLSearchParams(canonicalParams).toString();
+    if (canonicalSearch !== searchParams.toString()) {
+      setSearchParams(canonicalParams, { replace: true });
+    }
+  }, [
+    conferenceScope,
+    leftPlayerId,
+    options,
+    rightPlayerId,
+    searchParams,
+    season,
+    setSearchParams,
+    statKey,
+    venueScope,
+  ]);
+
+  function updateViewParams(changes: Record<string, string>) {
+    setSearchParams({ ...currentViewParams, ...changes });
+  }
+
   function changeSeason(nextSeason: string) {
     const nextPlayers = (options?.players ?? []).filter((player) =>
       player.seasons.includes(nextSeason),
@@ -277,29 +345,37 @@ function PlayerComparisonPage() {
           player.player_id === rightPlayerId &&
           player.player_id !== nextLeft?.player_id,
       ) ?? nextPlayers.find((player) => player.player_id !== nextLeft?.player_id);
-    setSeason(nextSeason);
-    setLeftPlayerId(nextLeft?.player_id ?? 0);
-    setRightPlayerId(nextRight?.player_id ?? 0);
+    updateViewParams({
+      season: nextSeason,
+      left: String(nextLeft?.player_id ?? 0),
+      right: String(nextRight?.player_id ?? 0),
+    });
   }
 
   function changeLeftPlayer(nextPlayerId: number) {
-    setLeftPlayerId(nextPlayerId);
-    if (nextPlayerId === rightPlayerId) {
-      setRightPlayerId(
-        availablePlayers.find((player) => player.player_id !== nextPlayerId)
-          ?.player_id ?? 0,
-      );
-    }
+    const nextRightPlayerId =
+      nextPlayerId === rightPlayerId
+        ? (availablePlayers.find(
+            (player) => player.player_id !== nextPlayerId,
+          )?.player_id ?? 0)
+        : rightPlayerId;
+    updateViewParams({
+      left: String(nextPlayerId),
+      right: String(nextRightPlayerId),
+    });
   }
 
   function changeRightPlayer(nextPlayerId: number) {
-    setRightPlayerId(nextPlayerId);
-    if (nextPlayerId === leftPlayerId) {
-      setLeftPlayerId(
-        availablePlayers.find((player) => player.player_id !== nextPlayerId)
-          ?.player_id ?? 0,
-      );
-    }
+    const nextLeftPlayerId =
+      nextPlayerId === leftPlayerId
+        ? (availablePlayers.find(
+            (player) => player.player_id !== nextPlayerId,
+          )?.player_id ?? 0)
+        : leftPlayerId;
+    updateViewParams({
+      left: String(nextLeftPlayerId),
+      right: String(nextPlayerId),
+    });
   }
 
   function exportCsv() {
@@ -366,6 +442,10 @@ function PlayerComparisonPage() {
         </p>
       </header>
       <WorkspaceViewNav />
+
+      {options && !globallyEmpty ? (
+        <WorkspaceViewActions view="comparison" params={currentViewParams} />
+      ) : null}
 
       {options && !globallyEmpty ? (
         <section
@@ -435,7 +515,9 @@ function PlayerComparisonPage() {
               Statistic
               <select
                 value={statKey}
-                onChange={(event) => setStatKey(event.target.value)}
+                onChange={(event) =>
+                  updateViewParams({ stat: event.target.value })
+                }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
                 {options.metrics.map((metric) => (
@@ -450,7 +532,7 @@ function PlayerComparisonPage() {
               <select
                 value={conferenceScope}
                 onChange={(event) =>
-                  setConferenceScope(event.target.value as ConferenceScope)
+                  updateViewParams({ conference: event.target.value })
                 }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >
@@ -466,7 +548,7 @@ function PlayerComparisonPage() {
               <select
                 value={venueScope}
                 onChange={(event) =>
-                  setVenueScope(event.target.value as VenueScope)
+                  updateViewParams({ venue: event.target.value })
                 }
                 className="mt-1.5 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-950 focus:border-yellow-500 focus:outline-2 focus:outline-offset-1 focus:outline-yellow-500"
               >

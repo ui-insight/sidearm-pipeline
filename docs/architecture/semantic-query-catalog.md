@@ -93,9 +93,19 @@ derive a new authoritative aggregate: displayed totals, games reviewed, coverage
 quality counts, and source links all come from the governed responses. The
 comparison and aligned evidence can also be exported as CSV.
 
-The workspace intentionally does not yet provide saved views, opponent-specific
-filtering, multi-player comparisons, or free-form questions. Those remain later
-Phase 6 work built on the same bounded catalog.
+Both workspace routes encode their complete validated filter state in canonical
+query parameters. Incoming parameters are checked against the current
+server-governed options, and stale values are replaced with valid defaults. This
+makes a copied workspace URL a complete, reproducible view of the governed
+question.
+
+Users can also give that same route-and-filter configuration a name. These saved
+views are stored only in the current browser, are limited to 20 validated
+entries, and do not contain result facts or source evidence. They are explicitly
+not account-synced or team-shared; opening one still executes the current
+governed query. Account-backed sharing, opponent-specific filtering,
+multi-player comparisons, and free-form questions remain later Phase 6 work
+built on the same bounded catalog.
 
 ## Deterministic boundary
 

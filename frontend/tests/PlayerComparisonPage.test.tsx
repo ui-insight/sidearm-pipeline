@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PlayerComparisonPage from "../src/pages/PlayerComparisonPage";
 import {
@@ -16,6 +16,11 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
   return new Response(JSON.stringify(body), { ...init, headers });
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="Current location">{location.pathname}{location.search}</output>;
 }
 
 const options = {
@@ -110,11 +115,17 @@ const coverage = {
 
 function splitFor(playerId: number, overrides: Record<string, unknown> = {}) {
   const isAlice = playerId === 4;
+  const playerName =
+    playerId === 4
+      ? "Alice Adams"
+      : playerId === 11
+        ? "Renee Rivers"
+        : "Bobbi Brown";
   return {
     program_slug: "womens-basketball",
     program_name: "Women's Basketball",
     player_id: playerId,
-    player_name: isAlice ? "Alice Adams" : "Bobbi Brown",
+    player_name: playerName,
     stat_key: "points",
     stat_label: "Points",
     aggregation_method: "sum",
@@ -271,6 +282,47 @@ describe("PlayerComparisonPage", () => {
     expect(
       await screen.findByText("Rebounds from the same governed game filters."),
     ).toBeInTheDocument();
+  });
+
+  it("hydrates a complete player comparison from the URL", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&left=11&right=4",
+        ]}
+      >
+        <PlayerComparisonPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Renee Rivers vs. Alice Adams",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Player A")).toHaveValue("11");
+    expect(screen.getByLabelText("Player B")).toHaveValue("4");
+    expect(screen.getByLabelText("Season")).toHaveValue("2024-25");
+    expect(screen.getByLabelText("Competition")).toHaveValue("conference");
+    expect(screen.getByLabelText("Venue")).toHaveValue("home");
+    expect(screen.getByLabelText("Current location")).toHaveTextContent(
+      "/workspace/compare?season=2024-25&stat=points&conference=conference&venue=home&left=11&right=4",
+    );
+
+    const bodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === "POST")
+      .map(([, init]) => requestBody(init));
+    for (const playerId of [11, 4]) {
+      expect(bodies).toContainEqual({
+        query_id: "player_game_split",
+        player_id: playerId,
+        stat_key: "points",
+        season: "2024-25",
+        conference_scope: "conference",
+        venue_scope: "home",
+      });
+    }
   });
 
   it("aligns unequal game sets and exports the comparison evidence", () => {
