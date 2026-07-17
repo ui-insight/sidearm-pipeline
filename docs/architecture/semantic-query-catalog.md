@@ -31,6 +31,11 @@ question templates, and the JSON Schema generated from each Pydantic parameter
 model. Consumers should use this response to discover supported questions rather
 than construct arbitrary database requests.
 
+`GET /api/v1/semantic-queries/options` returns the women's basketball seasons,
+Record Book metrics, and supported leaderboard sizes that currently have
+warehouse evidence. The Exploratory Workspace uses these server-governed options
+instead of maintaining a second list of available filters in the frontend.
+
 `POST /api/v1/semantic-queries/execute` accepts a discriminated request. For
 example, a conference-only player split is:
 
@@ -68,6 +73,19 @@ The response repeats `query_id` and wraps the query-specific typed result:
 
 The abbreviated example omits other response fields. Source URLs and snapshot IDs
 are included on the evidence rows returned by career-total and game-split queries.
+
+## Exploratory Workspace consumer
+
+The first workspace slice is the **Season desk** at `/workspace`. It combines
+`team_season_record` and season-scoped `stat_leaders` results so an SID can answer
+how Idaho finished and who led a selected metric without writing SQL. The game
+ledger and each leader retain direct source links; coverage statements and open
+quality-issue counts remain visible alongside the result. The same assembled
+evidence can be exported as CSV.
+
+This slice intentionally does not provide saved views, player comparisons, or
+free-form questions. Those remain later Phase 6 work built on the same bounded
+catalog.
 
 ## Deterministic boundary
 

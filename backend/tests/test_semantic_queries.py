@@ -298,6 +298,24 @@ async def test_semantic_catalog_exposes_stable_typed_queries(client) -> None:
     assert "venue_scope" in properties
 
 
+async def test_workspace_options_come_from_available_facts_and_metrics(
+    client,
+    db_session,
+) -> None:
+    await seed_semantic_query_facts(db_session)
+
+    response = await client.get("/api/v1/semantic-queries/options")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["program_slug"] == "womens-basketball"
+    assert payload["seasons"] == ["2025-26", "2024-25"]
+    assert [metric["stat_key"] for metric in payload["metrics"]] == ["points"]
+    assert payload["leader_limits"] == [5, 10, 15, 25]
+    assert payload["default_season"] == "2025-26"
+    assert payload["default_stat_key"] == "points"
+
+
 async def test_team_season_record_counts_final_non_exhibition_games(client, db_session):
     await seed_semantic_query_facts(db_session)
 
