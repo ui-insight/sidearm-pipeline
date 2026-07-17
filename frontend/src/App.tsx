@@ -7,6 +7,7 @@ import IdentityQueuePage from "./pages/IdentityQueuePage";
 import HistoricalBackfillPage from "./pages/HistoricalBackfillPage";
 import RecordBookPage from "./pages/RecordBookPage";
 import ExploratoryWorkspacePage from "./pages/ExploratoryWorkspacePage";
+import PlayerComparisonPage from "./pages/PlayerComparisonPage";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/games/:id" element={<GamePage />} />
               <Route path="/workspace" element={<ExploratoryWorkspacePage />} />
+              <Route path="/workspace/compare" element={<PlayerComparisonPage />} />
               <Route path="/record-book" element={<RecordBookPage />} />
               <Route path="/identity-queue" element={<IdentityQueuePage />} />
               <Route path="/backfills" element={<HistoricalBackfillPage />} />

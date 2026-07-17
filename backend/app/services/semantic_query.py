@@ -35,6 +35,7 @@ from app.schemas.semantic_query import (
     SemanticQueryResult,
     SemanticSeasonEvidenceRead,
     SemanticWorkspaceOptionsRead,
+    SemanticWorkspacePlayerRead,
     StatLeadersQuery,
     StatLeadersQueryResult,
     TeamSeasonRecordGameRead,
@@ -71,6 +72,7 @@ async def get_semantic_workspace_options(
             program_name=metric_catalog.program_name,
             seasons=[],
             metrics=metric_catalog.metrics,
+            players=[],
             leader_limits=[5, 10, 15, 25],
         )
 
@@ -108,6 +110,44 @@ async def get_semantic_workspace_options(
         {season for season in [*game_seasons, *fact_seasons] if season},
         reverse=True,
     )
+    player_season_rows = (
+        await db.execute(
+            select(Player.id, Player.display_name, Game.season)
+            .select_from(PlayerGameStat)
+            .join(Player, Player.id == PlayerGameStat.player_id)
+            .join(Game, Game.id == PlayerGameStat.game_id)
+            .join(
+                StatDefinition,
+                StatDefinition.id == PlayerGameStat.stat_definition_id,
+            )
+            .join(Team, Team.id == PlayerGameStat.team_id)
+            .where(
+                Team.slug == IDAHO_TEAM_SLUG,
+                Game.sport == program.slug,
+                Game.event_status == "final",
+                Game.exhibition.is_(False),
+                Game.season.is_not(None),
+                StatDefinition.sport_program_id == program.id,
+                StatDefinition.record_book_eligible.is_(True),
+            )
+            .distinct()
+            .order_by(Player.display_name, Player.id, Game.season.desc())
+        )
+    ).all()
+    player_seasons: dict[tuple[int, str], list[str]] = {}
+    for row in player_season_rows:
+        key = (row.id, row.display_name)
+        available = player_seasons.setdefault(key, [])
+        if row.season and row.season not in available:
+            available.append(row.season)
+    players = [
+        SemanticWorkspacePlayerRead(
+            player_id=player_id,
+            player_name=player_name,
+            seasons=available_seasons,
+        )
+        for (player_id, player_name), available_seasons in player_seasons.items()
+    ]
     default_stat_key = next(
         (
             metric.stat_key
@@ -121,6 +161,7 @@ async def get_semantic_workspace_options(
         program_name=program.display_name,
         seasons=seasons,
         metrics=metric_catalog.metrics,
+        players=players,
         leader_limits=[5, 10, 15, 25],
         default_season=seasons[0] if seasons else None,
         default_stat_key=default_stat_key,

@@ -5,12 +5,20 @@ import type {
 } from "./recordBook";
 
 export type ConferenceScope = "all" | "conference" | "non_conference";
+export type VenueScope = "all" | "home" | "away" | "neutral";
+
+export interface SemanticWorkspacePlayer {
+  player_id: number;
+  player_name: string;
+  seasons: string[];
+}
 
 export interface SemanticWorkspaceOptions {
   program_slug: string;
   program_name: string;
   seasons: string[];
   metrics: RecordBookMetric[];
+  players: SemanticWorkspacePlayer[];
   leader_limits: number[];
   default_season: string | null;
   default_stat_key: LeaderboardStat | null;
@@ -61,4 +69,39 @@ export interface TeamSeasonRecordResult {
 export interface StatLeadersResult {
   query_id: "stat_leaders";
   result: Leaderboard;
+}
+
+export interface PlayerGameSplitGame {
+  game_id: number;
+  game_date: string | null;
+  season: string;
+  opponent: string;
+  venue: string | null;
+  conference_event: boolean;
+  value: string;
+  source_snapshot_id: number | null;
+  source_url: string | null;
+}
+
+export interface PlayerGameSplit {
+  program_slug: string;
+  program_name: string;
+  player_id: number;
+  player_name: string;
+  stat_key: string;
+  stat_label: string;
+  aggregation_method: string;
+  season: string | null;
+  conference_scope: ConferenceScope;
+  venue_scope: VenueScope;
+  value: string | null;
+  games_count: number;
+  open_quality_issue_count: number;
+  coverage: SemanticCoverage;
+  games: PlayerGameSplitGame[];
+}
+
+export interface PlayerGameSplitResult {
+  query_id: "player_game_split";
+  result: PlayerGameSplit;
 }

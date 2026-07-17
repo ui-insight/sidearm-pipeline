@@ -57,7 +57,7 @@ function AppShell({
           </Link>
           <nav
             aria-label="Primary"
-            className="order-3 flex w-full items-center gap-4 border-t border-gray-100 sm:order-none sm:w-auto sm:border-0 sm:gap-6"
+            className="order-3 flex w-full items-center gap-3 border-t border-gray-100 sm:order-none sm:w-auto sm:border-0 sm:gap-6"
           >
             <NavLink to="/" end className={navClass}>
               Games

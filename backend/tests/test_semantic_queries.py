@@ -223,6 +223,24 @@ async def seed_semantic_query_facts(db_session) -> dict[str, int]:
                 source_value=value,
             )
         )
+    for game, snapshot, value in zip(
+        games[:3],
+        game_snapshots[:3],
+        ("12", "18", "14"),
+        strict=True,
+    ):
+        db_session.add(
+            PlayerGameStat(
+                game=game,
+                player=bob,
+                team=idaho,
+                stat_definition=points,
+                source_snapshot=snapshot,
+                value=Decimal(value),
+                source_field="PTS",
+                source_value=value,
+            )
+        )
 
     verified_at = datetime(2026, 7, 17, tzinfo=UTC)
     db_session.add_all(
@@ -302,7 +320,7 @@ async def test_workspace_options_come_from_available_facts_and_metrics(
     client,
     db_session,
 ) -> None:
-    await seed_semantic_query_facts(db_session)
+    ids = await seed_semantic_query_facts(db_session)
 
     response = await client.get("/api/v1/semantic-queries/options")
 
@@ -311,6 +329,18 @@ async def test_workspace_options_come_from_available_facts_and_metrics(
     assert payload["program_slug"] == "womens-basketball"
     assert payload["seasons"] == ["2025-26", "2024-25"]
     assert [metric["stat_key"] for metric in payload["metrics"]] == ["points"]
+    assert payload["players"] == [
+        {
+            "player_id": ids["alice_id"],
+            "player_name": "Alice Adams",
+            "seasons": ["2025-26"],
+        },
+        {
+            "player_id": ids["bob_id"],
+            "player_name": "Bobbi Brown",
+            "seasons": ["2025-26"],
+        },
+    ]
     assert payload["leader_limits"] == [5, 10, 15, 25]
     assert payload["default_season"] == "2025-26"
     assert payload["default_stat_key"] == "points"

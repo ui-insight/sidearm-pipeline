@@ -2,9 +2,11 @@ import { api } from "./client";
 import type { LeaderboardStat } from "../types/recordBook";
 import type {
   ConferenceScope,
+  PlayerGameSplitResult,
   SemanticWorkspaceOptions,
   StatLeadersResult,
   TeamSeasonRecordResult,
+  VenueScope,
 } from "../types/semanticQuery";
 
 export const semanticQueriesApi = {
@@ -25,5 +27,21 @@ export const semanticQueriesApi = {
       scope: "season",
       season,
       limit,
+    }),
+
+  playerGameSplit: (
+    playerId: number,
+    season: string,
+    statKey: LeaderboardStat,
+    conferenceScope: ConferenceScope,
+    venueScope: VenueScope,
+  ) =>
+    api.post<PlayerGameSplitResult>("/semantic-queries/execute", {
+      query_id: "player_game_split",
+      player_id: playerId,
+      stat_key: statKey,
+      season,
+      conference_scope: conferenceScope,
+      venue_scope: venueScope,
     }),
 };
