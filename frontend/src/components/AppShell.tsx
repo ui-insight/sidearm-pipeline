@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router";
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return [
-    "border-b-2 px-1 py-5 text-sm font-medium transition-colors",
+    "shrink-0 whitespace-nowrap border-b-2 px-1 py-5 text-sm font-medium transition-colors",
     "focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-500",
     isActive
       ? "border-yellow-500 text-gray-950"
@@ -57,7 +57,7 @@ function AppShell({
           </Link>
           <nav
             aria-label="Primary"
-            className="order-3 flex w-full items-center gap-3 border-t border-gray-100 sm:order-none sm:w-auto sm:border-0 sm:gap-6"
+            className="order-3 flex w-full min-w-0 items-center gap-3 overflow-x-auto border-t border-gray-100 sm:order-none sm:w-auto sm:gap-6 sm:border-0"
           >
             <NavLink to="/" end className={navClass}>
               Games
