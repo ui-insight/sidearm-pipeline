@@ -46,14 +46,82 @@ const brief = {
     game(18, "2026-01-17", "Weber State", 95, 76),
   ],
   prior_meetings: [game(16, "2026-01-10", "Montana State", 66, 99)],
-  scoring_leaders: [
+  vandal_leader_groups: [
     {
-      player_id: 13,
-      player_name: "Jordan Example",
-      games_played: 22,
-      total_points: "330.000000",
-      points_per_game: "15.0",
-      evidence: [],
+      stat_key: "points",
+      label: "Scoring",
+      context: "Points created across every game before the cutoff.",
+      leaders: [
+        {
+          player_id: 13,
+          player_name: "Jordan Example",
+          team_name: "Idaho",
+          jersey_number: "23",
+          position: "Guard G 5'11\"",
+          class_year: "So.",
+          bio_url: "https://govandals.com/roster/jordan-example/13",
+          games_played: 22,
+          total: "330.000000",
+          per_game: "15.0",
+          evidence: [],
+        },
+      ],
+    },
+    {
+      stat_key: "steals",
+      label: "Ball pressure",
+      context: "Live-ball takeaways recorded in the box score.",
+      leaders: [
+        {
+          player_id: 8,
+          player_name: "Taylor Defender",
+          team_name: "Idaho",
+          jersey_number: "10",
+          position: "Forward F 6'1\"",
+          class_year: "Sr.",
+          bio_url: null,
+          games_played: 22,
+          total: "44.000000",
+          per_game: "2.0",
+          evidence: [],
+        },
+      ],
+    },
+  ],
+  previous_matchup_teams: [
+    {
+      team_name: "Idaho",
+      standouts: [
+        {
+          team_name: "Idaho",
+          player_name: "Ana Pinheiro",
+          jersey_number: "37",
+          starter: true,
+          minutes: 31,
+          points: 15,
+          rebounds: 6,
+          assists: 0,
+          steals: 0,
+          blocks: 1,
+        },
+      ],
+    },
+    {
+      team_name: "Montana State",
+      standouts: [
+        {
+          team_name: "Montana State",
+          player_name: "Morgan Opponent",
+          jersey_number: "5",
+          starter: true,
+          minutes: 34,
+          points: 24,
+          rebounds: 8,
+          assists: 4,
+          steals: 2,
+          blocks: 0,
+        },
+      ],
     },
   ],
   evidence_game_count: 22,
@@ -92,6 +160,11 @@ describe("AthleticsDemoPage", () => {
     expect(screen.getByText("17–5")).toBeInTheDocument();
     expect(screen.getByText("5–0")).toBeInTheDocument();
     expect(screen.getAllByText("Jordan Example")).toHaveLength(2);
+    expect(screen.getByText("Taylor Defender")).toBeInTheDocument();
+    expect(screen.getByText("Morgan Opponent")).toBeInTheDocument();
+    expect(screen.getByText("#23 · Guard G 5'11\" · So.")).toBeInTheDocument();
+    expect(screen.getByText("330 total · 15.0/game")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ball pressure" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Box score" })).toHaveLength(5);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/pregame-briefs/historical?season=2025-26&opponent=Montana+State&game_date=2026-02-05",

@@ -36,6 +36,20 @@ function venueLabel(venue: string): string {
   return "Venue unavailable";
 }
 
+function wholeNumber(value: string): string {
+  return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+function playerContext(
+  jerseyNumber: string | null,
+  position: string | null,
+  classYear: string | null,
+): string {
+  return [jerseyNumber ? `#${jerseyNumber}` : null, position, classYear]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function AthleticsDemoPage() {
   const [brief, setBrief] = useState<HistoricalPregameBrief | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,7 +114,9 @@ function AthleticsDemoPage() {
   }
 
   const priorMeeting = brief.prior_meetings[0];
-  const scoringLeader = brief.scoring_leaders[0];
+  const scoringLeader = brief.vandal_leader_groups.find(
+    (group) => group.stat_key === "points",
+  )?.leaders[0];
   const target = brief.target_game;
 
   return (
@@ -148,15 +164,71 @@ function AthleticsDemoPage() {
             <dd className="mt-1 text-sm text-gray-600">Across the previous five games</dd>
           </div>
           <div className="border-t border-gray-300 py-5 sm:border-t-0 sm:pl-6">
-            <dt className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Scoring lead</dt>
+            <dt className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Vandal scoring lead</dt>
             <dd className="mt-2 text-lg font-black text-gray-950">
               {scoringLeader?.player_name ?? "Not available"}
             </dd>
             <dd className="mt-1 text-sm tabular-nums text-gray-600">
-              {scoringLeader ? `${scoringLeader.points_per_game} points per game` : "No scoring evidence"}
+              {scoringLeader
+                ? `${playerContext(scoringLeader.jersey_number, scoringLeader.position, scoringLeader.class_year)} · ${scoringLeader.per_game} PPG`
+                : "No scoring evidence"}
             </dd>
           </div>
         </dl>
+      </section>
+
+      <section aria-labelledby="first-meeting-heading" className="border-b border-gray-300 py-8">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
+          First meeting box score
+        </p>
+        <h2 id="first-meeting-heading" className="mt-2 text-xl font-black text-gray-950">
+          Who drove the January 10 game?
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+          These lines come from the retained source box score and include both teams. Players are ranked by broad box-score contribution, not points alone.
+        </p>
+        <div className="mt-6 grid gap-8 lg:grid-cols-2">
+          {brief.previous_matchup_teams.map((team) => (
+            <div key={team.team_name} className="min-w-0">
+              <h3 className="border-b-2 border-gray-950 pb-2 text-sm font-black uppercase tracking-[0.08em] text-gray-950">
+                {team.team_name}
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[30rem] text-sm">
+                  <thead className="text-xs uppercase tracking-[0.06em] text-gray-500">
+                    <tr>
+                      <th className="py-3 pr-3 text-left font-bold">Player</th>
+                      <th className="px-2 py-3 text-right font-bold">Min</th>
+                      <th className="px-2 py-3 text-right font-bold">Pts</th>
+                      <th className="px-2 py-3 text-right font-bold">Reb</th>
+                      <th className="px-2 py-3 text-right font-bold">Ast</th>
+                      <th className="px-2 py-3 text-right font-bold">Stl</th>
+                      <th className="py-3 pl-2 text-right font-bold">Blk</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 border-y border-gray-300 bg-white">
+                    {team.standouts.map((player) => (
+                      <tr key={`${team.team_name}-${player.player_name}`}>
+                        <td className="py-3 pr-3 font-semibold text-gray-950">
+                          <span className="mr-2 font-mono text-xs text-gray-500">
+                            {player.jersey_number ? `#${player.jersey_number}` : "—"}
+                          </span>
+                          {player.player_name}
+                          {player.starter ? <span className="ml-2 text-xs text-gray-500">Starter</span> : null}
+                        </td>
+                        {[player.minutes, player.points, player.rebounds, player.assists, player.steals, player.blocks].map((value, index) => (
+                          <td key={index} className="px-2 py-3 text-right font-mono tabular-nums text-gray-700 last:pl-2 last:pr-0">
+                            {value}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="grid border-b border-gray-300 py-8 lg:grid-cols-[15rem_1fr] lg:gap-10">
@@ -222,18 +294,37 @@ function AthleticsDemoPage() {
       </section>
 
       <section aria-labelledby="leaders-heading" className="border-b border-gray-300 py-8">
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Player preparation</p>
-        <h2 id="leaders-heading" className="mt-2 text-xl font-black text-gray-950">Scoring leaders at the cutoff</h2>
-        <ol className="mt-5 divide-y divide-gray-200 border-y border-gray-300">
-          {brief.scoring_leaders.map((leader, index) => (
-            <li key={leader.player_id} className="grid gap-2 py-4 sm:grid-cols-[2rem_1fr_auto_auto] sm:items-center sm:gap-6">
-              <span className="font-mono text-sm font-black text-amber-700">{String(index + 1).padStart(2, "0")}</span>
-              <span className="font-bold text-gray-950">{leader.player_name}</span>
-              <span className="text-sm tabular-nums text-gray-600">{leader.total_points} points · {leader.games_played} games</span>
-              <span className="text-right font-mono font-black tabular-nums text-gray-950">{leader.points_per_game} PPG</span>
-            </li>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Idaho personnel</p>
+        <h2 id="leaders-heading" className="mt-2 text-xl font-black text-gray-950">Vandals to know at the cutoff</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+          Offense, creation, rebounding, and defensive activity are separated so one scoring list does not stand in for a scouting report.
+        </p>
+        <div className="mt-6 divide-y divide-gray-300 border-y border-gray-300">
+          {brief.vandal_leader_groups.map((group) => (
+            <section key={group.stat_key} className="grid gap-4 py-5 lg:grid-cols-[12rem_1fr] lg:gap-8">
+              <div>
+                <h3 className="font-black text-gray-950">{group.label}</h3>
+                <p className="mt-1 text-xs leading-5 text-gray-500">{group.context}</p>
+              </div>
+              <ol className="grid gap-3 sm:grid-cols-3">
+                {group.leaders.map((leader, index) => (
+                  <li key={leader.player_id} className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.06em] text-amber-700">
+                      {index === 0 ? "Leader" : `No. ${index + 1}`} · {leader.team_name}
+                    </p>
+                    <p className="mt-1 truncate font-bold text-gray-950">{leader.player_name}</p>
+                    <p className="mt-1 truncate text-xs text-gray-500">
+                      {playerContext(leader.jersey_number, leader.position, leader.class_year)}
+                    </p>
+                    <p className="mt-2 font-mono text-sm font-bold tabular-nums text-gray-800">
+                      {wholeNumber(leader.total)} total · {leader.per_game}/game
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </section>
           ))}
-        </ol>
+        </div>
       </section>
 
       <section className="py-8">
