@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { semanticQueriesApi } from "../api/semanticQueries";
 import type { Leaderboard } from "../types/recordBook";

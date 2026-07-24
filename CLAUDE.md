@@ -27,7 +27,7 @@ the [TEMPLATE-app](https://github.com/ui-insight/TEMPLATE-app) repository templa
 | TypeScript | ~5.x | Type safety |
 | Vite | 7.x | Build tool and dev server |
 | Tailwind CSS | v4.x | Utility-first styling |
-| React Router | v7.x | Client-side routing |
+| React Router | v8.x | Client-side routing |
 | Vitest | latest | Unit/component testing |
 | ESLint | latest | Code linting |
 

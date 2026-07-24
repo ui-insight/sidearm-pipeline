@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { recordBookApi } from "../api/recordBook";
 import type {
