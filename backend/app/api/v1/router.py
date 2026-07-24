@@ -10,6 +10,7 @@ from app.api.v1 import (
     games,
     identity_resolution,
     ingest_runs,
+    pregame_briefs,
     record_book,
     semantic_queries,
     sources,
@@ -29,6 +30,11 @@ api_router.include_router(
     semantic_queries.router,
     prefix="/semantic-queries",
     tags=["semantic-queries"],
+)
+api_router.include_router(
+    pregame_briefs.router,
+    prefix="/pregame-briefs",
+    tags=["pregame-briefs"],
 )
 api_router.include_router(games.router, prefix="/games", tags=["games"])
 api_router.include_router(
