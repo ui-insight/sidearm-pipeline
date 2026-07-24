@@ -28,6 +28,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Athletics Demo Runbook: athletics-demo-runbook.md
   - Onboarding: onboarding.md
   - Glossary: glossary.md
   - Background:

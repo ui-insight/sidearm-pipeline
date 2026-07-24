@@ -74,6 +74,9 @@ function AppShell({
             <NavLink to="/backfills" className={navClass}>
               Backfills
             </NavLink>
+            <NavLink to="/demo" className={navClass}>
+              Demo
+            </NavLink>
           </nav>
           <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
             <span className="hidden text-right leading-tight md:block">
