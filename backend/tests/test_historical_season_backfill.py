@@ -8,6 +8,7 @@ from app.db.seed import seed_warehouse_reference_data
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import EventSource, Game, IngestRun
+from app.models.sport_program import SportProgram
 from app.services.current_season_sync import (
     CurrentSeasonGameRefresh,
     CurrentSeasonSyncResult,
@@ -167,7 +168,22 @@ async def test_historical_backfill_reports_complete_coverage_idempotently(
     db_session,
     monkeypatch,
 ) -> None:
-    run_id, _ = await _seed_backfill_context(db_session, with_boxscore=True)
+    run_id, game = await _seed_backfill_context(db_session, with_boxscore=True)
+    program = await db_session.scalar(
+        select(SportProgram).where(SportProgram.slug == "womens-basketball")
+    )
+    db_session.add(
+        DataQualityIssue(
+            sport_program_id=program.id,
+            game_id=game.id,
+            issue_type="unresolved_identity",
+            status="open",
+            severity="warning",
+            summary="Opponent player needs review",
+            details={"season": SEASON, "institution": "Montana"},
+        )
+    )
+    await db_session.commit()
 
     async def fake_sync(*args, **kwargs) -> CurrentSeasonSyncResult:
         assert kwargs == {

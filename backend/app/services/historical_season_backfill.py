@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -259,8 +259,11 @@ async def _update_game_coverage(
     )
     open_quality_issues = await _season_open_quality_issue_count(
         db,
+        program_id=program.id,
         season=season,
         game_ids={game.id for game in games},
+        team_id=team.id,
+        team_institutions=(team.canonical_name, team.institution),
     )
     await db.commit()
     return HistoricalSeasonCoverageResult(
@@ -373,19 +376,36 @@ async def _resolve_issue(db: AsyncSession, deduplication_key: str) -> None:
 async def _season_open_quality_issue_count(
     db: AsyncSession,
     *,
+    program_id: int,
     season: str,
     game_ids: set[int],
+    team_id: int,
+    team_institutions: tuple[str | None, ...],
 ) -> int:
-    issues = list(
-        await db.scalars(
-            select(DataQualityIssue).where(
-                DataQualityIssue.status.in_(("open", "in_review"))
+    institution = DataQualityIssue.details["institution"].as_string()
+    season_value = DataQualityIssue.details["season"].as_string()
+    institution_names = [name for name in team_institutions if name]
+    return int(
+        await db.scalar(
+            select(func.count(DataQualityIssue.id)).where(
+                DataQualityIssue.sport_program_id == program_id,
+                DataQualityIssue.status.in_(("open", "in_review")),
+                or_(
+                    DataQualityIssue.game_id.in_(game_ids),
+                    season_value == season,
+                ),
+                or_(
+                    DataQualityIssue.issue_type != "unresolved_identity",
+                    DataQualityIssue.team_id == team_id,
+                    institution.in_(institution_names),
+                    and_(
+                        DataQualityIssue.team_id.is_(None),
+                        institution.is_(None),
+                    ),
+                ),
             )
         )
-    )
-    return sum(
-        issue.game_id in game_ids or issue.details.get("season") == season
-        for issue in issues
+        or 0
     )
 
 

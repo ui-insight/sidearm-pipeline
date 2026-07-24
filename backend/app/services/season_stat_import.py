@@ -120,7 +120,8 @@ async def import_cumulative_stats(
 
     resolved: list[tuple[ParsedCumulativePlayer, PlayerSeason]] = []
     for source_player_id, rows in grouped_rows.items():
-        if len(rows) > 1:
+        player_row = _merge_compatible_player_rows(rows)
+        if player_row is None:
             source_conflicts += 1
             issue_counts["created"] += await _upsert_source_issue(
                 db,
@@ -139,7 +140,15 @@ async def import_cumulative_stats(
             )
             continue
 
-        player_row = rows[0]
+        issue_counts["resolved"] += await _resolve_issue(
+            db,
+            _source_issue_key(
+                issue_type="source_conflict",
+                program=program,
+                season=source.season,
+                stable_identity=source_player_id,
+            ),
+        )
         identity = await db.scalar(
             select(PlayerExternalIdentity).where(
                 PlayerExternalIdentity.source_system == source.identity_source_system,
@@ -595,16 +604,12 @@ async def _upsert_source_issue(
     player_id: int | None = None,
     rows: list[ParsedCumulativePlayer] | None = None,
 ) -> int:
-    digest = hashlib.sha256(
-        "|".join(
-            (
-                issue_type,
-                program.slug,
-                source.season,
-                stable_identity,
-            )
-        ).encode("utf-8")
-    ).hexdigest()
+    deduplication_key = _source_issue_key(
+        issue_type=issue_type,
+        program=program,
+        season=source.season,
+        stable_identity=stable_identity,
+    )
     details = {
         "season": source.season,
         "source_url": source.source_url,
@@ -621,11 +626,85 @@ async def _upsert_source_issue(
         team=team,
         snapshot=snapshot,
         player_id=player_id,
-        deduplication_key=f"cumulative-source:{digest}",
+        deduplication_key=deduplication_key,
         issue_type=issue_type,
         severity="error" if issue_type == "source_conflict" else "warning",
         summary=summary,
         details=details,
+    )
+
+
+def _source_issue_key(
+    *,
+    issue_type: str,
+    program: SportProgram,
+    season: str,
+    stable_identity: str,
+) -> str:
+    digest = hashlib.sha256(
+        "|".join(
+            (
+                issue_type,
+                program.slug,
+                season,
+                stable_identity,
+            )
+        ).encode("utf-8")
+    ).hexdigest()
+    return f"cumulative-source:{digest}"
+
+
+def _merge_compatible_player_rows(
+    rows: list[ParsedCumulativePlayer],
+) -> ParsedCumulativePlayer | None:
+    first = rows[0]
+    normalized_name = " ".join(first.display_name.casefold().split())
+    for row in rows[1:]:
+        if (
+            " ".join(row.display_name.casefold().split()) != normalized_name
+            or row.source_player_id != first.source_player_id
+            or row.bio_url != first.bio_url
+        ):
+            return None
+        for stat_key in first.source_fields.keys() & row.source_fields.keys():
+            if first.source_fields[stat_key] != row.source_fields[stat_key]:
+                return None
+
+    stats = {
+        stat_key: sum(
+            (row.stats.get(stat_key, Decimal("0")) for row in rows),
+            start=Decimal("0"),
+        )
+        for stat_key in set().union(*(row.stats.keys() for row in rows))
+    }
+    source_fields = {
+        stat_key: next(
+            row.source_fields[stat_key] for row in rows if stat_key in row.source_fields
+        )
+        for stat_key in stats
+    }
+    games_started = (
+        sum(row.games_started for row in rows if row.games_started is not None)
+        if all(row.games_started is not None for row in rows)
+        else None
+    )
+    source_values = {
+        source_fields[stat_key]: str(value) for stat_key, value in stats.items()
+    }
+    source_values["GP"] = str(sum(row.games_played for row in rows))
+    if games_started is not None:
+        source_values["GS"] = str(games_started)
+
+    return ParsedCumulativePlayer(
+        display_name=first.display_name,
+        jersey_number=first.jersey_number,
+        source_player_id=first.source_player_id,
+        bio_url=first.bio_url,
+        games_played=sum(row.games_played for row in rows),
+        games_started=games_started,
+        stats=stats,
+        source_fields=source_fields,
+        source_values=source_values,
     )
 
 

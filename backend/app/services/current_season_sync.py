@@ -7,11 +7,12 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import Game, IngestRun
+from app.models.team import Team
 from app.services.game_ingest import ingest_boxscore
 from app.services.roster_import import RosterImportResult, import_roster
 from app.services.schedule_import import import_schedule_events
@@ -196,7 +197,15 @@ async def sync_current_wbb_season(
     refreshed = sum(outcome.status == "refreshed" for outcome in outcomes)
     failed = sum(outcome.status == "failed" for outcome in outcomes)
     skipped = len(eligible) - len(selected)
-    open_identity_issues = await _open_identity_issue_count(db, season_game_ids)
+    idaho = await db.scalar(select(Team).where(Team.slug == "idaho"))
+    if idaho is None:
+        raise ValueError("Idaho team reference data is missing")
+    open_identity_issues = await _open_identity_issue_count(
+        db,
+        season_game_ids,
+        team_id=idaho.id,
+        team_institutions=(idaho.canonical_name, idaho.institution),
+    )
     finished_at = datetime.now(UTC)
     status = "succeeded" if failed == 0 else "partial"
     result = CurrentSeasonSyncResult(
@@ -374,15 +383,28 @@ async def _resolved_identity_games(
 async def _open_identity_issue_count(
     db: AsyncSession,
     game_ids: list[int],
+    *,
+    team_id: int,
+    team_institutions: tuple[str | None, ...],
 ) -> int:
     if not game_ids:
         return 0
+    institution = DataQualityIssue.details["institution"].as_string()
+    institution_names = [name for name in team_institutions if name]
     return int(
         await db.scalar(
             select(func.count(DataQualityIssue.id)).where(
                 DataQualityIssue.game_id.in_(game_ids),
                 DataQualityIssue.issue_type == "unresolved_identity",
                 DataQualityIssue.status == "open",
+                or_(
+                    DataQualityIssue.team_id == team_id,
+                    institution.in_(institution_names),
+                    and_(
+                        DataQualityIssue.team_id.is_(None),
+                        institution.is_(None),
+                    ),
+                ),
             )
         )
         or 0
