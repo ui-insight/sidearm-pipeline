@@ -385,6 +385,46 @@ async def test_team_season_record_counts_final_non_exhibition_games(client, db_s
     ]
 
 
+async def test_team_record_excludes_opponent_identity_issues(client, db_session):
+    await seed_semantic_query_facts(db_session)
+    program = await db_session.scalar(
+        select(SportProgram).where(SportProgram.slug == "womens-basketball")
+    )
+    game = await db_session.scalar(
+        select(Game).where(Game.canonical_uid == "semantic:game:1")
+    )
+    opponent = Team(
+        slug="montana",
+        canonical_name="Montana",
+        short_name="Montana",
+        institution="University of Montana",
+    )
+    db_session.add(opponent)
+    await db_session.flush()
+    db_session.add(
+        DataQualityIssue(
+            sport_program=program,
+            game=game,
+            team=opponent,
+            deduplication_key="opponent-player-identity",
+            issue_type="unresolved_identity",
+            status="open",
+            severity="warning",
+            summary="Opponent player needs identity review",
+            details={"season": "2025-26", "institution": "University of Montana"},
+        )
+    )
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v1/semantic-queries/execute",
+        json={"query_id": "team_season_record", "season": "2025-26"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["open_quality_issue_count"] == 1
+
+
 async def test_team_record_supports_conference_only_scope(client, db_session):
     await seed_semantic_query_facts(db_session)
 

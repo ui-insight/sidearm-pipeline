@@ -8,6 +8,7 @@ import HistoricalBackfillPage from "./pages/HistoricalBackfillPage";
 import RecordBookPage from "./pages/RecordBookPage";
 import ExploratoryWorkspacePage from "./pages/ExploratoryWorkspacePage";
 import PlayerComparisonPage from "./pages/PlayerComparisonPage";
+import AthleticsDemoPage from "./pages/AthleticsDemoPage";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="/record-book" element={<RecordBookPage />} />
               <Route path="/identity-queue" element={<IdentityQueuePage />} />
               <Route path="/backfills" element={<HistoricalBackfillPage />} />
+              <Route path="/demo" element={<AthleticsDemoPage />} />
             </Routes>
           </AppShell>
         )}

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.seed import IDAHO_TEAM_SLUG, WBB_PROGRAM_SLUG
@@ -489,6 +489,8 @@ async def _team_season_record(
         db,
         program_id=program.id,
         seasons=[request.season],
+        team_id=idaho.id,
+        team_institutions=(idaho.canonical_name, idaho.institution),
         game_ids=(
             [game.game_id for game in games] if request.opponent is not None else None
         ),
@@ -667,6 +669,8 @@ async def _opponent_stat_leaders(
         program_id=program.id,
         seasons=[request.season],
         definition_id=definition.id,
+        team_id=idaho.id,
+        team_institutions=(idaho.canonical_name, idaho.institution),
         game_ids=selected_game_ids,
     )
     coverage = await _coverage_summary(
@@ -699,7 +703,7 @@ async def _player_career_total(
     db: AsyncSession,
     request: PlayerCareerTotalQuery,
 ) -> PlayerCareerTotalRead:
-    program, _ = await _program_and_idaho_team(db)
+    program, idaho = await _program_and_idaho_team(db)
     player = await _player_in_program(
         db,
         player_id=request.player_id,
@@ -763,6 +767,8 @@ async def _player_career_total(
         seasons=seasons,
         definition_id=definition.id,
         player_id=player.id,
+        team_id=idaho.id,
+        team_institutions=(idaho.canonical_name, idaho.institution),
     )
     coverage = await _coverage_summary(
         db,
@@ -879,6 +885,8 @@ async def _player_game_split(
         seasons=selected_seasons,
         definition_id=definition.id,
         player_id=player.id,
+        team_id=idaho.id,
+        team_institutions=(idaho.canonical_name, idaho.institution),
     )
     coverage = await _coverage_summary(
         db,
@@ -1031,6 +1039,8 @@ async def _open_quality_issue_count(
     seasons: Sequence[str],
     definition_id: int | None = None,
     player_id: int | None = None,
+    team_id: int | None = None,
+    team_institutions: Sequence[str | None] = (),
     game_ids: Sequence[int] | None = None,
 ) -> int:
     statement = (
@@ -1060,6 +1070,20 @@ async def _open_quality_issue_count(
             or_(
                 DataQualityIssue.player_id == player_id,
                 DataQualityIssue.player_id.is_(None),
+            )
+        )
+    if team_id is not None:
+        institution = DataQualityIssue.details["institution"].as_string()
+        institution_names = [name for name in team_institutions if name]
+        statement = statement.where(
+            or_(
+                DataQualityIssue.issue_type != "unresolved_identity",
+                DataQualityIssue.team_id == team_id,
+                institution.in_(institution_names),
+                and_(
+                    DataQualityIssue.team_id.is_(None),
+                    institution.is_(None),
+                ),
             )
         )
     if game_ids is not None:
