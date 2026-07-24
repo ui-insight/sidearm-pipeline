@@ -9,7 +9,11 @@ from app.db.seed import seed_warehouse_reference_data
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import Game, IngestRun
 from app.models.sport_program import SportProgram
-from app.services.current_season_sync import sync_current_wbb_season
+from app.models.team import Team
+from app.services.current_season_sync import (
+    _open_identity_issue_count,
+    sync_current_wbb_season,
+)
 from app.services.sidearm_roster import ParsedRoster, ParsedRosterPlayer
 from app.services.sidearm_schedule import ParsedScheduleEvent
 from app.services.sidearm_scraper import ParsedBoxscore
@@ -167,6 +171,56 @@ async def test_season_sync_ingests_new_finals_then_skips_unchanged_history(
     assert scrape_calls == [BOXSCORE_URL]
     assert await db_session.scalar(select(func.count(Game.id))) == 1
     assert await db_session.scalar(select(func.count(IngestRun.id))) == 3
+
+
+async def test_open_identity_count_excludes_opponent_players(db_session) -> None:
+    await seed_warehouse_reference_data(db_session)
+    program = await db_session.scalar(
+        select(SportProgram).where(SportProgram.slug == "womens-basketball")
+    )
+    team = await db_session.scalar(select(Team).where(Team.slug == "idaho"))
+    game = Game(
+        source_url=BOXSCORE_URL,
+        canonical_uid="sidearm:womens-basketball:2025-26:identity-scope",
+        sport="womens-basketball",
+        season=SEASON,
+        event_status="final",
+    )
+    db_session.add(game)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            DataQualityIssue(
+                sport_program_id=program.id,
+                game_id=game.id,
+                team_id=team.id,
+                issue_type="unresolved_identity",
+                status="open",
+                severity="warning",
+                summary="Idaho player needs review",
+                details={"season": SEASON, "institution": "University of Idaho"},
+            ),
+            DataQualityIssue(
+                sport_program_id=program.id,
+                game_id=game.id,
+                issue_type="unresolved_identity",
+                status="open",
+                severity="warning",
+                summary="Opponent player needs review",
+                details={"season": SEASON, "institution": "Montana"},
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    count = await _open_identity_issue_count(
+        db_session,
+        [game.id],
+        team_id=team.id,
+        team_institutions=(team.canonical_name, team.institution),
+    )
+
+    assert count == 1
 
 
 async def test_boxscore_refresh_preserves_schedule_owned_away_status(

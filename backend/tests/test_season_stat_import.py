@@ -240,14 +240,47 @@ async def test_incomplete_game_coverage_creates_one_gap_not_false_mismatches(
     assert coverage.verified_at is not None
 
 
+async def test_compatible_source_segments_merge_and_reconcile(db_session) -> None:
+    await _seed_player_with_games(db_session, "10", "15")
+
+    result = await import_cumulative_stats(
+        db_session,
+        _parsed_source(
+            _player_row(games_played=1, points="10"),
+            _player_row(games_played=1, points="15"),
+        ),
+    )
+
+    assert result.players_resolved == 1
+    assert result.source_conflicts == 0
+    assert result.facts_written == 1
+    assert result.facts_matched == 1
+    assert result.coverage_completeness == "complete"
+    fact = await db_session.scalar(select(PlayerSeasonStat))
+    assert fact is not None
+    assert fact.value == 25
+    assert await db_session.scalar(select(func.count(DataQualityIssue.id))) == 0
+
+
 async def test_duplicate_and_missing_source_ids_remain_actionable(db_session) -> None:
     await _seed_player_with_games(db_session, "25")
     duplicate = _player_row(games_played=1, points="25")
+    conflicting_duplicate = ParsedCumulativePlayer(
+        display_name="Different, Player",
+        jersey_number=duplicate.jersey_number,
+        source_player_id=duplicate.source_player_id,
+        bio_url=duplicate.bio_url,
+        games_played=duplicate.games_played,
+        games_started=duplicate.games_started,
+        stats=duplicate.stats,
+        source_fields=duplicate.source_fields,
+        source_values=duplicate.source_values,
+    )
     missing = _player_row(source_player_id=None, games_played=1, points="5")
 
     result = await import_cumulative_stats(
         db_session,
-        _parsed_source(duplicate, duplicate, missing),
+        _parsed_source(duplicate, conflicting_duplicate, missing),
     )
 
     assert result.players_resolved == 0
