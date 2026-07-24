@@ -12,10 +12,40 @@ export interface BriefGame {
 export interface BriefPlayerLeader {
   player_id: number;
   player_name: string;
+  team_name: string;
+  jersey_number: string | null;
+  position: string | null;
+  class_year: string | null;
+  bio_url: string | null;
   games_played: number;
-  total_points: string;
-  points_per_game: string;
+  total: string;
+  per_game: string;
   evidence: BriefGame[];
+}
+
+export interface BriefLeaderGroup {
+  stat_key: string;
+  label: string;
+  context: string;
+  leaders: BriefPlayerLeader[];
+}
+
+export interface PreviousMatchupPlayer {
+  team_name: string;
+  player_name: string;
+  jersey_number: string | null;
+  starter: boolean;
+  minutes: number;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+}
+
+export interface PreviousMatchupTeam {
+  team_name: string;
+  standouts: PreviousMatchupPlayer[];
 }
 
 export interface HistoricalPregameBrief {
@@ -31,7 +61,8 @@ export interface HistoricalPregameBrief {
   };
   recent_form: BriefGame[];
   prior_meetings: BriefGame[];
-  scoring_leaders: BriefPlayerLeader[];
+  vandal_leader_groups: BriefLeaderGroup[];
+  previous_matchup_teams: PreviousMatchupTeam[];
   evidence_game_count: number;
   methodology: string;
 }
