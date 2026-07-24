@@ -8,13 +8,17 @@ production deployment.
 
 - The current local-development path bootstraps tables from ORM metadata when
   `DEV_MODE=true`.
-- The migration framework exists under `backend/migrations/`, but the repository
-  does not yet include committed Alembic revision files for the current model
-  set.
-- The current persisted model includes `games`, `team_stats`,
-  `player_stat_groups`, `scoring_plays`, and `generated_content`.
+- The repository has a linear, tested Alembic history from
+  `0001_canonical_event_foundation` through
+  `0007_shared_workspace_views`.
+- The migration suite upgrades a fresh database to `head`, checks ORM drift,
+  and exercises rollback boundaries with SQLite in CI. PostgreSQL 16 remains
+  the standard shared-deployment database.
+- The current persisted model includes the canonical event foundation, ingest
+  history, normalized warehouse, roster provenance, reviewed identity
+  resolutions, and shared workspace route definitions.
 
-This is acceptable for early local iteration, but it is not the long-term
+ORM `create_all` remains a local and test convenience. It is not the schema
 change-management path for staging or production environments.
 
 ## Project Policy
@@ -25,8 +29,8 @@ change-management path for staging or production environments.
 3. Never change a deployed schema manually.
 4. Every schema change must be reviewed alongside API contracts and governance
    artifacts.
-5. Before the first shared deployment, create and commit a baseline Alembic
-   revision covering the current schema.
+5. Deployments must run `alembic upgrade head` before serving application
+   traffic that depends on a new schema.
 
 ## Change Checklist
 
@@ -38,11 +42,8 @@ change-management path for staging or production environments.
 - [ ] [Data Lineage](data-lineage.md) updated if data flow changed
 - [ ] [Data Classification](data-classification.md) updated if classification changed
 
-## Immediate Follow-Up Needed
+## Current Head
 
-The next schema-governance milestone for this repository should be:
-
-- generate and commit the initial Alembic baseline revision
-- wire deployment workflows to run `alembic upgrade head`
-- stop treating ORM `create_all` as anything other than a local developer
-  convenience
+`0007_shared_workspace_views` creates the deployment-wide saved-view table and
+its creator/time indexes. Downgrading to `0006_player_identity_resolutions`
+removes that table without affecting warehouse or identity-resolution data.

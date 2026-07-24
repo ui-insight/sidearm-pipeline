@@ -42,6 +42,7 @@ Current project inventory:
 | Generated recaps, spotlights, and social drafts before publication | Internal | `generated_content` | athletics communications staff, platform maintainers | None currently expected |
 | Published editorial content derived from generated coverage | Public | downstream website or CMS publication surface | athletics website visitors, communications staff | None currently expected |
 | Operational ingest timestamps, future job history, and future audit metadata | Internal | `games.ingested_at`; future operational tables | platform maintainers, athletics operations | None currently expected |
+| Shared workspace view names, route filters, creator label, and timestamp | Internal | `workspace_views` | authenticated athletics communications staff and platform maintainers | None currently expected |
 | API keys, application secrets, and service credentials | Restricted | `.env` or secret-management system, not application tables | platform administrators only | Institutional security policy |
 
 At the current scope, no FERPA, HIPAA, PCI-DSS, or GLBA data is expected to be

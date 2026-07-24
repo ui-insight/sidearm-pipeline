@@ -20,6 +20,9 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - PROTOTYPE_AUTH_ENABLED=${PROTOTYPE_AUTH_ENABLED:-false}
+      - PROTOTYPE_AUTH_USERNAME=${PROTOTYPE_AUTH_USERNAME:-prototype}
+      - PROTOTYPE_AUTH_PASSWORD=${PROTOTYPE_AUTH_PASSWORD:-}
       - DEV_MODE=${DEV_MODE:-true}
       - UPLOAD_DIR=/app/uploads
       - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:5173","http://localhost:9200"]}

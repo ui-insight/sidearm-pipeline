@@ -1,12 +1,256 @@
 """Tests for source discovery API endpoints."""
 
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import func, select
 
-from app.models.game import EventSource, Game
+from app.db.seed import seed_warehouse_reference_data
+from app.models.data_quality_issue import DataQualityIssue
+from app.models.game import EventSource, Game, SourceSnapshot
+from app.models.player import Player, PlayerExternalIdentity, PlayerSeason
+from app.services.sidearm_cumulative_stats import (
+    CumulativeStatsParseError,
+    ParsedCumulativePlayer,
+    ParsedCumulativeStats,
+)
+from app.services.sidearm_roster import ParsedRoster, ParsedRosterPlayer
 from app.services.sidearm_schedule import ParsedScheduleEvent
 from app.services.sidearm_scraper import ParsedBoxscore
+
+
+def _discovered_roster() -> ParsedRoster:
+    return ParsedRoster(
+        sport_program_slug="womens-basketball",
+        season="2025-26",
+        source_system="sidearm",
+        institution="University of Idaho",
+        team_slug="idaho",
+        source_url=("https://govandals.com/sports/womens-basketball/roster/2025-26"),
+        raw_html="<html>roster</html>",
+        players=[
+            ParsedRosterPlayer(
+                display_name="Sarah Brans",
+                jersey_number="2",
+                class_year="Sr.",
+                position="F",
+                bio_url=(
+                    "https://govandals.com/sports/womens-basketball/roster/"
+                    "sarah-brans/8428"
+                ),
+                source_player_id="8428",
+                canonical_bio_url=(
+                    "https://govandals.com/sports/womens-basketball/roster/"
+                    "sarah-brans/8428"
+                ),
+            )
+        ],
+    )
+
+
+def _discovered_cumulative_stats() -> ParsedCumulativeStats:
+    return ParsedCumulativeStats(
+        sport_program_slug="womens-basketball",
+        season="2025-26",
+        source_system="govandals_public_html",
+        identity_source_system="sidearm",
+        institution="University of Idaho",
+        team_slug="idaho",
+        source_url=("https://govandals.com/sports/womens-basketball/stats/2025-26"),
+        raw_html="<html>season facts</html>",
+        players=[
+            ParsedCumulativePlayer(
+                display_name="Unresolved Player",
+                jersey_number="00",
+                source_player_id=None,
+                bio_url=None,
+                games_played=1,
+                games_started=0,
+                stats={"points": Decimal("5")},
+                source_fields={"points": "PTS"},
+                source_values={"GP": "1", "PTS": "5"},
+            )
+        ],
+    )
+
+
+async def test_preview_cumulative_statistics_returns_atomic_facts(
+    client,
+    monkeypatch,
+) -> None:
+    async def fake_discover_cumulative_stats(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedCumulativeStats:
+        assert sport_slug == "womens-basketball"
+        assert season == "2025-26"
+        return _discovered_cumulative_stats()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_cumulative_stats",
+        fake_discover_cumulative_stats,
+    )
+
+    response = await client.get(
+        "/api/v1/sources/womens-basketball/season-stats?season=2025-26"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_system"] == "govandals_public_html"
+    assert payload["players"][0]["stats"] == {"points": "5"}
+    assert payload["players"][0]["source_fields"] == {"points": "PTS"}
+
+
+async def test_import_cumulative_statistics_returns_coverage_and_review_state(
+    client,
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+
+    async def fake_discover_cumulative_stats(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedCumulativeStats:
+        return _discovered_cumulative_stats()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_cumulative_stats",
+        fake_discover_cumulative_stats,
+    )
+
+    response = await client.post(
+        "/api/v1/sources/womens-basketball/season-stats/import?season=2025-26"
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["players_seen"] == 1
+    assert payload["players_unresolved"] == 1
+    assert payload["facts_written"] == 0
+    assert payload["quality_issues_created"] == 1
+    assert payload["coverage_completeness"] == "partial"
+    assert len(payload["coverage_window_ids"]) == 1
+
+
+async def test_import_cumulative_statistics_persists_parser_failure(
+    client,
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+
+    async def fake_discover_cumulative_stats(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedCumulativeStats:
+        raise CumulativeStatsParseError(
+            "Overall Individual Statistics table was not found",
+            source_url=("https://govandals.com/sports/womens-basketball/stats/2025-26"),
+            raw_html="<html>changed markup</html>",
+            http_status=200,
+        )
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_cumulative_stats",
+        fake_discover_cumulative_stats,
+    )
+
+    response = await client.post(
+        "/api/v1/sources/womens-basketball/season-stats/import?season=2025-26"
+    )
+
+    assert response.status_code == 502
+    assert "markup could not be parsed" in response.json()["detail"]
+    assert await db_session.scalar(select(func.count(SourceSnapshot.id))) == 1
+    issue = await db_session.scalar(select(DataQualityIssue))
+    assert issue is not None
+    assert issue.issue_type == "parser_failure"
+    assert issue.details["parser_version"] == "govandals-cumulative-html-v1"
+
+
+async def test_preview_roster_discovery_returns_namespaced_identity_fields(
+    client,
+    monkeypatch,
+) -> None:
+    async def fake_discover_roster(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedRoster:
+        assert sport_slug == "womens-basketball"
+        assert season == "2025-26"
+        return _discovered_roster()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_roster",
+        fake_discover_roster,
+    )
+
+    response = await client.get(
+        "/api/v1/sources/womens-basketball/roster?season=2025-26"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "display_name": "Sarah Brans",
+            "jersey_number": "2",
+            "class_year": "Sr.",
+            "position": "F",
+            "bio_url": (
+                "https://govandals.com/sports/womens-basketball/roster/sarah-brans/8428"
+            ),
+            "source_player_id": "8428",
+            "canonical_bio_url": (
+                "https://govandals.com/sports/womens-basketball/roster/sarah-brans/8428"
+            ),
+            "canonical_source_player_id": "8428",
+            "identity_resolution_error": None,
+        }
+    ]
+
+
+async def test_import_roster_discovery_persists_canonical_identity(
+    client,
+    db_session,
+    monkeypatch,
+) -> None:
+    await seed_warehouse_reference_data(db_session)
+    await db_session.commit()
+
+    async def fake_discover_roster(
+        sport_slug: str,
+        season: str,
+    ) -> ParsedRoster:
+        return _discovered_roster()
+
+    monkeypatch.setattr(
+        "app.api.v1.sources.discover_roster",
+        fake_discover_roster,
+    )
+
+    response = await client.post(
+        "/api/v1/sources/womens-basketball/roster/import?season=2025-26"
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "source_url": ("https://govandals.com/sports/womens-basketball/roster/2025-26"),
+        "season": "2025-26",
+        "source_snapshot_id": 1,
+        "players_seen": 1,
+        "players_created": 1,
+        "identities_created": 1,
+        "player_seasons_created": 1,
+        "player_seasons_updated": 0,
+        "quality_issues_created": 0,
+    }
+    assert await db_session.scalar(select(func.count(Player.id))) == 1
+    assert await db_session.scalar(select(func.count(PlayerExternalIdentity.id))) == 1
+    assert await db_session.scalar(select(func.count(PlayerSeason.id))) == 1
 
 
 async def test_preview_schedule_discovery_returns_events(client, monkeypatch) -> None:

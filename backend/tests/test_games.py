@@ -72,7 +72,10 @@ async def test_ingest_creates_canonical_event_metadata(
     assert payload["event_sources"][0]["source_type"] == "boxscore_html"
     assert payload["event_sources"][0]["source_id"] == "8467"
     assert payload["event_sources"][0]["primary_source"] is True
-    assert payload["source_snapshots"][0]["parser_version"] == "sidearm-html-v1"
+    assert payload["source_snapshots"][0]["parser_version"] == "sidearm-html-v2"
+    assert payload["source_snapshots"][0]["source_system"] == "sidearm"
+    assert payload["source_snapshots"][0]["source_type"] == "boxscore_html"
+    assert payload["source_snapshots"][0]["source_url"] == payload["source_url"]
     assert len(payload["source_snapshots"][0]["content_hash"]) == 64
     assert payload["status_history"][0]["to_status"] == "final"
 
@@ -95,6 +98,16 @@ async def test_ingest_creates_canonical_event_metadata(
     assert history_payload[0]["run_metadata"]["canonical_uid"] == (
         "sidearm:football:2025:8467"
     )
+    filtered_history = await client.get(
+        "/api/v1/ingest-runs",
+        params={"source_type": "boxscore_html", "sport": "football"},
+    )
+    assert len(filtered_history.json()) == 1
+    unrelated_history = await client.get(
+        "/api/v1/ingest-runs",
+        params={"source_type": "historical_range_backfill"},
+    )
+    assert unrelated_history.json() == []
 
     game = await db_session.scalar(select(Game))
     assert game is not None
@@ -260,3 +273,28 @@ async def test_ingest_records_retry_exhaustion(client, db_session, monkeypatch):
     assert ingest_run.attempt_count == 3
     assert ingest_run.max_attempts == 3
     assert ingest_run.run_metadata["retry_exhausted"] is True
+
+
+async def test_ingest_records_parser_failure(client, db_session, monkeypatch):
+    async def fake_scrape_boxscore(url: str) -> ParsedBoxscore:
+        raise ValueError("No Sidearm player tables were found")
+
+    monkeypatch.setattr("app.api.v1.games.scrape_boxscore", fake_scrape_boxscore)
+
+    response = await client.post(
+        "/api/v1/games",
+        json={
+            "url": "https://govandals.com/sports/womens-basketball/stats/"
+            "2025-26/idaho-state/boxscore/9968"
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == (
+        "Failed to parse Sidearm page: No Sidearm player tables were found"
+    )
+    ingest_run = await db_session.scalar(select(IngestRun))
+    assert ingest_run is not None
+    assert ingest_run.status == "failed"
+    assert ingest_run.error_type == "ValueError"
+    assert ingest_run.run_metadata["failure_phase"] == "parse_boxscore"

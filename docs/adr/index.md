@@ -37,3 +37,6 @@ What benefits, costs, and follow-on obligations come with that choice?
 
 - [ADR-001: Preserve Explicit Template Customization Points](001-template-customization.md)
 - [ADR-002: Tailwind CSS Only](002-tailwind-only.md)
+- [ADR-005: Curated Semantic Layer for NLQ](005-semantic-layer-for-nlq.md)
+- [ADR-006: Release 1 Is Internal-SID-First](006-release1-internal-sid-first.md)
+- [ADR-007: Normalized Long-Form Stat Storage](007-normalized-long-form-stat-storage.md)

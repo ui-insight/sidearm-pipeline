@@ -15,6 +15,7 @@ The current schema supports:
 - source URL lineage, raw source snapshots, parser version metadata, and event
   status history
 - storage of optional AI-generated coverage derived from a game record
+- deployment-wide saved workspace route and filter definitions
 
 The current schema does not yet include ingest job tracking, operator audit logs,
 participant tables for non-boxscore event shapes, or website syndication
@@ -31,6 +32,15 @@ erDiagram
     Game ||--o{ SourceSnapshot : has
     Game ||--o{ EventStatusHistory : has
     Game ||--o{ GeneratedContent : has
+
+    WorkspaceView {
+        string id PK
+        string name
+        string view_kind
+        json params
+        string created_by
+        datetime created_at
+    }
 
     Game {
         int id PK
@@ -288,6 +298,29 @@ Governance note:
   drafts should be treated as internal editorial content until explicitly
   published
 
+### `workspace_views`
+
+Defined in `backend/app/models/workspace_view.py`.
+
+Purpose:
+- stores a named Season desk or Player comparison route for everyone signed
+  into the deployment
+- supports newsroom handoffs without copying result facts or source evidence
+  into a second store
+
+Important fields:
+- `id`: UUID-form stable identifier
+- `name`: operator-supplied label, limited to 60 characters
+- `view_kind`: constrained to `season` or `comparison`
+- `params`: exact validated filter set for the selected workspace route
+- `created_by`: configured prototype-session username captured as creator
+  context, not an ownership or authorization boundary
+- `created_at`: shared-list ordering and display timestamp
+
+Current limitation:
+- the prototype uses one shared credential and has no user table or RBAC, so
+  every authenticated operator can open and delete every shared view
+
 ## API Shapes
 
 The current public application surfaces map these tables into:
@@ -295,6 +328,7 @@ The current public application surfaces map these tables into:
 - `GameSummary` for list views
 - `GameDetail` for full event display
 - `GeneratedContentRead` for coverage output
+- `WorkspaceViewRead` for shared route definitions
 
 These schemas are defined in:
 

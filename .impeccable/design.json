@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-15T22:30:00Z",
+  "title": "Design System: Vandals Stats Pipeline",
+  "extensions": {
+    "colorMeta": {
+      "vandal-gold": {
+        "role": "primary",
+        "displayName": "Vandal Gold",
+        "tonalRamp": ["#422006", "#713f12", "#a16207", "#ca8a04", "#eab308", "#facc15", "#fef08a", "#fefce8"]
+      },
+      "editorial-ink": {
+        "role": "neutral",
+        "displayName": "Editorial Ink",
+        "tonalRamp": ["#030712", "#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#d1d5db", "#f9fafb"]
+      },
+      "alert-red": {
+        "role": "semantic",
+        "displayName": "Alert Red",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#f87171", "#fecaca", "#fef2f2"]
+      },
+      "verified-green": {
+        "role": "semantic",
+        "displayName": "Verified Green",
+        "tonalRamp": ["#052e16", "#14532d", "#166534", "#15803d", "#22c55e", "#86efac", "#dcfce7", "#f0fdf4"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Display", "purpose": "Product and workspace headings only."},
+      "headline": {"displayName": "Headline", "purpose": "Game titles and page questions."},
+      "title": {"displayName": "Title", "purpose": "Section and table-group headings."},
+      "body": {"displayName": "Body", "purpose": "Interface copy and dense evidence tables."},
+      "label": {"displayName": "Label", "purpose": "Columns, metadata, and state vocabulary."}
+    },
+    "shadows": [
+      {"name": "ambient-low", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Separate one major work surface from the newsprint canvas."}
+    ],
+    "motion": [
+      {"name": "state-fast", "value": "150ms ease", "purpose": "Hover, focus, and compact state changes; disabled when reduced motion is requested."}
+    ],
+    "breakpoints": [
+      {"name": "sm", "value": "640px"},
+      {"name": "md", "value": "768px"},
+      {"name": "lg", "value": "1024px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action for consequential workspace operations.",
+      "html": "<button class=\"ds-btn-ink\">Load schedule</button>",
+      "css": ".ds-btn-ink { background: #111827; color: #fff; border: 1px solid #111827; border-radius: 6px; padding: 8px 16px; font: 500 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-ink:hover { background: #374151; border-color: #374151; } .ds-btn-ink:active { background: #030712; } .ds-btn-ink:focus-visible { outline: 2px solid #eab308; outline-offset: 2px; }"
+    },
+    {
+      "name": "Gold Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "High-attention task action such as ingesting a boxscore.",
+      "html": "<button class=\"ds-btn-gold\">Ingest boxscore</button>",
+      "css": ".ds-btn-gold { background: #eab308; color: #111827; border: 1px solid #eab308; border-radius: 6px; padding: 8px 16px; font: 600 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-gold:hover { background: #ca8a04; border-color: #ca8a04; } .ds-btn-gold:active { background: #a16207; } .ds-btn-gold:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting action that should not compete with the primary task.",
+      "html": "<button class=\"ds-btn-secondary\">Import schedule</button>",
+      "css": ".ds-btn-secondary { background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 16px; font: 500 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; } .ds-btn-secondary:active { background: #f3f4f6; } .ds-btn-secondary:focus-visible { outline: 2px solid #eab308; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Compact field for source URLs, search, and filters.",
+      "html": "<label class=\"ds-field\"><span>Boxscore URL</span><input placeholder=\"https://govandals.com/...\" /></label>",
+      "css": ".ds-field { display: grid; gap: 4px; color: #4b5563; font: 600 12px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; } .ds-field input { width: 320px; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; text-transform: none; letter-spacing: normal; } .ds-field input:hover { border-color: #9ca3af; } .ds-field input:focus-visible { outline: 2px solid #eab308; outline-offset: 2px; border-color: #111827; }"
+    },
+    {
+      "name": "Workspace Navigation",
+      "kind": "nav",
+      "description": "Direct top-level navigation for Games and Identity Queue.",
+      "html": "<nav class=\"ds-nav\"><strong>VANDALS / STATS DESK</strong><a class=\"ds-nav-active\" href=\"#\">Games</a><a href=\"#\">Identity queue</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #e5e7eb; background: #fff; padding: 12px 24px; color: #111827; font: 500 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-nav strong { margin-right: auto; font-size: 12px; letter-spacing: .08em; } .ds-nav a { color: #6b7280; text-decoration: none; padding: 6px 0; border-bottom: 2px solid transparent; } .ds-nav a:hover { color: #111827; } .ds-nav a:focus-visible { outline: 2px solid #eab308; outline-offset: 3px; } .ds-nav .ds-nav-active { color: #111827; border-bottom-color: #eab308; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Textual state marker for queue and ingestion records.",
+      "html": "<span class=\"ds-chip\"><span aria-hidden=\"true\"></span>Open review</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; background: #f9fafb; color: #4b5563; border: 1px solid #e5e7eb; border-radius: 9999px; padding: 2px 8px; font: 600 12px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-chip span { width: 6px; height: 6px; border-radius: 9999px; background: #eab308; }"
+    },
+    {
+      "name": "Evidence Table",
+      "kind": "custom",
+      "description": "Dense, provenance-aware player statistics table.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Player</th><th>MIN</th><th>FG</th><th>PTS</th></tr></thead><tbody><tr><td>Kyra Gardner</td><td>31</td><td>7-12</td><td><strong>19</strong></td></tr><tr><td>Sara Armbruster</td><td>27</td><td>5-9</td><td><strong>13</strong></td></tr></tbody></table>",
+      "css": ".ds-table { width: 460px; border-collapse: collapse; background: #fff; color: #111827; font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-table th { border-bottom: 1px solid #d1d5db; padding: 8px 12px; color: #6b7280; font-size: 12px; letter-spacing: .06em; text-align: right; } .ds-table th:first-child, .ds-table td:first-child { text-align: left; } .ds-table td { border-bottom: 1px solid #e5e7eb; padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; } .ds-table tbody tr:hover { background: #f9fafb; } .ds-table tbody tr:focus-within { outline: 2px solid #eab308; outline-offset: -2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sports Desk",
+    "overview": "The interface should feel like the working desk behind a trusted athletics publication: compact, evidence-rich, and composed under deadline. Strong typographic hierarchy separates the game, the fact, and the source without turning routine operations into spectacle. Familiar navigation, tables, filters, and forms should disappear into the editorial task. This is an internal operations product, so density is useful when structure stays clear. Newsprint backgrounds, paper work surfaces, dark editorial ink, and a limited Vandal Gold accent create the professional confidence of ESPN or The Athletic without copying a fan-facing broadcast package.",
+    "keyCharacteristics": [
+      "Editorial hierarchy with compact, repeatable data rhythms",
+      "Paper and newsprint surfaces separated by rules more often than shadows",
+      "Vandal Gold reserved for primary actions, active state, and important attention",
+      "Tabular numerals and aligned columns for fast comparison",
+      "Evidence, uncertainty, and resolution state kept beside the fact"
+    ],
+    "rules": [
+      {"name": "The One Signal Rule", "body": "Vandal Gold should occupy no more than roughly 10% of a screen. Its rarity gives it editorial authority.", "section": "colors"},
+      {"name": "The Evidence Is Not Decoration Rule", "body": "Red and green communicate status only; neither color may be used as ambient decoration, and neither may carry meaning alone.", "section": "colors"},
+      {"name": "The Scoreboard Rhythm Rule", "body": "Numerical comparisons use tabular numerals and right alignment; names and editorial context remain left aligned.", "section": "typography"},
+      {"name": "The Flat-By-Default Rule", "body": "Tables, filters, and repeated rows use rules and tonal contrast, not stacks of floating cards.", "section": "elevation"}
+    ],
+    "dos": [
+      "Do organize screens around an SID's editorial question, with evidence and provenance beside any fact that may be published.",
+      "Do use Paper (#ffffff), Newsprint (#f9fafb), and Newsroom Rule (#e5e7eb) to create structure before adding a shadow.",
+      "Do reserve Vandal Gold (#eab308) for primary actions, selection, focus, and important attention states.",
+      "Do use 14px body copy, 12px labels, right-aligned tabular numerals, and compact 8px to 16px row spacing for scan-friendly data.",
+      "Do provide keyboard access, visible focus, reduced-motion behavior, and status text in addition to color to meet WCAG 2.2 AA."
+    ],
+    "donts": [
+      "Don't build a fan-facing athletics site around hype, promotional graphics, or game-day spectacle.",
+      "Don't produce a generic SaaS dashboard made from interchangeable cards and decorative metrics.",
+      "Don't expose a database administration console or implementation details instead of newsroom concepts.",
+      "Don't make the interface chatbot-first, obscure evidence, or treat generated prose as authoritative.",
+      "Don't imitate sports-broadcast styling when it sacrifices legibility, density, or provenance for visual drama.",
+      "Don't use gradients, glass effects, colored side stripes, ornamental display type, or animated decoration."
+    ]
+  }
+}

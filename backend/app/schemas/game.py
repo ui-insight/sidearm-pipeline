@@ -1,6 +1,7 @@
 """Pydantic schemas for games and boxscore data."""
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -27,6 +28,23 @@ class PlayerStatGroupRead(BaseModel):
     team: str | None = None
     columns: list[str]
     rows: list[list[str]]
+
+
+class NormalizedPlayerGameStatRead(BaseModel):
+    """One provenance-aware normalized player fact for a game."""
+
+    player_id: int
+    player_name: str
+    team_id: int | None = None
+    team_name: str | None = None
+    stat_key: str
+    display_label: str
+    value: Decimal
+    value_type: str
+    display_format: str | None = None
+    source_field: str | None = None
+    source_value: str | None = None
+    source_snapshot_id: int | None = None
 
 
 class ScoringPlayRead(BaseModel):
@@ -92,6 +110,10 @@ class EventSourceRead(BaseModel):
 class SourceSnapshotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
+    source_system: str
+    source_type: str
+    source_url: str
     parser_version: str
     content_hash: str
     http_status: int | None = None

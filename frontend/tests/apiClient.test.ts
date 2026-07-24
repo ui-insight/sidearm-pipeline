@@ -53,6 +53,10 @@ describe("api client", () => {
     await expect(api.get<{ status: string }>("/health")).resolves.toEqual({
       status: "ok",
     });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/health",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
   });
 
   it("returns undefined for 204 responses", async () => {

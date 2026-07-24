@@ -12,10 +12,12 @@ DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "source_registry.j
 
 
 class SourcePatterns(BaseModel):
-    """URL templates for one sport's authoritative Sidearm sources."""
+    """Registered URL templates for one sport's source adapters."""
 
     schedule_url: str
     boxscore_url_pattern: str | None = None
+    roster_url: str | None = None
+    cumulative_stats_url: str | None = None
 
 
 class PollingPolicy(BaseModel):

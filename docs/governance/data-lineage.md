@@ -23,6 +23,7 @@ metadata and editorial drafts.
 | AI-generated coverage drafts | Derived from normalized game data via `content_generator` | model prompt and response transformed into recap, spotlight, and social text | `generated_content` | athletics communications workflows, internal reviewers | Internal until publication decision; retained with the parent game unless a later editorial retention policy supersedes it |
 | Website-ready event payloads | Derived from normalized game data and publish-state logic | not yet implemented; planned as versioned syndication API/feed responses | not currently persisted as a dedicated table | athletics website and CMS consumers | Export path planned under Release 1 and Release 2 website syndication work |
 | Operational ingest metadata | Current `ingested_at` timestamp plus planned ingest job and audit records | used for freshness, retries, monitoring, and audit | `games.ingested_at`; future operational tables | platform maintainers, athletics operations | Internal operational data; retention policy to be implemented with monitoring and audit work |
+| Shared workspace views | Named route and filter configuration submitted from the authenticated workspace UI | Pydantic validates the exact supported Season desk or Player comparison parameter set; the API records the prototype-session username | `workspace_views` | authenticated workspace UI users | Stores no result facts or source evidence; opening a view reruns the current governed query; any authenticated user can delete a shared view under the current shared-credential model |
 
 ## Governance Notes
 
@@ -31,3 +32,5 @@ metadata and editorial drafts.
 - The authoritative external integration is currently Sidearm source content.
 - When publish-state, audit, or live-ingest tables are added, this page should
   be updated in the same change set as the schema change.
+- Browser-local saved views remain outside server lineage in localStorage and
+  are limited to route/filter definitions in the current browser.
