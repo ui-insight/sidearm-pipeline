@@ -1,319 +1,274 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
 import { ApiError } from "../api/client";
-import { semanticQueriesApi } from "../api/semanticQueries";
-import type { Leaderboard } from "../types/recordBook";
+import { pregameBriefsApi } from "../api/pregameBriefs";
 import type {
-  SemanticWorkspaceOptions,
-  TeamSeasonRecord,
-} from "../types/semanticQuery";
+  BriefGame,
+  HistoricalPregameBrief,
+} from "../types/pregameBrief";
 
-const TARGET_SEASON = "2025-26";
+const DEMO_SEASON = "2025-26";
+const DEMO_OPPONENT = "Montana State";
+const DEMO_GAME_DATE = "2026-02-05";
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
-  return "Demo readiness could not be checked.";
+  return "The historical briefing could not be loaded.";
+}
+
+function readableDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function scoreline(game: BriefGame): string {
+  return `${game.result === "win" ? "W" : game.result === "loss" ? "L" : "T"} ${game.idaho_score}–${game.opponent_score}`;
+}
+
+function venueLabel(venue: string): string {
+  if (venue === "home") return "Home";
+  if (venue === "away") return "Away";
+  if (venue === "neutral") return "Neutral";
+  return "Venue unavailable";
 }
 
 function AthleticsDemoPage() {
-  const [options, setOptions] = useState<SemanticWorkspaceOptions | null>(null);
-  const [record, setRecord] = useState<TeamSeasonRecord | null>(null);
-  const [leaders, setLeaders] = useState<Leaderboard | null>(null);
+  const [brief, setBrief] = useState<HistoricalPregameBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resultRevealed, setResultRevealed] = useState(false);
 
   useEffect(() => {
     let active = true;
-
-    async function loadReadiness() {
-      setLoading(true);
-      setError(null);
+    async function loadBrief() {
       try {
-        const nextOptions = await semanticQueriesApi.options();
-        if (!active) return;
-        setOptions(nextOptions);
-
-        const season = nextOptions.seasons.includes(TARGET_SEASON)
-          ? TARGET_SEASON
-          : nextOptions.default_season ?? nextOptions.seasons[0];
-        const statKey =
-          nextOptions.default_stat_key ?? nextOptions.metrics[0]?.stat_key;
-        if (!season || !statKey) return;
-
-        const [recordResponse, leaderResponse] = await Promise.all([
-          semanticQueriesApi.teamSeasonRecord(season, "all", null),
-          semanticQueriesApi.statLeaders(season, statKey, 10),
-        ]);
-        if (!active) return;
-        setRecord(recordResponse.result);
-        setLeaders(leaderResponse.result);
+        const response = await pregameBriefsApi.historical(
+          DEMO_SEASON,
+          DEMO_OPPONENT,
+          DEMO_GAME_DATE,
+        );
+        if (active) setBrief(response);
       } catch (loadError) {
-        if (!active) return;
-        setError(errorMessage(loadError));
+        if (active) setError(errorMessage(loadError));
       } finally {
         if (active) setLoading(false);
       }
     }
-
-    void loadReadiness();
+    void loadBrief();
     return () => {
       active = false;
     };
   }, []);
 
-  const season = options?.seasons.includes(TARGET_SEASON)
-    ? TARGET_SEASON
-    : options?.default_season ?? options?.seasons[0] ?? "";
-  const metric =
-    options?.metrics.find(
-      (candidate) => candidate.stat_key === options.default_stat_key,
-    ) ?? options?.metrics[0];
-  const players = useMemo(
-    () =>
-      (options?.players ?? []).filter((player) =>
-        player.seasons.includes(season),
-      ),
-    [options, season],
-  );
-  const opponents = useMemo(
-    () =>
-      (options?.opponents ?? []).filter((opponent) =>
-        opponent.seasons.includes(season),
-      ),
-    [options, season],
-  );
+  const recentRecord = useMemo(() => {
+    const wins = brief?.recent_form.filter((game) => game.result === "win").length ?? 0;
+    const losses = brief?.recent_form.filter((game) => game.result === "loss").length ?? 0;
+    return `${wins}–${losses}`;
+  }, [brief]);
 
-  const seasonReady = Boolean(season && metric && record && leaders);
-  const evidenceReady = Boolean(
-    record && record.games_played > 0 && record.games.every((game) => game.source_url),
-  );
-  const qualityReady = Boolean(
-    record &&
-      leaders &&
-      record.open_quality_issue_count === 0 &&
-      leaders.open_quality_issue_count === 0,
-  );
-  const comparisonReady = players.length >= 2;
-  const demoReady =
-    seasonReady && evidenceReady && qualityReady && comparisonReady;
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl animate-pulse px-4 py-10 sm:px-6 lg:px-8" role="status">
+        <div className="h-4 w-40 rounded bg-gray-200" />
+        <div className="mt-4 h-10 w-80 max-w-full rounded bg-gray-200" />
+        <div className="mt-10 grid gap-6 border-y border-gray-200 py-8 sm:grid-cols-3">
+          <div className="h-24 rounded bg-gray-100" />
+          <div className="h-24 rounded bg-gray-100" />
+          <div className="h-24 rounded bg-gray-100" />
+        </div>
+        <span className="sr-only">Building historical pregame brief</span>
+      </div>
+    );
+  }
 
-  const seasonDeskUrl = metric
-    ? `/workspace?${new URLSearchParams({
-        season,
-        stat: metric.stat_key,
-        scope: "all",
-        opponent: "all",
-        limit: "10",
-      })}`
-    : "/workspace";
-  const opponentDeskUrl = metric && opponents[0]
-    ? `/workspace?${new URLSearchParams({
-        season,
-        stat: metric.stat_key,
-        scope: "all",
-        opponent: opponents[0].opponent_name,
-        limit: "10",
-      })}`
-    : "/workspace";
-  const comparisonUrl = metric && players[0] && players[1]
-    ? `/workspace/compare?${new URLSearchParams({
-        season,
-        stat: metric.stat_key,
-        conference: "all",
-        venue: "all",
-        opponent: "all",
-        left: String(players[0].player_id),
-        right: String(players[1].player_id),
-      })}`
-    : "/workspace/compare";
+  if (error || !brief) {
+    return (
+      <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6" role="alert">
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-red-700">
+          Brief unavailable
+        </p>
+        <h1 className="mt-2 text-2xl font-black text-gray-950">
+          Historical evidence could not be assembled
+        </h1>
+        <p className="mt-3 text-sm text-gray-700">{error}</p>
+      </section>
+    );
+  }
 
-  const gates = [
-    {
-      label: "Season facts",
-      ready: seasonReady,
-      detail: seasonReady
-        ? `${record?.games_played ?? 0} final games and ${leaders?.total_players ?? 0} ranked players`
-        : "Sync the completed WBB season and cumulative statistics.",
-    },
-    {
-      label: "Source evidence",
-      ready: evidenceReady,
-      detail: evidenceReady
-        ? "Every game in the record has a source link."
-        : "Final-game evidence is missing or incomplete.",
-    },
-    {
-      label: "Quality review",
-      ready: qualityReady,
-      detail: qualityReady
-        ? "No open issues affect the season record or leaderboard."
-        : `${(record?.open_quality_issue_count ?? 0) + (leaders?.open_quality_issue_count ?? 0)} open issue references remain.`,
-    },
-    {
-      label: "Player comparison",
-      ready: comparisonReady,
-      detail: comparisonReady
-        ? `${players.length} players have game-level evidence.`
-        : "At least two resolved players need game-level evidence.",
-    },
-  ];
+  const priorMeeting = brief.prior_meetings[0];
+  const scoringLeader = brief.scoring_leaders[0];
+  const target = brief.target_game;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-      <header className="grid gap-6 border-b border-gray-300 pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="max-w-3xl">
+    <article className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <header className="border-b-2 border-gray-950 pb-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
-            Athletics briefing
+            Historical pregame brief
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
-            WBB demo desk
-          </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-gray-600">
-            Verify the evidence, then walk through three questions an athletics
-            staff member can answer without SQL.
-          </p>
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">
+            No hindsight: data through {readableDate(brief.as_of_date)}
+          </span>
         </div>
-        {!loading && !error ? (
-          <div
-            className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold ${
-              demoReady
-                ? "bg-emerald-50 text-emerald-800"
-                : "bg-amber-50 text-amber-900"
-            }`}
-            role="status"
-          >
-            <span aria-hidden="true">{demoReady ? "✓" : "!"}</span>
-            {demoReady ? "Ready to present" : "Preparation required"}
-          </div>
-        ) : null}
+        <h1 className="mt-4 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
+          {target.opponent} at Idaho
+        </h1>
+        <p className="mt-2 text-base font-semibold text-gray-700">
+          {readableDate(target.game_date)} · {venueLabel(target.venue)} · Women&apos;s basketball
+        </p>
+        <p className="mt-4 max-w-3xl text-sm leading-6 text-gray-600">
+          A replay of what the sports desk could have known before tipoff, assembled from verified game evidence already in the warehouse.
+        </p>
       </header>
 
-      {loading ? (
-        <div className="animate-pulse py-10" role="status">
-          <div className="h-5 w-48 rounded bg-gray-200" />
-          <div className="mt-6 space-y-3">
-            <div className="h-14 rounded bg-gray-100" />
-            <div className="h-14 rounded bg-gray-100" />
-            <div className="h-14 rounded bg-gray-100" />
+      <section aria-labelledby="desk-knew" className="border-b border-gray-300 py-8">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
+          Briefing snapshot
+        </p>
+        <h2 id="desk-knew" className="mt-2 text-2xl font-black text-gray-950">
+          What the desk knew
+        </h2>
+        <dl className="mt-6 grid border-y border-gray-300 sm:grid-cols-3 sm:divide-x sm:divide-gray-300">
+          <div className="py-5 sm:pr-6">
+            <dt className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Season position</dt>
+            <dd className="mt-2 text-2xl font-black tabular-nums text-gray-950">
+              {brief.season_record.wins}–{brief.season_record.losses}
+            </dd>
+            <dd className="mt-1 text-sm text-gray-600">
+              Through {brief.season_record.games_played} final games
+            </dd>
           </div>
-          <span className="sr-only">Checking demo readiness</span>
+          <div className="border-t border-gray-300 py-5 sm:border-t-0 sm:px-6">
+            <dt className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Recent form</dt>
+            <dd className="mt-2 text-2xl font-black tabular-nums text-gray-950">{recentRecord}</dd>
+            <dd className="mt-1 text-sm text-gray-600">Across the previous five games</dd>
+          </div>
+          <div className="border-t border-gray-300 py-5 sm:border-t-0 sm:pl-6">
+            <dt className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Scoring lead</dt>
+            <dd className="mt-2 text-lg font-black text-gray-950">
+              {scoringLeader?.player_name ?? "Not available"}
+            </dd>
+            <dd className="mt-1 text-sm tabular-nums text-gray-600">
+              {scoringLeader ? `${scoringLeader.points_per_game} points per game` : "No scoring evidence"}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="grid border-b border-gray-300 py-8 lg:grid-cols-[15rem_1fr] lg:gap-10">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Editorial angle</p>
+          <h2 className="mt-2 text-xl font-black text-gray-950">The rematch question</h2>
         </div>
-      ) : error ? (
-        <section className="mt-8 border border-red-200 bg-red-50 px-5 py-4" role="alert">
-          <h2 className="font-bold text-red-900">Readiness check failed</h2>
-          <p className="mt-1 text-sm text-red-800">{error}</p>
-          <Link
-            to="/"
-            className="mt-3 inline-block text-sm font-bold text-red-900 underline underline-offset-2"
-          >
-            Return to season sync
-          </Link>
-        </section>
-      ) : (
-        <>
-          <section className="grid border-b border-gray-300 py-8 lg:grid-cols-[15rem_1fr] lg:gap-10">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
-                Readiness gates
+        <div className="mt-5 lg:mt-0">
+          {priorMeeting ? (
+            <>
+              <p className="max-w-3xl text-lg font-semibold leading-8 text-gray-900">
+                Idaho entered on a {recentRecord} run after losing {priorMeeting.idaho_score}–{priorMeeting.opponent_score} at Montana State in the first meeting.
               </p>
-              <h2 className="mt-2 text-xl font-black text-gray-950">
-                {season || TARGET_SEASON}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                These checks use current warehouse results, not a static demo checklist.
-              </p>
-            </div>
-            <ol className="mt-6 divide-y divide-gray-200 border-y border-gray-200 lg:mt-0">
-              {gates.map((gate) => (
-                <li
-                  key={gate.label}
-                  className="grid gap-1 py-4 sm:grid-cols-[11rem_1fr_auto] sm:items-center sm:gap-4"
-                >
-                  <span className="font-bold text-gray-950">{gate.label}</span>
-                  <span className="text-sm text-gray-600">{gate.detail}</span>
-                  <span
-                    className={`text-xs font-black uppercase tracking-[0.08em] ${
-                      gate.ready ? "text-emerald-700" : "text-amber-800"
-                    }`}
-                  >
-                    {gate.ready ? "Ready" : "Needs work"}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <section className="py-8">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
-              Ten-minute walkthrough
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-gray-950">
-              Three questions, every answer sourced
-            </h2>
-            <ol className="mt-6 divide-y divide-gray-200 border-y border-gray-300 bg-white">
-              <li className="grid gap-4 px-4 py-5 sm:grid-cols-[2rem_1fr_auto] sm:items-center sm:px-5">
-                <span className="font-mono text-lg font-black text-amber-700">01</span>
-                <div>
-                  <h3 className="font-bold text-gray-950">Who led the season?</h3>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Open the team record and {metric?.display_label.toLowerCase() ?? "stat"} leaders with coverage beside the result.
-                  </p>
-                </div>
-                <Link className="text-sm font-bold text-gray-950 underline decoration-amber-500 underline-offset-4" to={seasonDeskUrl}>
-                  Open season desk
-                </Link>
-              </li>
-              <li className="grid gap-4 px-4 py-5 sm:grid-cols-[2rem_1fr_auto] sm:items-center sm:px-5">
-                <span className="font-mono text-lg font-black text-amber-700">02</span>
-                <div>
-                  <h3 className="font-bold text-gray-950">What happened against one opponent?</h3>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {opponents[0]
-                      ? `Review ${opponents[0].opponent_name} results and the contributing boxscores.`
-                      : "Sync game-level evidence to unlock an opponent walkthrough."}
-                  </p>
-                </div>
-                <Link className="text-sm font-bold text-gray-950 underline decoration-amber-500 underline-offset-4" to={opponentDeskUrl}>
-                  Open opponent view
-                </Link>
-              </li>
-              <li className="grid gap-4 px-4 py-5 sm:grid-cols-[2rem_1fr_auto] sm:items-center sm:px-5">
-                <span className="font-mono text-lg font-black text-amber-700">03</span>
-                <div>
-                  <h3 className="font-bold text-gray-950">How do two players compare?</h3>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {players[0] && players[1]
-                      ? `Compare ${players[0].player_name} and ${players[1].player_name} over the same verified games.`
-                      : "Resolve two player identities to unlock the comparison."}
-                  </p>
-                </div>
-                <Link className="text-sm font-bold text-gray-950 underline decoration-amber-500 underline-offset-4" to={comparisonUrl}>
-                  Open comparison
-                </Link>
-              </li>
-            </ol>
-          </section>
-
-          {!demoReady ? (
-            <section className="border border-amber-200 bg-amber-50 px-5 py-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
-              <div>
-                <h2 className="font-bold text-gray-950">Finish the data preparation</h2>
-                <p className="mt-1 text-sm leading-6 text-gray-700">
-                  Sync the season first, then clear identity and quality issues before presenting.
-                </p>
-              </div>
-              <Link
-                to="/"
-                className="mt-4 inline-flex rounded-md bg-gray-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:mt-0"
+              <a
+                href={priorMeeting.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-block text-sm font-bold text-gray-700 underline decoration-amber-500 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-500"
               >
-                Go to season sync
-              </Link>
-            </section>
-          ) : null}
-        </>
-      )}
-    </div>
+                Verify the first meeting box score
+              </a>
+            </>
+          ) : (
+            <p className="text-sm text-gray-600">No earlier meeting was available before the cutoff.</p>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="form-heading" className="border-b border-gray-300 py-8">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Source ledger</p>
+            <h2 id="form-heading" className="mt-2 text-xl font-black text-gray-950">Previous five games</h2>
+          </div>
+          <p className="text-xs text-gray-500">Each row opens the authoritative box score</p>
+        </div>
+        <div className="mt-5 overflow-x-auto border-y border-gray-300">
+          <table className="w-full min-w-[38rem] text-left text-sm">
+            <thead className="bg-gray-100 text-xs uppercase tracking-[0.06em] text-gray-600">
+              <tr>
+                <th className="px-3 py-3 font-bold">Date</th>
+                <th className="px-3 py-3 font-bold">Opponent</th>
+                <th className="px-3 py-3 font-bold">Site</th>
+                <th className="px-3 py-3 text-right font-bold">Result</th>
+                <th className="px-3 py-3 text-right font-bold">Evidence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {brief.recent_form.map((game) => (
+                <tr key={game.game_id}>
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-600">{readableDate(game.game_date)}</td>
+                  <td className="px-3 py-3 font-semibold text-gray-950">{game.opponent}</td>
+                  <td className="px-3 py-3 text-gray-600">{venueLabel(game.venue)}</td>
+                  <td className="px-3 py-3 text-right font-mono font-bold text-gray-950">{scoreline(game)}</td>
+                  <td className="px-3 py-3 text-right">
+                    <a className="font-bold text-gray-700 underline decoration-amber-500 underline-offset-4" href={game.source_url} target="_blank" rel="noreferrer">Box score</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="leaders-heading" className="border-b border-gray-300 py-8">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Player preparation</p>
+        <h2 id="leaders-heading" className="mt-2 text-xl font-black text-gray-950">Scoring leaders at the cutoff</h2>
+        <ol className="mt-5 divide-y divide-gray-200 border-y border-gray-300">
+          {brief.scoring_leaders.map((leader, index) => (
+            <li key={leader.player_id} className="grid gap-2 py-4 sm:grid-cols-[2rem_1fr_auto_auto] sm:items-center sm:gap-6">
+              <span className="font-mono text-sm font-black text-amber-700">{String(index + 1).padStart(2, "0")}</span>
+              <span className="font-bold text-gray-950">{leader.player_name}</span>
+              <span className="text-sm tabular-nums text-gray-600">{leader.total_points} points · {leader.games_played} games</span>
+              <span className="text-right font-mono font-black tabular-nums text-gray-950">{leader.points_per_game} PPG</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="py-8">
+        <div className="border border-gray-300 bg-white px-5 py-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">After the briefing</p>
+            <h2 className="mt-2 text-xl font-black text-gray-950">Reveal what happened</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+              The result stays separate from every pregame calculation, making the historical replay auditable.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-expanded={resultRevealed}
+            onClick={() => setResultRevealed((current) => !current)}
+            className="mt-5 shrink-0 rounded-md bg-gray-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:mt-0"
+          >
+            {resultRevealed ? "Hide result" : "Reveal result"}
+          </button>
+        </div>
+        {resultRevealed ? (
+          <div className="border-x border-b border-gray-300 bg-amber-50 px-5 py-5" role="status">
+            <p className="text-xs font-black uppercase tracking-[0.08em] text-amber-800">Actual result</p>
+            <p className="mt-2 text-2xl font-black tabular-nums text-gray-950">
+              Idaho {target.idaho_score}, {target.opponent} {target.opponent_score}
+            </p>
+            <p className="mt-2 text-sm text-gray-700">The Vandals answered the rematch question with a three-point home win.</p>
+            <a className="mt-3 inline-block text-sm font-bold text-gray-800 underline decoration-amber-500 underline-offset-4" href={target.source_url} target="_blank" rel="noreferrer">Open the final box score</a>
+          </div>
+        ) : null}
+        <p className="mt-5 max-w-3xl text-xs leading-5 text-gray-500">
+          Method: {brief.methodology} {brief.evidence_game_count} eligible games were checked.
+        </p>
+      </section>
+    </article>
   );
 }
 
