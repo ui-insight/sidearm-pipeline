@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router";
 import AuthenticationBoundary from "./components/AuthenticationBoundary";
 import AppShell from "./components/AppShell";
 import HomePage from "./pages/HomePage";
