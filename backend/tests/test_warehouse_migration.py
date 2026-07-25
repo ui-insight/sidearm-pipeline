@@ -55,6 +55,19 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
             column["name"]
             for column in inspect(connection).get_columns("workspace_views")
         }
+        notability_policy_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("notability_policies")
+        }
+        achievement_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("achievement_suggestions")
+        }
+        policy_count = connection.scalar(
+            select(func.count()).select_from(
+                Table("notability_policies", metadata, autoload_with=connection)
+            )
+        )
         definition_count = connection.scalar(
             select(func.count()).select_from(stat_definitions)
         )
@@ -76,8 +89,12 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "coverage_windows",
         "data_quality_issues",
         "workspace_views",
+        "notability_policies",
+        "notability_policy_metrics",
+        "achievement_suggestions",
     }.issubset(tables)
     assert definition_count == 16
+    assert policy_count == 1
     assert program_slug == "womens-basketball"
     assert source_snapshot_columns["game_id"]["nullable"] is True
     assert {
@@ -100,6 +117,50 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "created_by",
         "created_at",
     }.issubset(workspace_view_columns)
+    assert {
+        "sport_program_id",
+        "version",
+        "scope_weights",
+        "top_n",
+        "active",
+    }.issubset(notability_policy_columns)
+    assert {
+        "game_id",
+        "player_id",
+        "achievement_type",
+        "computed_value",
+        "notability_score",
+        "coverage_context",
+    }.issubset(achievement_columns)
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "downgrade",
+            "0007_shared_workspace_views",
+        ],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    tables = set(inspect(engine).get_table_names())
+    engine.dispose()
+    assert "achievement_suggestions" not in tables
+    assert "notability_policies" not in tables
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     subprocess.run(
         [
@@ -221,6 +282,8 @@ def test_engine_registers_normalized_models_in_a_fresh_process() -> None:
         "coverage_windows",
         "data_quality_issues",
         "workspace_views",
+        "notability_policies",
+        "achievement_suggestions",
     }
     script = (
         "from app.db.engine import Base; "

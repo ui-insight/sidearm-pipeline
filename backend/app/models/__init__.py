@@ -4,6 +4,11 @@ Add one file per resource (e.g., user.py, project.py).
 Import all models here so they are registered with Base.metadata.
 """
 
+from app.models.achievement import (
+    AchievementSuggestion,
+    NotabilityPolicy,
+    NotabilityPolicyMetric,
+)
 from app.models.content import GeneratedContent
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
@@ -29,6 +34,7 @@ from app.models.team_season_stat import TeamSeasonStat
 from app.models.workspace_view import WorkspaceView
 
 __all__ = [
+    "AchievementSuggestion",
     "CoverageWindow",
     "DataQualityIssue",
     "EventSource",
@@ -36,6 +42,8 @@ __all__ = [
     "Game",
     "GeneratedContent",
     "IngestRun",
+    "NotabilityPolicy",
+    "NotabilityPolicyMetric",
     "OpponentAlias",
     "Player",
     "PlayerExternalIdentity",

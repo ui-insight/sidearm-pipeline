@@ -22,6 +22,7 @@ from app.models.game import (
     SourceSnapshot,
     TeamStat,
 )
+from app.services.achievement_detection import detect_achievement_suggestions
 from app.services.player_game_stat_import import replace_wbb_player_game_stats
 from app.services.sidearm_scraper import (
     ParsedBoxscore,
@@ -99,6 +100,9 @@ async def ingest_boxscore(
             snapshot=game.source_snapshots[-1],
             parsed=parsed,
         )
+    achievement_result = None
+    if normalized_result is not None and game.event_status == "final":
+        achievement_result = await detect_achievement_suggestions(db, game=game)
 
     _finish_successful_ingest_run(ingest_run, game, parsed, started_at)
     if normalized_result is not None:
@@ -110,6 +114,12 @@ async def ingest_boxscore(
                 normalized_result.player_rows_unresolved
             ),
             "normalized_player_game_stats_written": normalized_result.facts_written,
+        }
+    if achievement_result is not None:
+        ingest_run.run_metadata = {
+            **ingest_run.run_metadata,
+            "achievement_suggestions_written": (achievement_result.suggestions_written),
+            "achievement_policy_version": achievement_result.policy_version,
         }
     await db.commit()
     await db.refresh(
