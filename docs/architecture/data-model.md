@@ -16,7 +16,8 @@ The current schema supports:
   status history
 - storage of optional AI-generated coverage derived from a game record
 - deployment-wide saved workspace route and filter definitions
-- versioned WBB Notability policy and deterministic Achievement Suggestions
+- versioned WBB Notability policy, deterministic Achievement Suggestions, and
+  validated optional AI ordering and phrasing
 
 The current schema does not yet include ingest job tracking, operator audit logs,
 participant tables for non-boxscore event shapes, or website syndication
@@ -77,6 +78,12 @@ erDiagram
         decimal notability_score
         json context
         json coverage_context
+        string phrasing
+        int ai_rank
+        string ai_model
+        string ai_prompt_version
+        string ai_output_hash
+        datetime ai_ranked_at
         string state
     }
 

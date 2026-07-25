@@ -36,6 +36,7 @@ nav:
   - Architecture:
     - Overview: architecture/overview.md
     - Data Model: architecture/data-model.md
+    - Achievement AI Review: architecture/achievement-ai-review.md
     - Athletic Event Model: architecture/athletic-event-model.md
     - Source Registry: architecture/source-registry.md
     - Semantic Query Catalog: architecture/semantic-query-catalog.md

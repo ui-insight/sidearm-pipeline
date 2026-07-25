@@ -150,6 +150,11 @@ class AchievementSuggestion(Base):
         JSONType, default=dict, nullable=False
     )
     phrasing: Mapped[str | None] = mapped_column(String(1024))
+    ai_rank: Mapped[int | None] = mapped_column(Integer, index=True)
+    ai_model: Mapped[str | None] = mapped_column(String(128))
+    ai_prompt_version: Mapped[str | None] = mapped_column(String(64))
+    ai_output_hash: Mapped[str | None] = mapped_column(String(64))
+    ai_ranked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     state: Mapped[str] = mapped_column(
         String(32), default="pending", server_default="pending", index=True
     )

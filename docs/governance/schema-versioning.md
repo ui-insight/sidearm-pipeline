@@ -10,7 +10,7 @@ production deployment.
   `DEV_MODE=true`.
 - The repository has a linear, tested Alembic history from
   `0001_canonical_event_foundation` through
-  `0008_deterministic_achievements`.
+  `0009_ai_achievement_ranking`.
 - The migration suite upgrades a fresh database to `head`, checks ORM drift,
   and exercises rollback boundaries with SQLite in CI. PostgreSQL 16 remains
   the standard shared-deployment database.
@@ -45,6 +45,17 @@ change-management path for staging or production environments.
 
 ## Current Head
 
+`0009_ai_achievement_ranking` adds nullable AI ordering, model, prompt-version,
+output-hash, and ranking-timestamp fields to `achievement_suggestions`.
+Downgrading to `0008_deterministic_achievements` removes only those AI metadata
+fields and retains every deterministic suggestion and its optional phrasing.
+
+The AI fields remain nullable because deterministic detection is fully usable
+without model access. A validated ranking writes `phrasing`, `ai_rank`,
+`ai_model`, `ai_prompt_version`, `ai_output_hash`, and `ai_ranked_at` together.
+
+## Previous Head
+
 `0008_deterministic_achievements` creates the versioned Notability policy,
 metric-rule, and Achievement Suggestion tables. Downgrading to
 `0007_shared_workspace_views` removes those tables without affecting warehouse
@@ -71,13 +82,13 @@ Purpose:
 - retain the computed value, comparison value or rank, policy version, source
   snapshot, and a snapshot of the applicable Coverage Window
 - provide pending, approved, and rejected states for the later SID Verdict
-  workflow while leaving phrasing empty for the later AI-assistance phase
+  workflow and a nullable phrasing field for validated AI assistance
 
 The `all_time_top_n` detector name follows the issue contract, but its stored
 coverage context limits presentation to “since `<season>`” or “in available
 warehouse history” unless complete all-time coverage is actually verified.
 
-## Previous Head
+## Earlier Head
 
 `0007_shared_workspace_views` creates the deployment-wide saved-view table and
 its creator/time indexes. Downgrading to `0006_player_identity_resolutions`
