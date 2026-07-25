@@ -85,6 +85,16 @@ def test_sidearm_fetch_policy_settings_validate() -> None:
         build_settings(SIDEARM_FETCH_MAX_ATTEMPTS=0)
 
 
+def test_achievement_ai_candidate_limit_validates() -> None:
+    settings = build_settings(ACHIEVEMENT_AI_MAX_CANDIDATES=25)
+
+    assert settings.ACHIEVEMENT_AI_MAX_CANDIDATES == 25
+    with pytest.raises(ValueError):
+        build_settings(ACHIEVEMENT_AI_MAX_CANDIDATES=0)
+    with pytest.raises(ValueError):
+        build_settings(ACHIEVEMENT_AI_MAX_CANDIDATES=101)
+
+
 def test_security_check_rejects_default_secret_in_production() -> None:
     settings = build_settings(DEV_MODE=False)
 

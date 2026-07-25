@@ -131,7 +131,48 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "computed_value",
         "notability_score",
         "coverage_context",
+        "phrasing",
+        "ai_rank",
+        "ai_model",
+        "ai_prompt_version",
+        "ai_output_hash",
+        "ai_ranked_at",
     }.issubset(achievement_columns)
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "downgrade",
+            "0008_deterministic_achievements",
+        ],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    with engine.connect() as connection:
+        tables = set(inspect(connection).get_table_names())
+        achievement_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("achievement_suggestions")
+        }
+    engine.dispose()
+    assert "achievement_suggestions" in tables
+    assert "phrasing" in achievement_columns
+    assert "ai_rank" not in achievement_columns
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     subprocess.run(
         [

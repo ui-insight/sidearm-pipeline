@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import (
+    achievement_suggestions,
     auth,
     games,
     identity_resolution,
@@ -21,6 +22,11 @@ from app.schemas.health import HealthResponse, ReadinessResponse
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(
+    achievement_suggestions.router,
+    prefix="/achievement-suggestions",
+    tags=["achievement-suggestions"],
+)
 api_router.include_router(
     record_book.router,
     prefix="/record-book",
