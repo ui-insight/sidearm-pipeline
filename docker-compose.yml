@@ -26,6 +26,10 @@ services:
       - DEV_MODE=${DEV_MODE:-true}
       - UPLOAD_DIR=/app/uploads
       - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:5173","http://localhost:9200"]}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
+      - ACHIEVEMENT_MODEL=${ACHIEVEMENT_MODEL:-claude-opus-4-7}
+      - ACHIEVEMENT_AI_MAX_CANDIDATES=${ACHIEVEMENT_AI_MAX_CANDIDATES:-100}
     volumes:
       - uploads:/app/uploads
     depends_on:
