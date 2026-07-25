@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.db.seed import seed_warehouse_reference_data
+from app.models.achievement import NotabilityPolicy, NotabilityPolicyMetric
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import Game
@@ -31,6 +32,10 @@ async def test_reference_seed_is_idempotent(db_session) -> None:
         select(func.count(Team.id)).where(Team.slug == "idaho")
     )
     definition_count = await db_session.scalar(select(func.count(StatDefinition.id)))
+    policy_count = await db_session.scalar(select(func.count(NotabilityPolicy.id)))
+    policy_metric_count = await db_session.scalar(
+        select(func.count(NotabilityPolicyMetric.id))
+    )
     points = await db_session.scalar(
         select(StatDefinition).where(StatDefinition.stat_key == "points")
     )
@@ -41,6 +46,8 @@ async def test_reference_seed_is_idempotent(db_session) -> None:
     assert program_count == 1
     assert idaho_count == 1
     assert definition_count == 16
+    assert policy_count == 1
+    assert policy_metric_count == 10
     assert points is not None
     assert points.aggregation_method == "sum"
     assert points.record_book_eligible is True

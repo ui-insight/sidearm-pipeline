@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 
 from app.db.seed import seed_warehouse_reference_data
+from app.models.achievement import AchievementSuggestion
 from app.models.data_quality_issue import DataQualityIssue
 from app.models.game import IngestRun, PlayerStatGroup, SourceSnapshot
 from app.models.player import Player, PlayerExternalIdentity, PlayerSeason
@@ -92,6 +93,10 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
     assert await db_session.scalar(select(func.count(PlayerStatGroup.id))) == 0
     assert await db_session.scalar(select(func.count(SourceSnapshot.id))) == 1
     assert await db_session.scalar(select(func.count(DataQualityIssue.id))) == 10
+    first_suggestion_count = await db_session.scalar(
+        select(func.count(AchievementSuggestion.id))
+    )
+    assert first_suggestion_count > 0
 
     kyra = await db_session.scalar(
         select(Player).where(Player.display_name == "Gardner, Kyra")
@@ -148,6 +153,10 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
     assert ingest_run.run_metadata["normalized_player_rows_resolved"] == 9
     assert ingest_run.run_metadata["normalized_player_rows_unresolved"] == 10
     assert ingest_run.run_metadata["normalized_player_game_stats_written"] == 144
+    assert ingest_run.run_metadata["achievement_suggestions_written"] == (
+        first_suggestion_count
+    )
+    assert ingest_run.run_metadata["achievement_policy_version"] == 1
 
     queue_response = await client.get("/api/v1/identity-resolution/queue")
     assert queue_response.status_code == 200
@@ -172,6 +181,10 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
     assert await db_session.scalar(select(func.count(PlayerStatGroup.id))) == 0
     assert await db_session.scalar(select(func.count(SourceSnapshot.id))) == 2
     assert await db_session.scalar(select(func.count(DataQualityIssue.id))) == 10
+    assert (
+        await db_session.scalar(select(func.count(AchievementSuggestion.id)))
+        == first_suggestion_count
+    )
 
     latest_snapshot_id = await db_session.scalar(select(func.max(SourceSnapshot.id)))
     fact_snapshot_ids = set(

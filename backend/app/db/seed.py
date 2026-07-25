@@ -1,8 +1,11 @@
 """Idempotent reference-data seeds for local warehouse development."""
 
+from decimal import Decimal
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.achievement import NotabilityPolicy, NotabilityPolicyMetric
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.models.team import Team
@@ -158,6 +161,29 @@ WBB_STAT_DEFINITIONS = (
     },
 )
 
+WBB_NOTABILITY_POLICY_VERSION = 1
+WBB_SCOPE_WEIGHTS = {
+    "season_high": "2.0",
+    "career_high": "3.0",
+    "threshold_crossing": "4.0",
+    "all_time_top_n": "5.0",
+}
+WBB_NOTABILITY_METRICS = {
+    "points": {"weight": "1.0", "thresholds": [1000, 1500, 2000]},
+    "total_rebounds": {"weight": "0.9", "thresholds": [500, 750, 1000]},
+    "assists": {"weight": "0.9", "thresholds": [250, 500]},
+    "steals": {"weight": "0.8", "thresholds": [100, 200]},
+    "blocks": {"weight": "0.8", "thresholds": [100, 200]},
+    "three_point_field_goals_made": {
+        "weight": "0.8",
+        "thresholds": [100, 200],
+    },
+    "field_goals_made": {"weight": "0.7", "thresholds": [250, 500]},
+    "free_throws_made": {"weight": "0.6", "thresholds": [250, 500]},
+    "offensive_rebounds": {"weight": "0.7", "thresholds": [250, 500]},
+    "defensive_rebounds": {"weight": "0.7", "thresholds": [250, 500]},
+}
+
 
 async def seed_warehouse_reference_data(session: AsyncSession) -> None:
     """Create the WBB program, Idaho team, and atomic stat definitions once."""
@@ -209,5 +235,53 @@ async def seed_warehouse_reference_data(session: AsyncSession) -> None:
                 sport_program_id=program.id,
                 entity_scope="player",
                 **definition_values,
+            )
+        )
+    await session.flush()
+
+    policy = await session.scalar(
+        select(NotabilityPolicy).where(
+            NotabilityPolicy.sport_program_id == program.id,
+            NotabilityPolicy.version == WBB_NOTABILITY_POLICY_VERSION,
+        )
+    )
+    if policy is None:
+        policy = NotabilityPolicy(
+            sport_program_id=program.id,
+            version=WBB_NOTABILITY_POLICY_VERSION,
+            name="WBB seed notability rubric",
+            scope_weights=WBB_SCOPE_WEIGHTS,
+            top_n=10,
+            active=True,
+        )
+        session.add(policy)
+        await session.flush()
+
+    existing_metric_ids = set(
+        await session.scalars(
+            select(NotabilityPolicyMetric.stat_definition_id).where(
+                NotabilityPolicyMetric.notability_policy_id == policy.id
+            )
+        )
+    )
+    definitions_by_key = {
+        definition.stat_key: definition
+        for definition in await session.scalars(
+            select(StatDefinition).where(
+                StatDefinition.sport_program_id == program.id,
+                StatDefinition.entity_scope == "player",
+            )
+        )
+    }
+    for stat_key, rule in WBB_NOTABILITY_METRICS.items():
+        definition = definitions_by_key[stat_key]
+        if definition.id in existing_metric_ids:
+            continue
+        session.add(
+            NotabilityPolicyMetric(
+                notability_policy_id=policy.id,
+                stat_definition_id=definition.id,
+                importance_weight=Decimal(rule["weight"]),
+                thresholds=rule["thresholds"],
             )
         )

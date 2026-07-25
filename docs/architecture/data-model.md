@@ -16,6 +16,7 @@ The current schema supports:
   status history
 - storage of optional AI-generated coverage derived from a game record
 - deployment-wide saved workspace route and filter definitions
+- versioned WBB Notability policy and deterministic Achievement Suggestions
 
 The current schema does not yet include ingest job tracking, operator audit logs,
 participant tables for non-boxscore event shapes, or website syndication
@@ -32,6 +33,10 @@ erDiagram
     Game ||--o{ SourceSnapshot : has
     Game ||--o{ EventStatusHistory : has
     Game ||--o{ GeneratedContent : has
+    Game ||--o{ AchievementSuggestion : produces
+    NotabilityPolicy ||--o{ NotabilityPolicyMetric : defines
+    NotabilityPolicy ||--o{ AchievementSuggestion : scores
+    CoverageWindow ||--o{ AchievementSuggestion : bounds
 
     WorkspaceView {
         string id PK
@@ -40,6 +45,39 @@ erDiagram
         json params
         string created_by
         datetime created_at
+    }
+
+    NotabilityPolicy {
+        int id PK
+        int sport_program_id FK
+        int version
+        json scope_weights
+        int top_n
+        bool active
+    }
+
+    NotabilityPolicyMetric {
+        int id PK
+        int notability_policy_id FK
+        int stat_definition_id FK
+        decimal importance_weight
+        json thresholds
+        bool suppressed
+    }
+
+    AchievementSuggestion {
+        int id PK
+        int game_id FK
+        int player_id FK
+        int stat_definition_id FK
+        int notability_policy_id FK
+        int coverage_window_id FK
+        string achievement_type
+        decimal computed_value
+        decimal notability_score
+        json context
+        json coverage_context
+        string state
     }
 
     Game {

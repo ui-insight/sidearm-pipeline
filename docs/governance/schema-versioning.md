@@ -10,13 +10,14 @@ production deployment.
   `DEV_MODE=true`.
 - The repository has a linear, tested Alembic history from
   `0001_canonical_event_foundation` through
-  `0007_shared_workspace_views`.
+  `0008_deterministic_achievements`.
 - The migration suite upgrades a fresh database to `head`, checks ORM drift,
   and exercises rollback boundaries with SQLite in CI. PostgreSQL 16 remains
   the standard shared-deployment database.
 - The current persisted model includes the canonical event foundation, ingest
   history, normalized warehouse, roster provenance, reviewed identity
-  resolutions, and shared workspace route definitions.
+  resolutions, shared workspace route definitions, versioned Notability policy,
+  and deterministic Achievement Suggestions.
 
 ORM `create_all` remains a local and test convenience. It is not the schema
 change-management path for staging or production environments.
@@ -43,6 +44,40 @@ change-management path for staging or production environments.
 - [ ] [Data Classification](data-classification.md) updated if classification changed
 
 ## Current Head
+
+`0008_deterministic_achievements` creates the versioned Notability policy,
+metric-rule, and Achievement Suggestion tables. Downgrading to
+`0007_shared_workspace_views` removes those tables without affecting warehouse
+facts or shared workspace views.
+
+### `notability_policies` and `notability_policy_metrics`
+
+Defined in `backend/app/models/achievement.py`.
+
+Purpose:
+- retain immutable, sport-specific policy versions so earlier scores remain
+  reproducible
+- keep editorial importance weights, thresholds, and suppression rules separate
+  from stable `StatDefinition` semantics per ADR-008
+- assign deterministic scope weights and a program top-N boundary
+
+### `achievement_suggestions`
+
+Defined in `backend/app/models/achievement.py`.
+
+Purpose:
+- persist career highs, season highs, career threshold crossings, and program
+  top-N game performances computed after a final WBB boxscore ingest
+- retain the computed value, comparison value or rank, policy version, source
+  snapshot, and a snapshot of the applicable Coverage Window
+- provide pending, approved, and rejected states for the later SID Verdict
+  workflow while leaving phrasing empty for the later AI-assistance phase
+
+The `all_time_top_n` detector name follows the issue contract, but its stored
+coverage context limits presentation to “since `<season>`” or “in available
+warehouse history” unless complete all-time coverage is actually verified.
+
+## Previous Head
 
 `0007_shared_workspace_views` creates the deployment-wide saved-view table and
 its creator/time indexes. Downgrading to `0006_player_identity_resolutions`
