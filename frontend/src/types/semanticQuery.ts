@@ -142,3 +142,14 @@ export interface PlayerGameSplitResult {
   query_id: "player_game_split";
   result: PlayerGameSplit;
 }
+
+export interface SemanticQuestionAnswer {
+  status: "answered" | "unanswerable";
+  question: string;
+  answer: string;
+  query_id: string | null;
+  query: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+  model: string;
+  prompt_version: string;
+}

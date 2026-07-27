@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     CONTENT_MODEL: str = "claude-opus-4-7"
     ACHIEVEMENT_MODEL: str = "claude-opus-4-7"
     ACHIEVEMENT_AI_MAX_CANDIDATES: int = Field(default=100, ge=1, le=100)
+    NLQ_MODEL: str | None = None
 
     @staticmethod
     def parse_cors_origins(value: str) -> list[str]:

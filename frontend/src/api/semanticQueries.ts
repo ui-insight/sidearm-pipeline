@@ -4,6 +4,7 @@ import type {
   ConferenceScope,
   OpponentStatLeadersResult,
   PlayerGameSplitResult,
+  SemanticQuestionAnswer,
   SemanticWorkspaceOptions,
   StatLeadersResult,
   TeamSeasonRecordResult,
@@ -13,6 +14,9 @@ import type {
 export const semanticQueriesApi = {
   options: () =>
     api.get<SemanticWorkspaceOptions>("/semantic-queries/options"),
+
+  ask: (question: string) =>
+    api.post<SemanticQuestionAnswer>("/semantic-queries/ask", { question }),
 
   teamSeasonRecord: (
     season: string,

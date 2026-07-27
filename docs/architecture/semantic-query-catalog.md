@@ -78,6 +78,27 @@ The abbreviated example omits other response fields. Source URLs and snapshot ID
 are included on the evidence rows returned by career-total, opponent-leaderboard,
 and game-split queries.
 
+## Natural-language question workflow
+
+`POST /api/v1/semantic-queries/ask` accepts one SID question. The model receives
+the catalog schemas plus warehouse-backed player, season, metric, opponent, and
+leader-limit options. It may return one typed query request or mark the question
+unanswerable. The service rejects unknown query IDs, invalid parameters, and
+values absent from the available options. It never accepts model-authored SQL.
+
+For a supported question, the application executes the selected SQLAlchemy query
+before making a separate phrasing request. The phrasing model sees only the
+question, validated query, and serialized warehouse result. A numerical guard
+rejects answers containing a number absent from that result. The response keeps
+the selected query and complete typed result beside the generated answer so an
+SID can inspect the evidence before using it.
+
+Unsupported questions return HTTP 200 with `status: "unanswerable"`, no query,
+and no result. Invalid or unsafe model output returns a gateway error and never
+falls through to free-form query execution. The `/ask` interface presents both
+states directly and places the raw warehouse result behind an evidence
+disclosure.
+
 ## Exploratory Workspace consumer
 
 The first workspace slice is the **Season desk** at `/workspace`. For all
@@ -114,16 +135,16 @@ evidence, and opening either reruns the current governed query. The current
 prototype session uses a shared credential, so `created_by` is context rather
 than ownership and every authenticated operator can delete a shared entry. True
 per-person accounts and RBAC, multi-player comparisons, multi-season opponent
-leaderboards, and free-form questions remain later work built on the same
-bounded catalog.
+leaderboards and broader query types require additions to the same bounded
+catalog.
 
 ## Deterministic boundary
 
 All aggregation, record classification, filters, and ranking are expressed as
 reviewed SQLAlchemy statements over the warehouse. Application code validates and
-serializes results; it does not accept raw SQL. A future AI layer may choose one of
-these query IDs and fill its documented parameters. If no catalog entry matches a
-question, the correct answer is that the question is not supported yet.
+serializes results; it does not accept raw SQL. The AI layer may choose one of
+these query IDs and fill its documented parameters. If no catalog entry matches
+a question, the correct answer is that the question is not supported yet.
 
 Adding a query requires:
 

@@ -65,6 +65,9 @@ function AppShell({
             <NavLink to="/workspace" className={navClass}>
               Workspace
             </NavLink>
+            <NavLink to="/ask" className={navClass}>
+              Ask
+            </NavLink>
             <NavLink to="/achievements" className={navClass}>
               Achievements
             </NavLink>
