@@ -77,10 +77,18 @@ required operational policy until automation is added.
 | Data Category | Retention Period | Disposal Method |
 |---|---|---|
 | Normalized game and stat records | Retain as part of the athletics historical event archive unless superseded by a future archive policy | Archive or export before destructive purge |
-| Raw Sidearm HTML snapshots | Retain with the parent game record until raw-snapshot retention automation is implemented; target future policy is one year from final ingest | Delete with auditability once retention automation exists |
+| Raw Sidearm source snapshots | Retain with the related source/game record until raw-snapshot retention automation is implemented; target future policy is one year from final ingest | Delete with an auditable disposal record once retention automation exists |
 | Generated coverage drafts | Retain with the parent game record unless athletics communications adopts a different editorial retention rule | Delete or archive with the parent event when policy changes |
-| Operational ingest and audit metadata | Minimum one year once dedicated tables are implemented | Archive then delete per operational policy |
+| Ingest-run operational metadata | Minimum one year; enforcement is currently an operational responsibility because automated expiration is not implemented | Archive then delete per operational policy |
+| Data-quality issues and identity resolutions | Retain with the affected warehouse facts while those facts remain active; preserve enough history to explain corrections | Archive with the warehouse record before destructive purge |
+| Achievement Suggestions, AI provenance, and current SID verdict | Retain with the source game and applicable policy version; an immutable verdict-event history is not yet implemented | Archive with the game or future editorial audit record |
+| Shared workspace views | Retain until an authenticated user deletes the shared definition or a future workspace policy expires it | Delete through the authenticated workspace API |
 | Secrets and service credentials | Retain only while active and necessary | Rotate, revoke, and remove from secret storage when no longer needed |
+
+Retention periods are policy targets, not claims of automated enforcement. Raw
+snapshot, ingest-run, and editorial-record expiration jobs do not currently
+exist. Production owners must document who executes and verifies disposal until
+automation and immutable audit events are implemented.
 
 ## Documentation Obligations
 

@@ -103,8 +103,12 @@ Coverage Window.
 
 **Verdict**:
 The SID's approve/reject decision on a suggested achievement. Beyond gating what ships,
-verdicts are a **tuning signal** for an explicit, versioned Notability-policy revision.
-They do not silently mutate metric meaning or rewrite prior decisions.
+verdicts are a governed tuning signal. The current conservative feedback calibration
+may down-weight later suggestions of the same metric and achievement type; each result
+stores its prior counts, multiplier, and policy version so the score is reproducible.
+Changes to the formula or broader editorial weights require an explicit ADR or new
+Notability-policy version. Verdicts never mutate metric meaning or rewrite prior facts.
+See ADR-009.
 _Avoid_: "review" (the act is a verdict; "review view" is where verdicts happen)
 
 **Ask-a-Question (NLQ)**:

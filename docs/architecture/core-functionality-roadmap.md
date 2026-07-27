@@ -1,5 +1,11 @@
 # Core Functionality Roadmap
 
+!!! note "Legacy website-delivery roadmap"
+    The July 2026 [Reboot Implementation Plan](reboot-implementation-plan.md) and
+    ADR-006 supersede this document's sequencing and Release 1 definition. Keep
+    this page as background for later website syndication work; do not use its
+    release labels as current commitments.
+
 This roadmap defines the core product path for Vandals Stats Pipeline: a reliable
 integration that pulls Sidearm event data, stores it in a normalized application
 database, and publishes website-ready data to the athletics web experience.
@@ -15,7 +21,9 @@ Build a trusted data pipeline that:
 
 ## Implementation Status
 
-Last updated: April 24, 2026.
+Historical snapshot: April 24, 2026. For current implementation status, use the
+[Reboot Implementation Plan](reboot-implementation-plan.md),
+[As-Built Data Model](data-model.md), and API documentation.
 
 Implemented:
 

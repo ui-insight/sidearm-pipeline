@@ -10,7 +10,7 @@ production deployment.
   `DEV_MODE=true`.
 - The repository has a linear, tested Alembic history from
   `0001_canonical_event_foundation` through
-  `0009_ai_achievement_ranking`.
+  `0010_achievement_review_verdicts`.
 - The migration suite upgrades a fresh database to `head`, checks ORM drift,
   and exercises rollback boundaries with SQLite in CI. PostgreSQL 16 remains
   the standard shared-deployment database.
@@ -45,11 +45,15 @@ change-management path for staging or production environments.
 
 ## Current Head
 
+`0010_achievement_review_verdicts` adds nullable `reviewed_by` and `reviewed_at`
+provenance for SID approval and rejection decisions. Downgrading to
+`0009_ai_achievement_ranking` removes those two review-provenance fields while
+retaining deterministic suggestions and AI ranking metadata.
+
+## Previous Head
+
 `0009_ai_achievement_ranking` adds nullable AI ordering, model, prompt-version,
 output-hash, and ranking-timestamp fields to `achievement_suggestions`.
-
-Migration `0010_achievement_review_verdicts` adds reviewer and review-timestamp
-provenance for SID approval and rejection decisions.
 Downgrading to `0008_deterministic_achievements` removes only those AI metadata
 fields and retains every deterministic suggestion and its optional phrasing.
 
@@ -57,7 +61,7 @@ The AI fields remain nullable because deterministic detection is fully usable
 without model access. A validated ranking writes `phrasing`, `ai_rank`,
 `ai_model`, `ai_prompt_version`, `ai_output_hash`, and `ai_ranked_at` together.
 
-## Previous Head
+## Earlier Head
 
 `0008_deterministic_achievements` creates the versioned Notability policy,
 metric-rule, and Achievement Suggestion tables. Downgrading to
@@ -91,8 +95,11 @@ The `all_time_top_n` detector name follows the issue contract, but its stored
 coverage context limits presentation to “since `<season>`” or “in available
 warehouse history” unless complete all-time coverage is actually verified.
 
-## Earlier Head
+## Earlier Warehouse History
 
 `0007_shared_workspace_views` creates the deployment-wide saved-view table and
 its creator/time indexes. Downgrading to `0006_player_identity_resolutions`
 removes that table without affecting warehouse or identity-resolution data.
+
+The complete executable history remains in `backend/migrations/versions/`; this
+page summarizes the current boundary rather than duplicating every operation.

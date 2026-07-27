@@ -15,8 +15,13 @@ The project currently provides:
 
 - **Tech Stack**: React 19 + TypeScript + Tailwind CSS frontend, FastAPI + SQLAlchemy backend, PostgreSQL standard database
 - **Structured ingestion**: Sidearm scraping and normalized storage for games, team stats, player stat groups, and scoring plays
-- **Internal review UI**: list and detail views for ingested games
+- **Normalized warehouse**: canonical programs, teams, players, roster membership, metric definitions, and long-form game/season facts with source provenance
+- **Historical operations**: roster, schedule, boxscore, cumulative-season, and resumable range backfills with ingest-run history
+- **Data trust workflows**: identity-resolution queue, reconciliation issues, and explicit coverage windows
+- **Internal review UI**: game detail, exploratory workspace, player comparison, backfill, identity, and achievement-review views
 - **Record Book preview**: evidence-backed WBB leaderboards driven by the eligible metric catalog, with explicit coverage windows
+- **Governed questions**: deterministic semantic-query catalog, Ask-a-Question mapping, and historical pregame briefs
+- **Achievement workflow**: deterministic suggestions, optional validated AI ranking/phrasing, and SID verdict capture
 - **Documentation Standards**: MkDocs Material site with architecture, governance, and security docs
 - **Data Governance**: classification, lineage, retention, and schema-versioning guidance
 - **Security Standards**: dependency scanning, configuration checks, and launch-readiness guidance
@@ -188,8 +193,9 @@ cd backend
 ./.venv/bin/alembic upgrade head
 ```
 
-The scaffold still auto-creates tables in `DEV_MODE=true` for quick local starts,
-but Postgres plus Alembic is the standard path once the app has real schema history.
+The application still auto-creates tables in `DEV_MODE=true` for quick local
+starts, but PostgreSQL plus Alembic is the standard shared and production path.
+The current migration head is `0010_achievement_review_verdicts`.
 
 ### End-to-End Smoke Test
 

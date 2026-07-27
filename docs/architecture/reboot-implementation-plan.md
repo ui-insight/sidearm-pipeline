@@ -57,30 +57,30 @@ historical claim must say "since `<season>`" or "within warehouse history," not
 8. **Safe before shared.** Authentication, authorization, recovery, and basic
    monitoring are Release 1 pilot gates, not post-pilot hardening.
 
-## Current baseline
+## Current implementation status
 
-The repository already provides a credible ingestion foundation:
+The repository now implements substantial WBB vertical slices described across
+Phases 1–8:
 
-- canonical event identity and idempotent event refresh
-- schedule discovery and persisted schedule import
-- five registered team-contest sports
-- source snapshots, content hashes, parser versions, and event status history
-- durable ingest-run history plus timeout and retry behavior
-- internal game-list and boxscore-detail views
-- passing backend, frontend, browser-smoke, and documentation checks
+- canonical programs, teams, players, external identities, roster membership,
+  metric definitions, and normalized game/season facts
+- schedule, roster, boxscore, cumulative-season, one-season backfill, and
+  resumable range-backfill paths with source snapshots and ingest-run evidence
+- identity-resolution and data-quality queues plus explicit Coverage Windows and
+  sum-to-season reconciliation
+- Record Book, semantic-query catalog, exploratory workspace, player comparison,
+  shared workspace views, CSV export, and historical pregame briefs
+- deterministic Achievement Suggestions, optional validated AI ranking/phrasing,
+  and an authenticated SID verdict queue
 
-It is not yet an Athletic Data Warehouse:
+The legacy source-shaped `PlayerStatGroup` tables remain for game-detail
+compatibility, but governed Record Book and semantic queries use normalized facts.
 
-- player statistics are stored as opaque `PlayerStatGroup` JSON tables
-- there is no canonical `Player`, team/opponent dimension, normalized stat fact,
-  Record Book, reconciliation queue, semantic layer, or exploratory interface
-- the current women's basketball parser fixture proves scores and team stats but
-  does not include player rows or player-bio links
-- the current player-table classifier is primarily shaped around football
-  categories, so WBB player-stat coverage is not yet demonstrated
-- scheduled ingestion and validation code on the intern branches must be adapted,
-  not accepted as production-ready orchestration
-- write endpoints have no staff authentication or role checks
+Release 1 is still not production-complete. Phase -1 source-contract/SID decisions
+remain external governance work, and Phase 9 still requires individual identity,
+RBAC, immutable consequential-action auditing, backup/restore evidence, monitoring,
+and an operational scheduling/ownership decision. Public website syndication and
+generalized non-team-contest result models remain later work.
 
 ## Phase -1 — Source contract and product discovery
 

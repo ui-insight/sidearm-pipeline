@@ -125,12 +125,15 @@ This public GoVandals HTML is a publication-surface fallback while Athletics and
 Sidearm confirm the supported authoritative file, feed, or API. It must not be
 represented as an all-time or permanent source contract.
 
-## Next Uses
+## Remaining boundaries
 
-The next ingestion slice should use the registry to:
+The registry now drives schedule import, canonical event/source persistence,
+roster and season-stat paths, and final boxscore synchronization for the WBB
+vertical slice. Remaining work is to:
 
-- persist discovered schedule events as canonical event records
-- associate schedule, boxscore, recap, live-stat, and gamefile URLs in
-  `event_sources`
-- enqueue final boxscore ingestion for completed events with boxscore links
-- record source type and polling expectations in future ingest job records
+- confirm a supported authoritative machine-to-machine source contract with
+  Athletics and Sidearm instead of assuming public HTML is permanent
+- persist scheduling/worker ownership and cadence rather than relying only on
+  operator-invoked synchronization
+- characterize and implement new event/result shapes before adding tennis, golf,
+  cross country, track and field, or swimming and diving
