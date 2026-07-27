@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from anthropic import AsyncAnthropic, AuthenticationError
@@ -244,12 +245,49 @@ def _strip_code_fence(value: str) -> str:
 
 def _validate_answer_numbers(answer: str, result: dict[str, Any]) -> None:
     available = set(_NUMBER_PATTERN.findall(json.dumps(result)))
+    available_decimals = {
+        normalized
+        for token in available
+        if (normalized := _normalized_decimal(token)) is not None
+    }
+    allowed_records = _allowed_compact_records(result)
     supplied = set(_NUMBER_PATTERN.findall(answer))
-    if not supplied.issubset(available):
+    rejected = {
+        token
+        for token in supplied
+        if token not in available
+        and token not in allowed_records
+        and _normalized_decimal(token) not in available_decimals
+    }
+    if rejected:
         raise SemanticQuestionAIError(
             "The model phrasing introduced a number not present in the warehouse "
             "result."
         )
+
+
+def _normalized_decimal(token: str) -> Decimal | None:
+    """Normalize display precision while leaving seasons and records intact."""
+    if "-" in token:
+        return None
+    try:
+        return Decimal(token.replace(",", ""))
+    except InvalidOperation:
+        return None
+
+
+def _allowed_compact_records(result: dict[str, Any]) -> set[str]:
+    """Allow a team record composed directly from returned wins and losses."""
+    if result.get("query_id") != "team_season_record":
+        return set()
+    warehouse_result = result.get("result")
+    if not isinstance(warehouse_result, dict):
+        return set()
+    wins = warehouse_result.get("wins")
+    losses = warehouse_result.get("losses")
+    if not isinstance(wins, int) or not isinstance(losses, int):
+        return set()
+    return {f"{wins}-{losses}"}
 
 
 def _query_uses_available_values(
@@ -261,7 +299,6 @@ def _query_uses_available_values(
         "stat_key": {metric["stat_key"] for metric in available["metrics"]},
         "player_id": {player["player_id"] for player in available["players"]},
         "opponent": set(available["opponents"]),
-        "limit": set(available["leader_limits"]),
     }
     return all(
         key not in query or query[key] is None or query[key] in allowed
