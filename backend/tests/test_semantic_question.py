@@ -134,3 +134,41 @@ async def test_ask_validates_question_length(client) -> None:
         "/api/v1/semantic-queries/ask", json={"question": "   "}
     )
     assert whitespace.status_code == 422
+
+
+def test_answer_number_guard_accepts_decimal_display_and_compact_record() -> None:
+    result = {
+        "query_id": "team_season_record",
+        "result": {
+            "season": "2025-26",
+            "wins": 29,
+            "losses": 6,
+            "leader_total": "287.000000",
+        },
+    }
+
+    semantic_question._validate_answer_numbers(
+        "Idaho finished 29-6 in 2025-26.", result
+    )
+    semantic_question._validate_answer_numbers(
+        "The leader recorded 287 rebounds.", result
+    )
+
+
+def test_available_value_guard_accepts_schema_valid_leader_limit() -> None:
+    query = {
+        "query_id": "stat_leaders",
+        "stat_key": "points",
+        "scope": "season",
+        "season": "2025-26",
+        "limit": 1,
+    }
+    available = {
+        "seasons": ["2025-26"],
+        "metrics": [{"stat_key": "points"}],
+        "players": [],
+        "opponents": [],
+        "leader_limits": [5, 10, 15, 25],
+    }
+
+    assert semantic_question._query_uses_available_values(query, available)
