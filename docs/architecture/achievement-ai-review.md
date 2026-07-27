@@ -85,3 +85,26 @@ model or credentials are unavailable. Validated phrasing and ordering are saved
 with the model name, prompt version, SHA-256 phrase hash, and ranking timestamp.
 This AI output remains a suggestion; the later Verdict workflow controls
 approval or rejection.
+
+## SID verdict workflow
+
+The authenticated `/achievements` workspace shows only ranked suggestions with
+validated phrasing. Suggestions are grouped by game and retain their AI order,
+warehouse fact, source snapshot, and Coverage Window qualification. The queue
+supports three durable states: `pending`, `approved`, and `rejected`.
+
+- `GET /api/v1/achievement-suggestions/review-queue` returns a paged game queue
+  for one state and counts for all three states.
+- `PATCH /api/v1/achievement-suggestions/{suggestion_id}/verdict` records an
+  `approved` or `rejected` verdict with the authenticated reviewer and time.
+- Re-ingesting the same game preserves AI phrasing and SID verdicts only while
+  the verified fact and Coverage Window remain unchanged. Changed facts return
+  to pending and require fresh ranking and review.
+- The Record Book and source snapshot remain directly accessible from review.
+
+Verdicts tune only notability, never facts. For each metric and achievement
+type, later detection runs apply the prior approval rate with two virtual
+approvals: `(approved + 2) / (approved + rejected + 2)`. This starts at `1.0`,
+never boosts a pattern, and progressively down-weights patterns rejected by the
+SID. The base score, multiplier, and prior counts are retained in suggestion
+context for explanation and testing.

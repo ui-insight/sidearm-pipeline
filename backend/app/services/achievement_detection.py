@@ -40,6 +40,24 @@ class AchievementDetectionResult:
     policy_version: int | None
 
 
+@dataclass(frozen=True)
+class _FeedbackSummary:
+    """Prior SID verdict counts for one metric and achievement pattern."""
+
+    approved: int = 0
+    rejected: int = 0
+
+    @property
+    def multiplier(self) -> Decimal:
+        """Return a conservative Bayesian down-weight, never an up-weight."""
+        reviewed = self.approved + self.rejected
+        if reviewed == 0:
+            return Decimal("1")
+        return (Decimal(self.approved + 2) / Decimal(reviewed + 2)).quantize(
+            Decimal("0.001")
+        )
+
+
 async def detect_achievement_suggestions(
     db: AsyncSession,
     *,
@@ -49,6 +67,32 @@ async def detect_achievement_suggestions(
     if game.id is None:
         raise ValueError("Game must be flushed before achievement detection")
 
+    existing_editorial = {
+        suggestion.suggestion_key: {
+            "facts": (
+                suggestion.computed_value,
+                suggestion.comparison_value,
+                suggestion.rank,
+                suggestion.coverage_context,
+            ),
+            "fields": {
+                "phrasing": suggestion.phrasing,
+                "ai_rank": suggestion.ai_rank,
+                "ai_model": suggestion.ai_model,
+                "ai_prompt_version": suggestion.ai_prompt_version,
+                "ai_output_hash": suggestion.ai_output_hash,
+                "ai_ranked_at": suggestion.ai_ranked_at,
+                "state": suggestion.state,
+                "reviewed_at": suggestion.reviewed_at,
+                "reviewed_by": suggestion.reviewed_by,
+            },
+        }
+        for suggestion in await db.scalars(
+            select(AchievementSuggestion).where(
+                AchievementSuggestion.game_id == game.id
+            )
+        )
+    }
     await db.execute(
         delete(AchievementSuggestion).where(AchievementSuggestion.game_id == game.id)
     )
@@ -107,6 +151,7 @@ async def detect_achievement_suggestions(
     players: set[int] = set()
     metrics: set[int] = set()
     suggestions: list[AchievementSuggestion] = []
+    feedback = await _feedback_by_pattern(db, policy_id=policy.id, game_id=game.id)
     prior_game = _prior_game_condition(game)
     for fact, definition, metric_rule in current_rows:
         players.add(fact.player_id)
@@ -125,18 +170,29 @@ async def detect_achievement_suggestions(
             season=game.season,
         )
         coverage_context = _coverage_context(coverage, game.season)
-        suggestions.extend(
-            _suggestions_for_fact(
-                game=game,
-                fact=fact,
-                definition=definition,
-                metric_rule=metric_rule,
-                policy=policy,
-                history=history,
-                coverage=coverage,
-                coverage_context=coverage_context,
-            )
+        detected = _suggestions_for_fact(
+            game=game,
+            fact=fact,
+            definition=definition,
+            metric_rule=metric_rule,
+            policy=policy,
+            history=history,
+            coverage=coverage,
+            coverage_context=coverage_context,
+            feedback=feedback,
         )
+        for suggestion in detected:
+            editorial = existing_editorial.get(suggestion.suggestion_key)
+            current_facts = (
+                suggestion.computed_value,
+                suggestion.comparison_value,
+                suggestion.rank,
+                suggestion.coverage_context,
+            )
+            if editorial is not None and editorial["facts"] == current_facts:
+                for field, value in editorial["fields"].items():
+                    setattr(suggestion, field, value)
+        suggestions.extend(detected)
 
     db.add_all(suggestions)
     await db.flush()
@@ -155,6 +211,46 @@ class _HistoryContext:
     career_total_before: Decimal
     program_rank: int
     tied_at_rank: int
+
+
+async def _feedback_by_pattern(
+    db: AsyncSession,
+    *,
+    policy_id: int,
+    game_id: int,
+) -> dict[tuple[int, str], _FeedbackSummary]:
+    """Aggregate earlier SID verdicts for deterministic notability tuning."""
+    rows = (
+        await db.execute(
+            select(
+                AchievementSuggestion.stat_definition_id,
+                AchievementSuggestion.achievement_type,
+                AchievementSuggestion.state,
+                func.count(AchievementSuggestion.id),
+            )
+            .where(
+                AchievementSuggestion.notability_policy_id == policy_id,
+                AchievementSuggestion.game_id != game_id,
+                AchievementSuggestion.state.in_(("approved", "rejected")),
+            )
+            .group_by(
+                AchievementSuggestion.stat_definition_id,
+                AchievementSuggestion.achievement_type,
+                AchievementSuggestion.state,
+            )
+        )
+    ).all()
+    counts: dict[tuple[int, str], dict[str, int]] = {}
+    for definition_id, achievement_type, state, count in rows:
+        pattern = counts.setdefault((definition_id, achievement_type), {})
+        pattern[state] = int(count)
+    return {
+        key: _FeedbackSummary(
+            approved=values.get("approved", 0),
+            rejected=values.get("rejected", 0),
+        )
+        for key, values in counts.items()
+    }
 
 
 async def _history_context(
@@ -246,6 +342,7 @@ def _suggestions_for_fact(
     history: _HistoryContext,
     coverage: CoverageWindow | None,
     coverage_context: dict,
+    feedback: dict[tuple[int, str], _FeedbackSummary],
 ) -> list[AchievementSuggestion]:
     suggestions: list[AchievementSuggestion] = []
     if history.career_high is not None and fact.value > history.career_high:
@@ -263,6 +360,7 @@ def _suggestions_for_fact(
                 computed_value=fact.value,
                 comparison_value=history.career_high,
                 context={"previous_high": str(history.career_high)},
+                feedback=feedback,
             )
         )
     if history.season_high is not None and fact.value > history.season_high:
@@ -283,6 +381,7 @@ def _suggestions_for_fact(
                     "season": game.season,
                     "previous_high": str(history.season_high),
                 },
+                feedback=feedback,
             )
         )
 
@@ -308,6 +407,7 @@ def _suggestions_for_fact(
                         "career_total_before": str(history.career_total_before),
                         "career_total_after": str(career_total_after),
                     },
+                    feedback=feedback,
                 )
             )
 
@@ -332,6 +432,7 @@ def _suggestions_for_fact(
                     "tied_at_rank": history.tied_at_rank,
                     "claim_scope": coverage_context["claim_scope"],
                 },
+                feedback=feedback,
             )
         )
     return suggestions
@@ -351,11 +452,16 @@ def _suggestion(
     computed_value: Decimal,
     comparison_value: Decimal | None,
     context: dict,
+    feedback: dict[tuple[int, str], _FeedbackSummary],
     key_suffix: str | None = None,
     rank: int | None = None,
 ) -> AchievementSuggestion:
     scope_weight = Decimal(str(policy.scope_weights[achievement_type]))
-    score = scope_weight * Decimal(metric_rule.importance_weight)
+    base_score = scope_weight * Decimal(metric_rule.importance_weight)
+    feedback_summary = feedback.get(
+        (definition.id, achievement_type), _FeedbackSummary()
+    )
+    score = base_score * feedback_summary.multiplier
     key_parts = [achievement_type, str(fact.player_id), definition.stat_key]
     if key_suffix is not None:
         key_parts.append(key_suffix)
@@ -379,6 +485,10 @@ def _suggestion(
             "game_value": str(fact.value),
             "scope_weight": str(scope_weight),
             "importance_weight": str(metric_rule.importance_weight),
+            "base_notability_score": str(base_score),
+            "feedback_multiplier": str(feedback_summary.multiplier),
+            "prior_approved": feedback_summary.approved,
+            "prior_rejected": feedback_summary.rejected,
             "policy_version": policy.version,
             **context,
         },

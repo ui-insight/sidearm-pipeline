@@ -47,6 +47,9 @@ change-management path for staging or production environments.
 
 `0009_ai_achievement_ranking` adds nullable AI ordering, model, prompt-version,
 output-hash, and ranking-timestamp fields to `achievement_suggestions`.
+
+Migration `0010_achievement_review_verdicts` adds reviewer and review-timestamp
+provenance for SID approval and rejection decisions.
 Downgrading to `0008_deterministic_achievements` removes only those AI metadata
 fields and retains every deterministic suggestion and its optional phrasing.
 

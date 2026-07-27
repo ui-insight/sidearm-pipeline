@@ -1,15 +1,25 @@
-"""Read and AI-rank verified Achievement Suggestions."""
+"""Read, AI-rank, and review verified Achievement Suggestions."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from datetime import UTC, datetime
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db.engine import get_db
 from app.models.achievement import AchievementSuggestion
-from app.models.game import Game
+from app.models.game import Game, SourceSnapshot
 from app.models.player import Player
 from app.models.stat_definition import StatDefinition
-from app.schemas.achievement import AchievementRankingRead, AchievementSuggestionRead
+from app.schemas.achievement import (
+    AchievementRankingRead,
+    AchievementReviewGameRead,
+    AchievementReviewQueueRead,
+    AchievementSuggestionRead,
+    AchievementVerdictRequest,
+)
 from app.services.achievement_ai import (
     AchievementAIError,
     NoVerifiedAchievementSuggestionsError,
@@ -17,6 +27,141 @@ from app.services.achievement_ai import (
 )
 
 router = APIRouter()
+ReviewState = Literal["pending", "approved", "rejected"]
+
+
+def _request_username(request: Request) -> str:
+    """Return middleware identity or the configured local-development identity."""
+    return getattr(
+        request.state,
+        "authenticated_username",
+        settings.PROTOTYPE_AUTH_USERNAME,
+    )
+
+
+@router.get(
+    "/review-queue",
+    response_model=AchievementReviewQueueRead,
+    summary="List the SID Achievement Suggestion review queue",
+)
+async def list_achievement_review_queue(
+    state_filter: ReviewState = Query(default="pending", alias="state"),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> AchievementReviewQueueRead:
+    """Return games with suggestions in one verdict state plus queue totals."""
+    state_counts = dict(
+        (
+            row_state,
+            int(count),
+        )
+        for row_state, count in (
+            await db.execute(
+                select(
+                    AchievementSuggestion.state,
+                    func.count(AchievementSuggestion.id),
+                )
+                .where(
+                    AchievementSuggestion.ai_rank.is_not(None),
+                    AchievementSuggestion.phrasing.is_not(None),
+                )
+                .group_by(AchievementSuggestion.state)
+            )
+        ).all()
+    )
+    total_games = int(
+        await db.scalar(
+            select(func.count(func.distinct(AchievementSuggestion.game_id))).where(
+                AchievementSuggestion.state == state_filter,
+                AchievementSuggestion.ai_rank.is_not(None),
+                AchievementSuggestion.phrasing.is_not(None),
+            )
+        )
+        or 0
+    )
+    game_ids = list(
+        await db.scalars(
+            select(Game.id)
+            .join(
+                AchievementSuggestion,
+                AchievementSuggestion.game_id == Game.id,
+            )
+            .where(
+                AchievementSuggestion.state == state_filter,
+                AchievementSuggestion.ai_rank.is_not(None),
+                AchievementSuggestion.phrasing.is_not(None),
+            )
+            .group_by(Game.id, Game.start_at, Game.game_date)
+            .order_by(
+                Game.start_at.desc().nulls_last(),
+                Game.game_date.desc().nulls_last(),
+                Game.id.desc(),
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+    )
+    games = {
+        game.id: game
+        for game in await db.scalars(select(Game).where(Game.id.in_(game_ids)))
+    }
+    suggestions_by_game = {
+        game_id: await _suggestion_reads(
+            db,
+            game_id=game_id,
+            state_filter=state_filter,
+        )
+        for game_id in game_ids
+    }
+    return AchievementReviewQueueRead(
+        items=[
+            AchievementReviewGameRead(
+                game_id=game.id,
+                title=game.title,
+                game_date=game.game_date,
+                season=game.season,
+                home_team=game.home_team,
+                away_team=game.away_team,
+                home_score=game.home_score,
+                away_score=game.away_score,
+                source_url=game.source_url,
+                suggestions=suggestions_by_game[game.id],
+            )
+            for game_id in game_ids
+            if (game := games.get(game_id)) is not None
+        ],
+        total_games=total_games,
+        pending_count=state_counts.get("pending", 0),
+        approved_count=state_counts.get("approved", 0),
+        rejected_count=state_counts.get("rejected", 0),
+    )
+
+
+@router.patch(
+    "/{suggestion_id}/verdict",
+    response_model=AchievementSuggestionRead,
+    summary="Record a SID verdict for an Achievement Suggestion",
+)
+async def record_achievement_verdict(
+    suggestion_id: int,
+    payload: AchievementVerdictRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> AchievementSuggestionRead:
+    """Persist approval or rejection for editorial gating and future tuning."""
+    suggestion = await db.get(AchievementSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Achievement Suggestion not found.",
+        )
+    suggestion.state = payload.state
+    suggestion.reviewed_at = datetime.now(UTC)
+    suggestion.reviewed_by = _request_username(request)
+    await db.commit()
+    rows = await _suggestion_reads(db, game_id=suggestion.game_id)
+    return next(row for row in rows if row.id == suggestion_id)
 
 
 @router.get(
@@ -78,16 +223,27 @@ async def _suggestion_reads(
     *,
     game_id: int,
     ai_ranked_only: bool = False,
+    state_filter: ReviewState | None = None,
 ) -> list[AchievementSuggestionRead]:
     statement = (
-        select(AchievementSuggestion, Player, StatDefinition)
+        select(AchievementSuggestion, Player, StatDefinition, SourceSnapshot)
         .join(Player, Player.id == AchievementSuggestion.player_id)
         .join(
             StatDefinition,
             StatDefinition.id == AchievementSuggestion.stat_definition_id,
         )
+        .outerjoin(
+            SourceSnapshot,
+            SourceSnapshot.id == AchievementSuggestion.source_snapshot_id,
+        )
         .where(AchievementSuggestion.game_id == game_id)
     )
+    if state_filter is not None:
+        statement = statement.where(
+            AchievementSuggestion.state == state_filter,
+            AchievementSuggestion.ai_rank.is_not(None),
+            AchievementSuggestion.phrasing.is_not(None),
+        )
     if ai_ranked_only:
         statement = statement.where(
             AchievementSuggestion.ai_rank.is_not(None),
@@ -125,7 +281,10 @@ async def _suggestion_reads(
             ai_prompt_version=suggestion.ai_prompt_version,
             ai_output_hash=suggestion.ai_output_hash,
             ai_ranked_at=suggestion.ai_ranked_at,
+            source_url=snapshot.source_url if snapshot is not None else None,
+            reviewed_at=suggestion.reviewed_at,
+            reviewed_by=suggestion.reviewed_by,
             state=suggestion.state,
         )
-        for suggestion, player, definition in rows
+        for suggestion, player, definition, snapshot in rows
     ]
