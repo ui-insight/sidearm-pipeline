@@ -137,6 +137,8 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "ai_prompt_version",
         "ai_output_hash",
         "ai_ranked_at",
+        "reviewed_at",
+        "reviewed_by",
     }.issubset(achievement_columns)
 
     subprocess.run(

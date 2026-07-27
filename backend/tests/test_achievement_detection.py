@@ -206,6 +206,71 @@ async def test_detection_replaces_suggestions_idempotently(db_session) -> None:
     )
 
 
+async def test_detection_preserves_editorial_verdict_on_reingest(db_session) -> None:
+    game, *_ = await _seed_achievement_history(db_session)
+    await detect_achievement_suggestions(db_session, game=game)
+    suggestion = await db_session.scalar(
+        select(AchievementSuggestion).where(
+            AchievementSuggestion.game_id == game.id,
+            AchievementSuggestion.achievement_type == "career_high",
+        )
+    )
+    suggestion.state = "rejected"
+    suggestion.reviewed_by = "sid-reviewer"
+    suggestion.phrasing = "Alice Adams set a verified career high with 50 points."
+    await db_session.commit()
+
+    await detect_achievement_suggestions(db_session, game=game)
+    await db_session.commit()
+    preserved = await db_session.scalar(
+        select(AchievementSuggestion).where(
+            AchievementSuggestion.game_id == game.id,
+            AchievementSuggestion.achievement_type == "career_high",
+        )
+    )
+
+    assert preserved.state == "rejected"
+    assert preserved.reviewed_by == "sid-reviewer"
+    assert preserved.phrasing == (
+        "Alice Adams set a verified career high with 50 points."
+    )
+
+
+async def test_detection_invalidates_editorial_verdict_when_fact_changes(
+    db_session,
+) -> None:
+    game, *_ = await _seed_achievement_history(db_session)
+    await detect_achievement_suggestions(db_session, game=game)
+    suggestion = await db_session.scalar(
+        select(AchievementSuggestion).where(
+            AchievementSuggestion.game_id == game.id,
+            AchievementSuggestion.achievement_type == "career_high",
+        )
+    )
+    suggestion.state = "approved"
+    suggestion.reviewed_by = "sid-reviewer"
+    suggestion.phrasing = "Alice Adams set a verified career high with 50 points."
+    current_fact = await db_session.scalar(
+        select(PlayerGameStat).where(PlayerGameStat.game_id == game.id)
+    )
+    current_fact.value = Decimal("55")
+    await db_session.commit()
+
+    await detect_achievement_suggestions(db_session, game=game)
+    await db_session.commit()
+    refreshed = await db_session.scalar(
+        select(AchievementSuggestion).where(
+            AchievementSuggestion.game_id == game.id,
+            AchievementSuggestion.achievement_type == "career_high",
+        )
+    )
+
+    assert refreshed.computed_value == 55
+    assert refreshed.state == "pending"
+    assert refreshed.reviewed_by is None
+    assert refreshed.phrasing is None
+
+
 async def test_detection_skips_nonfinal_and_exhibition_games(db_session) -> None:
     game, *_ = await _seed_achievement_history(db_session)
     await detect_achievement_suggestions(db_session, game=game)

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,7 +31,41 @@ class AchievementSuggestionRead(BaseModel):
     ai_prompt_version: str | None
     ai_output_hash: str | None
     ai_ranked_at: datetime | None
-    state: str
+    source_url: str | None
+    reviewed_at: datetime | None
+    reviewed_by: str | None
+    state: Literal["pending", "approved", "rejected"]
+
+
+class AchievementVerdictRequest(BaseModel):
+    """One SID editorial decision for an Achievement Suggestion."""
+
+    state: Literal["approved", "rejected"]
+
+
+class AchievementReviewGameRead(BaseModel):
+    """One game and its suggestions in the selected review state."""
+
+    game_id: int
+    title: str | None
+    game_date: str | None
+    season: str | None
+    home_team: str | None
+    away_team: str | None
+    home_score: int | None
+    away_score: int | None
+    source_url: str
+    suggestions: list[AchievementSuggestionRead]
+
+
+class AchievementReviewQueueRead(BaseModel):
+    """A page of games plus global verdict counts for queue navigation."""
+
+    items: list[AchievementReviewGameRead]
+    total_games: int
+    pending_count: int
+    approved_count: int
+    rejected_count: int
 
 
 class AchievementAICandidateOutput(BaseModel):
