@@ -1,395 +1,275 @@
-# Data Model
+# As-Built Data Model
 
-This document describes the current persisted data model for Vandals Stats
-Pipeline and highlights the gaps that still need to be addressed as the project
-moves from manual ingestion to live website syndication.
+This document is the authoritative human-readable inventory of the persisted
+Vandals Stats Pipeline schema. It describes the SQLAlchemy metadata and Alembic
+head at migration `0010_achievement_review_verdicts`.
 
-## Scope
+The executable schema remains defined by `backend/app/models/` and
+`backend/migrations/versions/`. Update this page in the same change set whenever
+an entity, relationship, classification-relevant field, or migration changes.
+
+## Scope and boundaries
 
 The current schema supports:
 
-- ingestion of public Sidearm boxscore pages
-- canonical event identity and lifecycle metadata for ingested games
-- storage of normalized game metadata, team stats, player stat groups, and
-  scoring plays
-- source URL lineage, raw source snapshots, parser version metadata, and event
-  status history
-- storage of optional AI-generated coverage derived from a game record
-- deployment-wide saved workspace route and filter definitions
-- versioned WBB Notability policy, deterministic Achievement Suggestions, and
-  validated optional AI ordering and phrasing
+- canonical athletic events, source URLs, source snapshots, lifecycle history,
+  and durable ingest-run records
+- legacy source-shaped boxscore tables retained for API compatibility
+- normalized sport, team, player, roster, and external-identity dimensions
+- long-form player and team facts at game and season grain
+- governed metric semantics, Coverage Windows, and reviewable data-quality issues
+- reviewed player-identity resolutions
+- shared workspace route/filter definitions
+- generated editorial drafts
+- versioned Notability policies, deterministic Achievement Suggestions, optional
+  AI ranking/phrasing, and SID verdict provenance
 
-The current schema does not yet include ingest job tracking, operator audit logs,
-participant tables for non-boxscore event shapes, or website syndication
-records. Those capabilities are planned in the roadmap and epics.
+The schema does not yet provide generalized participants/results for non-team
+contest shapes, scheduled job definitions, immutable operator audit events,
+individual user/RBAC tables, or website-syndication records.
 
-## Entity Relationship Overview
+## Relationship overview
 
 ```mermaid
 erDiagram
-    Game ||--o{ TeamStat : has
-    Game ||--o{ PlayerStatGroup : has
-    Game ||--o{ ScoringPlay : has
-    Game ||--o{ EventSource : has
-    Game ||--o{ SourceSnapshot : has
-    Game ||--o{ EventStatusHistory : has
-    Game ||--o{ GeneratedContent : has
-    Game ||--o{ AchievementSuggestion : produces
-    NotabilityPolicy ||--o{ NotabilityPolicyMetric : defines
-    NotabilityPolicy ||--o{ AchievementSuggestion : scores
-    CoverageWindow ||--o{ AchievementSuggestion : bounds
+    SPORT_PROGRAMS ||--o{ STAT_DEFINITIONS : defines
+    SPORT_PROGRAMS ||--o{ PLAYER_SEASONS : has
+    SPORT_PROGRAMS ||--o{ COVERAGE_WINDOWS : bounds
+    SPORT_PROGRAMS ||--o{ DATA_QUALITY_ISSUES : scopes
+    SPORT_PROGRAMS ||--o{ NOTABILITY_POLICIES : configures
 
-    WorkspaceView {
-        string id PK
-        string name
-        string view_kind
-        json params
-        string created_by
-        datetime created_at
-    }
+    TEAMS ||--o{ PLAYER_SEASONS : rosters
+    TEAMS ||--o{ OPPONENT_ALIASES : identifies
+    PLAYERS ||--o{ PLAYER_EXTERNAL_IDENTITIES : anchors
+    PLAYERS ||--o{ PLAYER_SEASONS : participates
+    PLAYERS ||--o{ PLAYER_GAME_STATS : records
+    PLAYERS ||--o{ PLAYER_IDENTITY_RESOLUTIONS : resolves
 
-    NotabilityPolicy {
-        int id PK
-        int sport_program_id FK
-        int version
-        json scope_weights
-        int top_n
-        bool active
-    }
+    GAMES ||--o{ EVENT_SOURCES : discovers
+    GAMES ||--o{ SOURCE_SNAPSHOTS : captures
+    GAMES ||--o{ EVENT_STATUS_HISTORY : transitions
+    GAMES ||--o{ INGEST_RUNS : processes
+    GAMES ||--o{ PLAYER_GAME_STATS : contains
+    GAMES ||--o{ TEAM_GAME_STATS : contains
+    GAMES ||--o{ ACHIEVEMENT_SUGGESTIONS : produces
 
-    NotabilityPolicyMetric {
-        int id PK
-        int notability_policy_id FK
-        int stat_definition_id FK
-        decimal importance_weight
-        json thresholds
-        bool suppressed
-    }
+    EVENT_SOURCES ||--o{ SOURCE_SNAPSHOTS : yields
+    SOURCE_SNAPSHOTS ||--o{ PLAYER_GAME_STATS : supports
+    SOURCE_SNAPSHOTS ||--o{ PLAYER_SEASON_STATS : supports
+    STAT_DEFINITIONS ||--o{ PLAYER_GAME_STATS : types
+    STAT_DEFINITIONS ||--o{ PLAYER_SEASON_STATS : types
+    STAT_DEFINITIONS ||--o{ TEAM_GAME_STATS : types
+    STAT_DEFINITIONS ||--o{ TEAM_SEASON_STATS : types
 
-    AchievementSuggestion {
-        int id PK
-        int game_id FK
-        int player_id FK
-        int stat_definition_id FK
-        int notability_policy_id FK
-        int coverage_window_id FK
-        string achievement_type
-        decimal computed_value
-        decimal notability_score
-        json context
-        json coverage_context
-        string phrasing
-        int ai_rank
-        string ai_model
-        string ai_prompt_version
-        string ai_output_hash
-        datetime ai_ranked_at
-        string state
-    }
-
-    Game {
-        int id PK
-        string source_url UK
-        string canonical_uid UK
-        string source_system
-        string source_event_id
-        string sport
-        string sport_name
-        string gender
-        string season
-        string game_date
-        string event_shape
-        string event_status
-        string publish_status
-        string home_team
-        string away_team
-        int home_score
-        int away_score
-        string title
-        datetime start_at
-        datetime end_at
-        string timezone
-        string location_name
-        string venue_name
-        string home_away_neutral
-        bool conference_event
-        bool exhibition
-        datetime first_seen_at
-        datetime last_seen_at
-        datetime last_successful_ingest_at
-        datetime ingested_at
-        text raw_html
-    }
-
-    TeamStat {
-        int id PK
-        int game_id FK
-        string stat_name
-        string home_value
-        string away_value
-        int sort_order
-    }
-
-    PlayerStatGroup {
-        int id PK
-        int game_id FK
-        string category
-        string team
-        json columns
-        json rows
-    }
-
-    ScoringPlay {
-        int id PK
-        int game_id FK
-        string period
-        string clock
-        string team
-        text description
-        int home_score
-        int away_score
-        int sort_order
-    }
-
-    EventSource {
-        int id PK
-        int game_id FK
-        string source_type
-        string source_url
-        string source_id
-        bool primary_source
-        datetime discovered_at
-        datetime last_fetched_at
-    }
-
-    SourceSnapshot {
-        int id PK
-        int game_id FK
-        int event_source_id FK
-        string parser_version
-        string content_hash
-        int http_status
-        datetime fetched_at
-        text raw_body
-    }
-
-    EventStatusHistory {
-        int id PK
-        int game_id FK
-        string from_status
-        string to_status
-        string reason
-        datetime changed_at
-    }
-
-    GeneratedContent {
-        int id PK
-        int game_id FK
-        text recap
-        string spotlight_player
-        text spotlight_body
-        text social_post
-        string headline
-        string model
-        datetime generated_at
-    }
+    PLAYER_SEASONS ||--o{ PLAYER_SEASON_STATS : contains
+    NOTABILITY_POLICIES ||--o{ NOTABILITY_POLICY_METRICS : contains
+    NOTABILITY_POLICIES ||--o{ ACHIEVEMENT_SUGGESTIONS : scores
+    COVERAGE_WINDOWS ||--o{ ACHIEVEMENT_SUGGESTIONS : qualifies
 ```
 
-## Entities
+The diagram emphasizes the normalized warehouse. The complete 27-table
+inventory follows.
+
+## Canonical events, sources, and operations
 
 ### `games`
 
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:17).
+One canonical athletic event. `source_url` and `canonical_uid` are independently
+unique. The record carries source identity, sport/season context, lifecycle and
+publish status, two-team summary fields, venue/time metadata, freshness
+timestamps, and a compatibility copy of raw HTML.
 
-Purpose:
-- one persisted record per ingested Sidearm event, currently maintained through
-  the manual boxscore ingestion path
-- anchor entity for normalized event data, source lineage, and generated
-  coverage
+Current constraints:
 
-Important fields:
-- `source_url`: current manual-ingest uniqueness boundary
-- `canonical_uid`: stable event identity for future idempotent ingest and
-  website consumers
-- `source_system`, `source_event_id`: external source identity, currently
-  derived from Sidearm boxscore URLs when available
-- `sport`, `season`, `game_date`: source-derived event metadata
-- `sport_name`, `gender`, `event_shape`: normalized context for sport-aware
-  parsing and display
-- `event_status`: athletic lifecycle such as `scheduled`, `live`, `final`, or
-  `canceled`
-- `publish_status`: publication readiness such as `draft`, `validated`,
-  `published`, or `blocked`
-- `home_team`, `away_team`, `home_score`, `away_score`: website-facing summary fields
-- `title`: source page title
-- `first_seen_at`, `last_seen_at`, `last_successful_ingest_at`, `ingested_at`:
-  ingestion and freshness timestamps
-- `raw_html`: original Sidearm page HTML captured for debugging and replay
-
-Current limitations:
-- `game_date` is stored as source text instead of a normalized timestamp
-- team/opponent fields still assume a two-team contest shape
-- publish-state transitions are stored but not yet enforced by a validation
-  service
-- no operator audit metadata yet
-
-### `team_stats`
-
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:54).
-
-Purpose:
-- stores normalized team stat rows such as first downs, total yards, or shots
-
-Important fields:
-- `game_id`: parent game
-- `stat_name`: display label for the statistic
-- `home_value`, `away_value`: comparable values for each side
-- `sort_order`: preserves source ordering
-
-### `player_stat_groups`
-
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:71).
-
-Purpose:
-- stores one logical player-stat table per category, such as passing, rushing,
-  receiving, or defense
-
-Important fields:
-- `category`: normalized stat grouping key
-- `team`: optional team label when the source provides one
-- `columns`: JSON list of source column headers
-- `rows`: JSON matrix of row values
-
-Notes:
-- this structure preserves heterogeneous Sidearm stat tables without forcing an
-  over-normalized relational model too early
-- downstream website contracts should not expose this raw structure directly
-
-### `scoring_plays`
-
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:88).
-
-Purpose:
-- stores the scoring progression for games that expose a scoring summary
-
-Important fields:
-- `period`, `clock`: timing context
-- `team`: scoring team
-- `description`: human-readable play summary
-- `home_score`, `away_score`: score after the play
-- `sort_order`: source order for timeline rendering
+- `game_date` remains source text rather than a normalized date/time field.
+- The summary shape assumes a two-team contest.
+- Publish-state transitions are not enforced by a dedicated validation service.
 
 ### `event_sources`
 
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:154).
-
-Purpose:
-- records every known source URL or source identifier associated with an event
-- allows schedule, live-stat, boxscore, recap, and result-PDF sources to point
-  at the same canonical event over time
-
-Important fields:
-- `source_type`: source category such as `boxscore_html`
-- `source_url`: URL fetched or discovered
-- `source_id`: external source identifier when available
-- `primary_source`: whether this source is the primary source for the current
-  ingest path
-- `last_fetched_at`: freshness timestamp for source polling and replay
+Known schedule, boxscore, recap, live-stat, gamefile, or other source references
+for one game. A `(game_id, source_type, source_url)` constraint prevents duplicate
+registrations.
 
 ### `source_snapshots`
 
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:183).
-
-Purpose:
-- stores raw source payloads captured during ingestion
-- provides replay material for parser regressions, source markup changes, and
-  audit/debugging needs
-
-Important fields:
-- `parser_version`: parser strategy/version used for the snapshot
-- `content_hash`: SHA-256 hash of the raw body for change detection
-- `http_status`: fetch status when known
-- `fetched_at`: source capture timestamp
-- `raw_body`: raw HTML or source payload
+Immutable-at-ingest raw source evidence with source system/type, URL, parser
+version, content hash, HTTP status, fetch time, and raw body. A snapshot may be
+captured before a game or event-source relationship is known, so those foreign
+keys are nullable.
 
 ### `event_status_history`
 
-Defined in [backend/app/models/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/game.py:211).
+Durable transitions between event lifecycle states, with reason and timestamp.
 
-Purpose:
-- records durable event lifecycle transitions
-- supports future operational review of status changes from scheduled through
-  final or canceled states
+### `ingest_runs`
 
-Important fields:
-- `from_status`, `to_status`: lifecycle transition values
-- `reason`: source or operator reason for the transition
-- `changed_at`: transition timestamp
+One operational execution against a source URL. It records trigger and source
+context, status/timing, retry attempts, HTTP result, retryability, error details,
+and structured run metadata. Range backfills also use these records for parent
+run checkpoints and resumption.
+
+### Legacy boxscore compatibility tables
+
+- `team_stats`: source-shaped home/away team-stat rows.
+- `player_stat_groups`: source-shaped player tables stored as JSON columns/rows.
+- `scoring_plays`: ordered scoring progression for supported team contests.
+
+These tables preserve the original scrape-store-display contract. New Record
+Book and semantic-query work uses normalized fact tables instead of interpreting
+`player_stat_groups` at query time.
+
+## Warehouse dimensions and identity
+
+### `sport_programs`
+
+One Idaho sport program, such as women's basketball, with stable slug, display
+name, sport, gender, season format, and active state.
+
+### `teams`
+
+Canonical Idaho and opponent team identities. The table stores stable slugs,
+canonical/short names, institution, and whether the team is Idaho.
+
+### `opponent_aliases`
+
+Source-specific observed opponent names mapped to canonical teams within a sport
+program. This supports labels such as “Idaho State,” “Idaho St.,” and “ISU.”
+
+### `players`
+
+Canonical warehouse person records with display and parsed name fields. A player
+is not identified by name alone.
+
+### `player_external_identities`
+
+Namespaced source identities for a canonical player. The uniqueness boundary is
+`(source_system, institution, source_player_id)`, preventing a bare Sidearm
+numeric identifier from being treated as globally unique. First/last-seen times
+and source URL preserve provenance.
+
+### `player_seasons`
+
+Roster membership for a player, sport program, team, and season, including
+jersey, class year, position, bio URL, and source snapshot.
+
+### `player_identity_resolutions`
+
+Reviewed fallback matches used when a stable external player identity is missing
+or ambiguous. The record preserves its match key, observed source/name/jersey
+context, selected canonical player, originating quality issue, notes, and
+timestamps.
+
+## Metric semantics and normalized facts
+
+### `stat_definitions`
+
+The governed metric catalog. Each definition belongs to a sport program and
+specifies:
+
+- stable key and display label
+- entity scope, value type, and unit
+- aggregation method and comparison direction
+- qualifying minimum and display format
+- source field aliases
+- ratio numerator/denominator keys when derived from components
+- Record Book and Notability eligibility
+
+Editorial weights do not live here; ADR-008 places them in versioned Notability
+policy records.
+
+### `player_game_stats`
+
+One numeric player fact for one game and metric. It links to the canonical player,
+optional team, metric definition, and source snapshot, while retaining the source
+field and original value text.
+
+### `team_game_stats`
+
+The team-grain counterpart to `player_game_stats`, keyed by game, team, metric,
+and source snapshot.
+
+### `player_season_stats`
+
+One source-provided or authoritative player-season fact linked through
+`player_seasons`, with metric definition and source snapshot.
+
+### `team_season_stats`
+
+One source-provided or authoritative team-season fact linked directly to sport
+program, season, team, metric definition, and source snapshot.
+
+Long-form fact tables use `Numeric(18, 6)` values. Valid aggregation depends on
+the associated `stat_definitions` record, not on the database column alone.
+
+## Trust, coverage, and editorial records
+
+### `coverage_windows`
+
+The bounded truth context for a sport program, optional metric, grain, and source
+system. It stores first/last season, completeness, known limitations, and
+verification timestamps. Comparative output must use this context rather than
+assuming “all-time” coverage.
+
+### `data_quality_issues`
+
+Reviewable identity, reconciliation, source-conflict, parser, or missing-event
+problems. Issues may point to the relevant program, game, player, team, metric,
+and source snapshot. Deduplication key, severity, structured details, resolution
+notes, and lifecycle timestamps support repeatable triage.
+
+### `notability_policies`
+
+Immutable versioned editorial rubrics per sport program. Each version records a
+name, achievement-scope weights, top-N boundary, active flag, and creation time.
+
+### `notability_policy_metrics`
+
+Metric-level importance weights, thresholds, and suppression rules for one
+Notability-policy version. This table separates changing editorial preferences
+from stable metric semantics.
+
+### `achievement_suggestions`
+
+Persisted comparative facts computed from warehouse history. Each suggestion
+links to its game, player, metric, policy version, optional Coverage Window, and
+source snapshot. It preserves computed/comparison values, rank, deterministic
+score, explanatory and coverage context, optional AI phrasing/ranking provenance,
+and the current SID verdict with reviewer and timestamp.
+
+The row stores the current verdict rather than an immutable verdict-event
+history. Prior verdict counts used by feedback calibration are captured in each
+new suggestion's context; see ADR-009.
 
 ### `generated_content`
 
-Defined in [backend/app/models/content.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/models/content.py:12).
-
-Purpose:
-- stores optional AI-generated editorial outputs derived from a stored game
-
-Important fields:
-- `headline`, `recap`, `spotlight_player`, `spotlight_body`, `social_post`
-- `model`: model identifier used to generate the output
-- `generated_at`: generation timestamp
-
-Governance note:
-- generated coverage is derived from public athletics data, but pre-publication
-  drafts should be treated as internal editorial content until explicitly
-  published
+Optional AI-generated headline, recap, spotlight, and social-copy drafts for a
+game, with model and generation time. These are Internal until explicitly
+published elsewhere.
 
 ### `workspace_views`
 
-Defined in `backend/app/models/workspace_view.py`.
+Deployment-wide named Season-desk or Player-comparison route/filter definitions.
+`created_by` is prototype-session context, not an ownership or authorization
+boundary. Under the current shared-credential model, every authenticated user can
+open and delete every saved view.
 
-Purpose:
-- stores a named Season desk or Player comparison route for everyone signed
-  into the deployment
-- supports newsroom handoffs without copying result facts or source evidence
-  into a second store
+## API and derived-result boundaries
 
-Important fields:
-- `id`: UUID-form stable identifier
-- `name`: operator-supplied label, limited to 60 characters
-- `view_kind`: constrained to `season` or `comparison`
-- `params`: exact validated filter set for the selected workspace route
-- `created_by`: configured prototype-session username captured as creator
-  context, not an ownership or authorization boundary
-- `created_at`: shared-list ordering and display timestamp
+Pydantic schemas in `backend/app/schemas/` define transport contracts; they are
+not additional persisted entities. Record Book results, semantic-query answers,
+pregame briefs, review queues, and CSV exports are computed from the warehouse and
+are not stored as separate result tables.
 
-Current limitation:
-- the prototype uses one shared credential and has no user table or RBAC, so
-  every authenticated operator can open and delete every shared view
+## Known model gaps
 
-## API Shapes
+- generalized events, participants, placements, rounds, heats, attempts, and
+  parent/child tournament structures for non-team-contest sports
+- immutable operator and verdict audit-event history
+- individual users, institutional SSO, and role-based authorization
+- scheduled job definitions and distributed worker/lease state
+- website-syndication publications, versions, and delivery receipts
+- automated retention/disposal state for raw snapshots and operational metadata
 
-The current public application surfaces map these tables into:
-
-- `GameSummary` for list views
-- `GameDetail` for full event display
-- `GeneratedContentRead` for coverage output
-- `WorkspaceViewRead` for shared route definitions
-
-These schemas are defined in:
-
-- [backend/app/schemas/game.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/schemas/game.py:1)
-- [backend/app/schemas/content.py](/Users/barrierobison/Documents/Administration/AICoordination2026/Athleticsdata/sidearm-pipeline/backend/app/schemas/content.py:1)
-
-## Near-Term Model Changes Expected
-
-The roadmap and current epic set imply these additions are likely next:
-
-- ingest run history and retry metadata
-- participant/result tables for non-boxscore event shapes such as tennis,
-  golf, cross country, track and field, and swimming/diving invitationals
-- validation services that enforce publish-state transitions
-- operational audit logging
-- stable syndication records or publish contracts for the athletics website
-
-Until those changes land, this document should be treated as the current-state
-baseline rather than the final target schema.
+These are gaps, not implied capabilities. Add them to this inventory only when
+the corresponding migration and ORM model land.

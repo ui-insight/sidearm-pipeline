@@ -40,3 +40,5 @@ What benefits, costs, and follow-on obligations come with that choice?
 - [ADR-005: Curated Semantic Layer for NLQ](005-semantic-layer-for-nlq.md)
 - [ADR-006: Release 1 Is Internal-SID-First](006-release1-internal-sid-first.md)
 - [ADR-007: Normalized Long-Form Stat Storage](007-normalized-long-form-stat-storage.md)
+- [ADR-008: Separate Metric Semantics from Notability Policy](008-separate-metric-semantics-from-notability-policy.md)
+- [ADR-009: Reproducible Verdict Feedback Calibration](009-reproducible-verdict-feedback-calibration.md)

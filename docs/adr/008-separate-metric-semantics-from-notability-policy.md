@@ -4,6 +4,9 @@
 
 Accepted
 
+ADR-009 clarifies how prior verdicts may calibrate a new suggestion's score
+without mutating `StatDefinition` or an existing Notability-policy version.
+
 ## Context
 
 `StatDefinition` describes objective properties of a metric: its entity scope,
@@ -30,6 +33,9 @@ versioned `NotabilityPolicy` model when the achievement workflow is implemented.
 Achievement suggestions and SID verdicts will retain the policy version used for
 their evaluation. Verdict history may motivate a new policy version but will not
 mutate an existing version or a `StatDefinition`.
+
+This decision does not prohibit a separately documented, reproducible feedback
+calibration over prior verdict counts. ADR-009 governs that implemented behavior.
 
 This decision supersedes only ADR-007's placement of `importance_weight`; the
 accepted long-form stat-storage decision remains unchanged.
