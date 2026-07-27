@@ -261,9 +261,7 @@ async def test_review_rejection_downweights_future_matching_pattern(
     assert response.status_code == 200
 
     player = await db_session.get(Player, career_high.player_id)
-    definition = await db_session.get(
-        StatDefinition, career_high.stat_definition_id
-    )
+    definition = await db_session.get(StatDefinition, career_high.stat_definition_id)
     idaho = await db_session.scalar(select(Team).where(Team.slug == "idaho"))
     future_game = Game(
         source_url="https://govandals.com/boxscore/future",
