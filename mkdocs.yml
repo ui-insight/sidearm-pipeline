@@ -37,6 +37,7 @@ nav:
     - Overview: architecture/overview.md
     - Data Model: architecture/data-model.md
     - Achievement AI Review: architecture/achievement-ai-review.md
+    - Editorial Article Workflow: architecture/editorial-article-workflow.md
     - Athletic Event Model: architecture/athletic-event-model.md
     - Source Registry: architecture/source-registry.md
     - Semantic Query Catalog: architecture/semantic-query-catalog.md
@@ -71,6 +72,10 @@ nav:
     - "ADR-007: Normalized Long-Form Stat Storage": adr/007-normalized-long-form-stat-storage.md
     - "ADR-008: Separate Metric Semantics from Notability Policy": adr/008-separate-metric-semantics-from-notability-policy.md
     - "ADR-009: Reproducible Verdict Feedback Calibration": adr/009-reproducible-verdict-feedback-calibration.md
+    - "ADR-010: Evidence-Bound Editorial Article Generation": adr/010-evidence-bound-editorial-article-generation.md
+    - "ADR-011: Append-Only Article Versions and Source Revalidation": adr/011-append-only-article-versions-and-revalidation.md
+    - "ADR-012: Versioned and Scoped Editorial Style Guides": adr/012-versioned-scoped-style-guides.md
+    - "ADR-013: Human-Gated Distribution Through a Durable Outbox": adr/013-human-gated-distribution-outbox.md
   - Resources: resources.md
 
 markdown_extensions:
