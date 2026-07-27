@@ -323,3 +323,19 @@ What are the trade-offs?
 - **Agent coordination**: See `docs/contributing/agent-coordination.md` for multi-agent workflows
 - **Stack questions**: Consult framework documentation — [FastAPI](https://fastapi.tiangolo.com/), [React](https://react.dev/), [SQLAlchemy](https://docs.sqlalchemy.org/), [Tailwind CSS](https://tailwindcss.com/)
 - **University standards**: Contact the UI-Insight team
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `ui-insight/sidearm-pipeline`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix` labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository using root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
