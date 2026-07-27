@@ -63,6 +63,19 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
             column["name"]
             for column in inspect(connection).get_columns("achievement_suggestions")
         }
+        article_columns = {
+            column["name"] for column in inspect(connection).get_columns("articles")
+        }
+        evidence_bundle_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("evidence_bundles")
+        }
+        article_suggestion_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "article_achievement_suggestions"
+            )
+        }
         policy_count = connection.scalar(
             select(func.count()).select_from(
                 Table("notability_policies", metadata, autoload_with=connection)
@@ -92,6 +105,9 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "notability_policies",
         "notability_policy_metrics",
         "achievement_suggestions",
+        "articles",
+        "article_achievement_suggestions",
+        "evidence_bundles",
     }.issubset(tables)
     assert definition_count == 16
     assert policy_count == 1
@@ -139,7 +155,34 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "ai_ranked_at",
         "reviewed_at",
         "reviewed_by",
+        "reviewed_fact_hash",
     }.issubset(achievement_columns)
+    assert {
+        "game_id",
+        "status",
+        "article_type",
+        "angle",
+        "audience",
+        "constraints",
+        "created_by",
+        "idempotency_key",
+        "request_hash",
+    }.issubset(article_columns)
+    assert {
+        "article_id",
+        "version",
+        "schema_version",
+        "content",
+        "content_hash",
+        "created_by",
+    }.issubset(evidence_bundle_columns)
+    assert {
+        "article_id",
+        "achievement_suggestion_id",
+        "suggestion_key",
+        "reviewed_fact_hash",
+        "linked_at",
+    }.issubset(article_suggestion_columns)
 
     subprocess.run(
         [
@@ -327,6 +370,9 @@ def test_engine_registers_normalized_models_in_a_fresh_process() -> None:
         "workspace_views",
         "notability_policies",
         "achievement_suggestions",
+        "articles",
+        "article_achievement_suggestions",
+        "evidence_bundles",
     }
     script = (
         "from app.db.engine import Base; "

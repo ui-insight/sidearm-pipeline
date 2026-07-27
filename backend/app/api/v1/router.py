@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import (
     achievement_suggestions,
+    articles,
     auth,
     games,
     identity_resolution,
@@ -27,6 +28,7 @@ api_router.include_router(
     prefix="/achievement-suggestions",
     tags=["achievement-suggestions"],
 )
+api_router.include_router(articles.router, prefix="/articles", tags=["articles"])
 api_router.include_router(
     record_book.router,
     prefix="/record-book",

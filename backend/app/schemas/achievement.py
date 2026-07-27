@@ -34,6 +34,7 @@ class AchievementSuggestionRead(BaseModel):
     source_url: str | None
     reviewed_at: datetime | None
     reviewed_by: str | None
+    reviewed_fact_hash: str | None
     state: Literal["pending", "approved", "rejected"]
 
 
