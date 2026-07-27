@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { achievementsApi } from "../api/achievements";
+import { articlesApi } from "../api/articles";
 import { ApiError } from "../api/client";
+import type { ArticleType } from "../types/article";
 import type {
   AchievementReviewGame,
   AchievementReviewQueue,
@@ -100,12 +102,21 @@ function QueueSkeleton() {
 }
 
 function AchievementReviewPage() {
+  const navigate = useNavigate();
   const [state, setState] = useState<AchievementReviewState>("pending");
   const [queue, setQueue] = useState<AchievementReviewQueue | null>(null);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [decisionId, setDecisionId] = useState<number | null>(null);
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<number[]>([]);
+  const [articleType, setArticleType] =
+    useState<ArticleType>("achievement_story");
+  const [angle, setAngle] = useState("");
+  const [audience, setAudience] = useState("Vandal fans");
+  const [constraints, setConstraints] = useState("");
+  const [briefPending, setBriefPending] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -150,7 +161,50 @@ function AchievementReviewPage() {
   function changeState(nextState: AchievementReviewState) {
     setState(nextState);
     setSelectedGameId(null);
+    setSelectedSuggestionIds([]);
+    setIdempotencyKey(null);
     setNotice(null);
+  }
+
+  function selectGame(gameId: number) {
+    setSelectedGameId(gameId);
+    setSelectedSuggestionIds([]);
+    setIdempotencyKey(null);
+  }
+
+  function toggleSuggestion(suggestionId: number) {
+    setSelectedSuggestionIds((current) =>
+      current.includes(suggestionId)
+        ? current.filter((id) => id !== suggestionId)
+        : [...current, suggestionId],
+    );
+    setIdempotencyKey(null);
+  }
+
+  async function createArticleBrief(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedSuggestionIds.length === 0 || !angle.trim()) return;
+    setBriefPending(true);
+    setError(null);
+    const requestKey =
+      idempotencyKey ??
+      `article-brief-${selectedGameId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setIdempotencyKey(requestKey);
+    try {
+      const brief = await articlesApi.create({
+        suggestion_ids: selectedSuggestionIds,
+        article_type: articleType,
+        angle: angle.trim(),
+        audience: audience.trim(),
+        constraints: constraints.trim() || null,
+        idempotency_key: requestKey,
+      });
+      await navigate(`/articles/${brief.id}`);
+    } catch (createError) {
+      setError(apiErrorMessage(createError));
+    } finally {
+      setBriefPending(false);
+    }
   }
 
   async function recordVerdict(
@@ -221,7 +275,7 @@ function AchievementReviewPage() {
 
       {error ? (
         <div role="alert" className="mb-5 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <p className="font-semibold">Review queue unavailable</p>
+          <p className="font-semibold">Achievement desk action failed</p>
           <p className="mt-1">{error}</p>
         </div>
       ) : null}
@@ -246,7 +300,7 @@ function AchievementReviewPage() {
                 <button
                   key={game.game_id}
                   type="button"
-                  onClick={() => setSelectedGameId(game.game_id)}
+                  onClick={() => selectGame(game.game_id)}
                   className={`block w-full border-b border-gray-200 px-4 py-4 text-left transition-colors focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-yellow-500 ${
                     selectedGameId === game.game_id
                       ? "bg-yellow-50 text-gray-950"
@@ -293,6 +347,102 @@ function AchievementReviewPage() {
               </div>
             </div>
 
+            {state === "approved" ? (
+              <form
+                onSubmit={(event) => void createArticleBrief(event)}
+                className="border-b border-gray-200 bg-yellow-50 px-5 py-5 sm:px-6"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-yellow-800">
+                      Article Brief
+                    </p>
+                    <h3 className="mt-1 text-lg font-black text-gray-950">
+                      Shape the approved evidence
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Select facts from this game, then record the SID’s editorial
+                      intent.
+                    </p>
+                  </div>
+                  <p className="text-xs font-semibold text-gray-600">
+                    {selectedSuggestionIds.length} selected
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="text-sm font-semibold text-gray-800">
+                    Article type
+                    <select
+                      value={articleType}
+                      onChange={(event) => {
+                        setArticleType(event.target.value as ArticleType);
+                        setIdempotencyKey(null);
+                      }}
+                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950 focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+                    >
+                      <option value="achievement_story">Achievement story</option>
+                      <option value="game_recap">Game recap</option>
+                      <option value="player_spotlight">Player spotlight</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold text-gray-800">
+                    Audience
+                    <input
+                      value={audience}
+                      onChange={(event) => {
+                        setAudience(event.target.value);
+                        setIdempotencyKey(null);
+                      }}
+                      required
+                      maxLength={255}
+                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950 focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+                    />
+                  </label>
+                  <label className="text-sm font-semibold text-gray-800 md:col-span-2">
+                    Article angle
+                    <textarea
+                      value={angle}
+                      onChange={(event) => {
+                        setAngle(event.target.value);
+                        setIdempotencyKey(null);
+                      }}
+                      required
+                      maxLength={1000}
+                      rows={2}
+                      placeholder="What should lead, and why does it matter?"
+                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950 focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+                    />
+                  </label>
+                  <label className="text-sm font-semibold text-gray-800 md:col-span-2">
+                    Constraints <span className="font-normal text-gray-500">(optional)</span>
+                    <textarea
+                      value={constraints}
+                      onChange={(event) => {
+                        setConstraints(event.target.value);
+                        setIdempotencyKey(null);
+                      }}
+                      maxLength={2000}
+                      rows={2}
+                      placeholder="Length, emphasis, or other instructions for the writer"
+                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950 focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={
+                    briefPending ||
+                    selectedSuggestionIds.length === 0 ||
+                    !angle.trim() ||
+                    !audience.trim()
+                  }
+                  className="mt-4 rounded-md bg-gray-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:bg-gray-400"
+                >
+                  {briefPending ? "Creating Article Brief…" : "Create Article Brief"}
+                </button>
+              </form>
+            ) : null}
+
             <ol className="divide-y divide-gray-200">
               {selectedGame.suggestions.map((suggestion) => {
                 const claimScope = contextText(suggestion.coverage_context.claim_scope);
@@ -300,6 +450,16 @@ function AchievementReviewPage() {
                 return (
                   <li key={suggestion.id} className="px-5 py-5 sm:px-6 sm:py-6">
                     <div className="flex gap-4">
+                      {state === "approved" &&
+                      suggestion.reviewed_fact_hash ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedSuggestionIds.includes(suggestion.id)}
+                          onChange={() => toggleSuggestion(suggestion.id)}
+                          aria-label={`Select ${suggestion.player_name}'s ${achievementLabel(suggestion.achievement_type)} for Article Brief`}
+                          className="mt-2 size-4 shrink-0 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500"
+                        />
+                      ) : null}
                       <div className="grid size-8 shrink-0 place-items-center rounded-full bg-gray-950 text-xs font-black tabular-nums text-white" aria-label={`Rank ${suggestion.ai_rank}`}>
                         {suggestion.ai_rank}
                       </div>
@@ -348,13 +508,30 @@ function AchievementReviewPage() {
                             </button>
                           </div>
                         ) : (
-                          <p className="mt-4 text-xs text-gray-500">
-                            {state === "approved" ? "Approved" : "Rejected"} by{" "}
-                            <span className="font-semibold text-gray-700">
-                              {suggestion.reviewed_by ?? "SID reviewer"}
-                            </span>{" "}
-                            on {formatReviewedAt(suggestion.reviewed_at)}
-                          </p>
+                          <div className="mt-4">
+                            <p className="text-xs text-gray-500">
+                              {state === "approved" ? "Approved" : "Rejected"} by{" "}
+                              <span className="font-semibold text-gray-700">
+                                {suggestion.reviewed_by ?? "SID reviewer"}
+                              </span>{" "}
+                              on {formatReviewedAt(suggestion.reviewed_at)}
+                            </p>
+                            {state === "approved" &&
+                            !suggestion.reviewed_fact_hash ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void recordVerdict(suggestion, "approved")
+                                }
+                                disabled={decisionId !== null}
+                                className="mt-3 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 transition-colors hover:border-gray-500 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-wait disabled:opacity-50"
+                              >
+                                {decisionId === suggestion.id
+                                  ? "Refreshing approval…"
+                                  : "Re-approve for Article use"}
+                              </button>
+                            ) : null}
+                          </div>
                         )}
                       </div>
                     </div>

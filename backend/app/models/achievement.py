@@ -157,6 +157,7 @@ class AchievementSuggestion(Base):
     ai_ranked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewed_by: Mapped[str | None] = mapped_column(String(128))
+    reviewed_fact_hash: Mapped[str | None] = mapped_column(String(64))
     state: Mapped[str] = mapped_column(
         String(32), default="pending", server_default="pending", index=True
     )

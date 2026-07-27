@@ -85,6 +85,7 @@ async def detect_achievement_suggestions(
                 "state": suggestion.state,
                 "reviewed_at": suggestion.reviewed_at,
                 "reviewed_by": suggestion.reviewed_by,
+                "reviewed_fact_hash": suggestion.reviewed_fact_hash,
             },
         }
         for suggestion in await db.scalars(

@@ -25,6 +25,7 @@ export interface AchievementSuggestion {
   source_url: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  reviewed_fact_hash: string | null;
   state: AchievementReviewState;
 }
 

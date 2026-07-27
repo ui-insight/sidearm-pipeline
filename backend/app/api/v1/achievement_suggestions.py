@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db.engine import get_db
 from app.models.achievement import AchievementSuggestion
+from app.models.coverage_window import CoverageWindow
 from app.models.game import Game, SourceSnapshot
 from app.models.player import Player
 from app.models.stat_definition import StatDefinition
@@ -25,6 +26,7 @@ from app.services.achievement_ai import (
     NoVerifiedAchievementSuggestionsError,
     rank_and_phrase_achievement_suggestions,
 )
+from app.services.article_brief import achievement_fact_hash
 
 router = APIRouter()
 ReviewState = Literal["pending", "approved", "rejected"]
@@ -159,6 +161,23 @@ async def record_achievement_verdict(
     suggestion.state = payload.state
     suggestion.reviewed_at = datetime.now(UTC)
     suggestion.reviewed_by = _request_username(request)
+    source = (
+        await db.get(SourceSnapshot, suggestion.source_snapshot_id)
+        if suggestion.source_snapshot_id is not None
+        else None
+    )
+    coverage = (
+        await db.get(CoverageWindow, suggestion.coverage_window_id)
+        if suggestion.coverage_window_id is not None
+        else None
+    )
+    game = await db.get(Game, suggestion.game_id)
+    suggestion.reviewed_fact_hash = achievement_fact_hash(
+        suggestion,
+        game=game,
+        source=source,
+        coverage=coverage,
+    )
     await db.commit()
     rows = await _suggestion_reads(db, game_id=suggestion.game_id)
     return next(row for row in rows if row.id == suggestion_id)
@@ -284,6 +303,7 @@ async def _suggestion_reads(
             source_url=snapshot.source_url if snapshot is not None else None,
             reviewed_at=suggestion.reviewed_at,
             reviewed_by=suggestion.reviewed_by,
+            reviewed_fact_hash=suggestion.reviewed_fact_hash,
             state=suggestion.state,
         )
         for suggestion, player, definition, snapshot in rows

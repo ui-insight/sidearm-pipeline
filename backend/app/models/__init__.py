@@ -9,6 +9,11 @@ from app.models.achievement import (
     NotabilityPolicy,
     NotabilityPolicyMetric,
 )
+from app.models.article import (
+    Article,
+    ArticleAchievementSuggestion,
+    EvidenceBundle,
+)
 from app.models.content import GeneratedContent
 from app.models.coverage_window import CoverageWindow
 from app.models.data_quality_issue import DataQualityIssue
@@ -35,10 +40,13 @@ from app.models.workspace_view import WorkspaceView
 
 __all__ = [
     "AchievementSuggestion",
+    "Article",
+    "ArticleAchievementSuggestion",
     "CoverageWindow",
     "DataQualityIssue",
     "EventSource",
     "EventStatusHistory",
+    "EvidenceBundle",
     "Game",
     "GeneratedContent",
     "IngestRun",

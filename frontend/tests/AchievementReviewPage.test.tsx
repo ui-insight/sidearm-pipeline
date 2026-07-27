@@ -42,6 +42,7 @@ const suggestion = {
   source_url: "https://govandals.com/boxscore/61",
   reviewed_at: null,
   reviewed_by: null,
+  reviewed_fact_hash: null,
   state: "pending",
 };
 
@@ -150,6 +151,7 @@ describe("AchievementReviewPage", () => {
       state: "approved",
       reviewed_at: "2026-07-27T17:00:00Z",
       reviewed_by: "sid-user",
+      reviewed_fact_hash: "fact-hash",
     };
     fetchMock.mockImplementation(async (input) => {
       const endpoint = String(input);
@@ -175,5 +177,108 @@ describe("AchievementReviewPage", () => {
 
     expect(await screen.findByText(suggestion.phrasing)).toBeInTheDocument();
     expect(screen.getByText(/Approved by/)).toHaveTextContent("sid-user");
+  });
+
+  it("creates an Article Brief from selected approved suggestions", async () => {
+    const approvedSuggestion = {
+      ...suggestion,
+      state: "approved",
+      reviewed_at: "2026-07-27T17:00:00Z",
+      reviewed_by: "sid-user",
+      reviewed_fact_hash: "fact-hash",
+    };
+    fetchMock.mockImplementation(async (input, init) => {
+      const endpoint = String(input);
+      if (endpoint.includes("review-queue?state=approved")) {
+        return jsonResponse({
+          ...pendingQueue,
+          pending_count: 0,
+          approved_count: 1,
+          items: [{ ...pendingQueue.items[0], suggestions: [approvedSuggestion] }],
+        });
+      }
+      if (endpoint.endsWith("/articles") && init?.method === "POST") {
+        return jsonResponse({ id: 401 }, { status: 201 });
+      }
+      return jsonResponse({ ...emptyQueue, approved_count: 1 });
+    });
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AchievementReviewPage />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: /Approved/ }));
+    await user.click(
+      await screen.findByRole("checkbox", {
+        name: /Select Avery Adams.*Article Brief/,
+      }),
+    );
+    await user.type(
+      screen.getByLabelText("Article angle"),
+      "Lead with the verified career high.",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Article type"),
+      "achievement_story",
+    );
+    await user.click(screen.getByRole("button", { name: "Create Article Brief" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/articles",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"suggestion_ids":[17]'),
+        }),
+      ),
+    );
+    const request = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input).endsWith("/articles") && init?.method === "POST",
+    );
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      suggestion_ids: [17],
+      article_type: "achievement_story",
+      angle: "Lead with the verified career high.",
+      audience: "Vandal fans",
+      constraints: null,
+      idempotency_key: expect.any(String),
+    });
+  });
+
+  it("requires legacy approvals to be refreshed before selection", async () => {
+    const legacyApproval = {
+      ...suggestion,
+      state: "approved",
+      reviewed_at: "2026-07-27T17:00:00Z",
+      reviewed_by: "sid-user",
+      reviewed_fact_hash: null,
+    };
+    fetchMock.mockImplementation(async (input) => {
+      if (String(input).includes("review-queue?state=approved")) {
+        return jsonResponse({
+          ...pendingQueue,
+          pending_count: 0,
+          approved_count: 1,
+          items: [{ ...pendingQueue.items[0], suggestions: [legacyApproval] }],
+        });
+      }
+      return jsonResponse({ ...emptyQueue, approved_count: 1 });
+    });
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AchievementReviewPage />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: /Approved/ }));
+
+    expect(
+      await screen.findByRole("button", { name: "Re-approve for Article use" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });
