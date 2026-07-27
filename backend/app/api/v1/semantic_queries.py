@@ -10,12 +10,20 @@ from app.schemas.semantic_query import (
     SemanticQueryResult,
     SemanticWorkspaceOptionsRead,
 )
+from app.schemas.semantic_question import (
+    SemanticQuestionAnswerRead,
+    SemanticQuestionRequest,
+)
 from app.services.record_book import RecordBookMetricNotFoundError
 from app.services.semantic_query import (
     SemanticQueryEntityNotFoundError,
     execute_semantic_query,
     get_semantic_query_catalog,
     get_semantic_workspace_options,
+)
+from app.services.semantic_question import (
+    SemanticQuestionAIError,
+    ask_semantic_question,
 )
 
 router = APIRouter()
@@ -58,5 +66,29 @@ async def run_semantic_query(
     except (RecordBookMetricNotFoundError, SemanticQueryEntityNotFoundError) as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/ask",
+    response_model=SemanticQuestionAnswerRead,
+    summary="Answer a natural-language question through the semantic catalog",
+)
+async def ask_question(
+    request: SemanticQuestionRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SemanticQuestionAnswerRead:
+    """Map an SID question to one vetted query and return its visible evidence."""
+    try:
+        return await ask_semantic_question(db, question=request.question.strip())
+    except (RecordBookMetricNotFoundError, SemanticQueryEntityNotFoundError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except SemanticQuestionAIError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc

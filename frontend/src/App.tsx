@@ -10,6 +10,7 @@ import ExploratoryWorkspacePage from "./pages/ExploratoryWorkspacePage";
 import PlayerComparisonPage from "./pages/PlayerComparisonPage";
 import AthleticsDemoPage from "./pages/AthleticsDemoPage";
 import AchievementReviewPage from "./pages/AchievementReviewPage";
+import AskWarehousePage from "./pages/AskWarehousePage";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/games/:id" element={<GamePage />} />
               <Route path="/workspace" element={<ExploratoryWorkspacePage />} />
+              <Route path="/ask" element={<AskWarehousePage />} />
               <Route path="/workspace/compare" element={<PlayerComparisonPage />} />
               <Route path="/record-book" element={<RecordBookPage />} />
               <Route path="/achievements" element={<AchievementReviewPage />} />

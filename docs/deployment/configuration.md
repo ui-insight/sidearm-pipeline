@@ -28,6 +28,7 @@ This page describes the baseline environment variables included in the template.
 | `CONTENT_MODEL` | `claude-opus-4-7` | Model used by the existing game-content generator |
 | `ACHIEVEMENT_MODEL` | `claude-opus-4-7` | Model used only to rank and phrase verified Achievement Suggestions |
 | `ACHIEVEMENT_AI_MAX_CANDIDATES` | `100` | Maximum verified candidates included in one ranking request; valid range is 1–100 |
+| `NLQ_MODEL` | empty | Optional model for semantic questions; falls back to `ACHIEVEMENT_MODEL` |
 
 ## Deployment Notes
 
@@ -49,8 +50,9 @@ This page describes the baseline environment variables included in the template.
   `X-Forwarded-For`.
 - Keep Sidearm retry settings conservative. The default retry policy only
   retries transient network errors plus HTTP 408, 429, and 5xx responses.
-- Keep AI credentials in the deployment environment. Achievement detection is
-  deterministic and remains available when optional model access is absent.
+- Keep AI credentials in the deployment environment. Achievement detection and
+  direct semantic queries remain available when optional model access is absent;
+  AI ranking and natural-language questions do not.
 
 ## Security Automation Outputs
 

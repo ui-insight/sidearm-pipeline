@@ -30,6 +30,7 @@ services:
       - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
       - ACHIEVEMENT_MODEL=${ACHIEVEMENT_MODEL:-claude-opus-4-7}
       - ACHIEVEMENT_AI_MAX_CANDIDATES=${ACHIEVEMENT_AI_MAX_CANDIDATES:-100}
+      - NLQ_MODEL=${NLQ_MODEL:-}
     volumes:
       - uploads:/app/uploads
     depends_on:
