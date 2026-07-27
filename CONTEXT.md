@@ -80,6 +80,54 @@ A *comparative* statement about a performance relative to the Record Book — e.
 derived from a single boxscore; requires the Record Book.
 _Avoid_: "milestone," "highlight" (use as informal synonyms only)
 
+### Editorial workflow
+
+**Article**:
+The canonical editorial work product prepared by the SID from one or more approved
+Achievement Suggestions and other verified facts for a single game. An Article owns
+workflow state and a history of Article Versions; it is not itself a channel-specific
+post or a mutable text field.
+_Avoid_: "GeneratedContent" (the legacy implementation record), "coverage bundle"
+
+**Article Brief**:
+The SID's approved editorial intent for an Article: selected Achievement Suggestions,
+angle, article type, audience, and constraints. Creating an Article Brief is a human
+action and freezes the first Evidence Bundle. It does not authorize publication.
+_Avoid_: "prompt" (the brief is a domain record; a prompt is an implementation detail)
+
+**Evidence Bundle**:
+An immutable, hashed snapshot of every warehouse fact, Coverage Window, source
+reference, and approval record that an Article writer may use. A writer may select and
+phrase evidence but may not expand the bundle. Refreshing changed facts creates a new
+Evidence Bundle and requires human revalidation.
+_Avoid_: "context" when referring to the governed factual boundary
+
+**Article Version**:
+An append-only snapshot of Article copy produced by AI or a human editor. Each version
+identifies its parent, author or model, Evidence Bundle, resolved Style Guide, validation
+results, and creation time. Saving or revising creates a new version; prior versions are
+never overwritten.
+_Avoid_: "current draft" when the exact version matters
+
+**Style Guide**:
+A versioned editorial policy resolved from shared athletics, sport, article-type, and
+channel rules. Rules may guide the writer or run as deterministic validation. A Style
+Guide version used for an Article Version remains reproducible after newer rules are
+activated.
+_Avoid_: "system prompt" (the guide is governed editorial policy)
+
+**Article Rendition**:
+An immutable, channel-specific representation derived from a ready Article Version,
+such as website, email, or social copy. A rendition may shorten or reshape approved
+copy within the same Evidence Bundle, but it does not mutate the canonical Article.
+_Avoid_: "Article Version" for channel-specific output
+
+**Distribution Submission**:
+The publisher's explicit, authenticated instruction to deliver selected Article
+Renditions to named Channel Profiles. It creates durable outbox work and an auditable
+delivery history; previewing or exporting a rendition is not a Distribution Submission.
+_Avoid_: "publish" when the system has only queued delivery
+
 ### AI capabilities
 
 **Deterministic-facts principle**:
@@ -138,6 +186,11 @@ _Avoid_: "text-to-SQL" (the rejected alternative — see ADR-005)
   **Coverage Window** and source provenance.
 - The **Athletic Data Warehouse** is the single system of record; the AI features
   read from it rather than maintaining their own separate stores.
+- An approved **Achievement Suggestion** may enter an **Article Brief**; the resulting
+  **Evidence Bundle** constrains every AI-authored **Article Version** and
+  **Article Rendition**.
+- A human marks one **Article Version** ready, then a publisher makes a separate
+  **Distribution Submission**. No model may cross either human gate.
 
 ## Flagged ambiguities
 
@@ -158,3 +211,7 @@ _Avoid_: "text-to-SQL" (the rejected alternative — see ADR-005)
 - NLQ approach: free text-to-SQL (interns' ADR-003/004 direction) vs. curated
   semantic layer. Resolved: **curated semantic layer** — facts must be trustworthy
   because the SID may quote them publicly. See ADR-005.
+- The legacy `GeneratedContent` bundle produces recap, spotlight, and social text
+  directly from a boxscore without the governed Article workflow. Resolved: retain
+  existing rows as read-only history, replace generation with Articles, and never
+  treat legacy drafts as approved Article Versions. See ADR-010 and issue #152.

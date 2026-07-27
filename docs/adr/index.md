@@ -42,3 +42,7 @@ What benefits, costs, and follow-on obligations come with that choice?
 - [ADR-007: Normalized Long-Form Stat Storage](007-normalized-long-form-stat-storage.md)
 - [ADR-008: Separate Metric Semantics from Notability Policy](008-separate-metric-semantics-from-notability-policy.md)
 - [ADR-009: Reproducible Verdict Feedback Calibration](009-reproducible-verdict-feedback-calibration.md)
+- [ADR-010: Evidence-Bound Editorial Article Generation](010-evidence-bound-editorial-article-generation.md)
+- [ADR-011: Append-Only Article Versions and Source Revalidation](011-append-only-article-versions-and-revalidation.md)
+- [ADR-012: Versioned and Scoped Editorial Style Guides](012-versioned-scoped-style-guides.md)
+- [ADR-013: Human-Gated Distribution Through a Durable Outbox](013-human-gated-distribution-outbox.md)
