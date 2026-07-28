@@ -10,12 +10,25 @@ from app.schemas.article import (
     ArticleBriefRead,
     ArticleGenerationJobCreate,
     ArticleGenerationJobRead,
+    ArticleQueueRead,
+    ArticleReadyCreate,
+    ArticleReadyRead,
+    ArticleVersionCreate,
+    ArticleVersionRead,
 )
 from app.services.article_brief import (
     ArticleBriefConflictError,
     ArticleBriefNotFoundError,
     create_article_brief,
     read_article_brief,
+)
+from app.services.article_editing import (
+    ArticleEditingConflictError,
+    ArticleEditingNotFoundError,
+    mark_article_version_ready,
+    read_article_queue,
+    read_article_versions,
+    save_human_article_version,
 )
 from app.services.article_generation import (
     ArticleGenerationConflictError,
@@ -34,6 +47,18 @@ def _request_username(request: Request) -> str:
         "authenticated_username",
         settings.PROTOTYPE_AUTH_USERNAME,
     )
+
+
+@router.get(
+    "",
+    response_model=ArticleQueueRead,
+    summary="List the SID editorial Article queue",
+)
+async def get_article_queue(
+    db: AsyncSession = Depends(get_db),
+) -> ArticleQueueRead:
+    """Return Articles with owner, current version, and ready-version state."""
+    return await read_article_queue(db)
 
 
 @router.post(
@@ -146,5 +171,97 @@ async def get_article_generation_job(
     except ArticleGenerationNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/{article_id}/versions",
+    response_model=list[ArticleVersionRead],
+    summary="List immutable Article Versions",
+)
+async def get_article_versions(
+    article_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> list[ArticleVersionRead]:
+    """Return every AI and human checkpoint for version comparison."""
+    try:
+        return await read_article_versions(db, article_id)
+    except ArticleEditingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/{article_id}/versions",
+    response_model=ArticleVersionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Save an append-only human Article Version",
+)
+async def post_article_version(
+    article_id: int,
+    payload: ArticleVersionCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleVersionRead:
+    """Validate and append a human edit without mutating prior versions."""
+    try:
+        version = await save_human_article_version(
+            db,
+            article_id,
+            payload,
+            author=_request_username(request),
+        )
+        await db.commit()
+        return version
+    except ArticleEditingNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ArticleEditingConflictError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/{article_id}/versions/{version_id}/ready",
+    response_model=ArticleReadyRead,
+    summary="Mark one immutable Article Version ready",
+)
+async def post_article_version_ready(
+    article_id: int,
+    version_id: int,
+    payload: ArticleReadyCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleReadyRead:
+    """Record the authenticated SID readiness gate and warning reasons."""
+    try:
+        result = await mark_article_version_ready(
+            db,
+            article_id,
+            version_id,
+            payload,
+            actor=_request_username(request),
+        )
+        await db.commit()
+        return result
+    except ArticleEditingNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ArticleEditingConflictError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc

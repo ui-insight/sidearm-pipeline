@@ -260,6 +260,18 @@ Durable generation jobs persist queued/running/succeeded/failed state, worker le
 attempt count, exact bounded writer input, resolved Style Guide snapshot, provider
 metadata, validation findings, and hashes. A successful safe result creates one
 append-only AI Article Version. Failed or unsafe output creates no partial version.
+Revision jobs also preserve their base version and human instructions while retaining
+the same Evidence Bundle. Human saves create a new version with the prior latest
+version as their parent; optimistic concurrency rejects stale bases without changing
+either editor's copy. `articles.ready_version_id` identifies the exact immutable
+version selected at the human readiness gate.
+
+### `article_warning_overrides` and `article_readiness_decisions`
+
+Warning overrides record the affected validation rule, the SID's reason, identity,
+and timestamp. Readiness decisions record each ready or reopen event against an exact
+Article Version. Both histories are append-only Internal audit data. They do not
+publish content or mutate the selected Article Version.
 
 ### `generated_content`
 

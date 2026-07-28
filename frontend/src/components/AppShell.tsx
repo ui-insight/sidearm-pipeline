@@ -71,6 +71,9 @@ function AppShell({
             <NavLink to="/achievements" className={navClass}>
               Achievements
             </NavLink>
+            <NavLink to="/articles" className={navClass}>
+              Articles
+            </NavLink>
             <NavLink to="/record-book" className={navClass}>
               Record Book
             </NavLink>

@@ -28,6 +28,14 @@ TrimmedConstraints = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
 ]
+EditorInstructions = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+]
+OverrideReason = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=8, max_length=1000),
+]
 IdempotencyKey = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=8, max_length=255),
@@ -218,12 +226,83 @@ class ArticleVersionRead(BaseModel):
     style_snapshot: dict
     style_hash: str
     prompt_version: str | None
+    editor_instructions: str | None
     provider: str | None
     model: str | None
     output_hash: str | None
     validation_results: list[ArticleValidationFindingRead]
     author: str | None
     created_at: datetime
+    warning_overrides: list["ArticleWarningOverrideRead"] = Field(default_factory=list)
+
+
+class ArticleVersionCreate(BaseModel):
+    """One append-only human edit based on the latest Article Version."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_version_id: int = Field(gt=0)
+    headline: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
+    ]
+    headline_evidence_ids: list[str] = Field(min_length=1, max_length=25)
+    blocks: list[ArticleDraftBlock] = Field(min_length=1, max_length=20)
+
+
+class ArticleWarningOverrideCreate(BaseModel):
+    """A human reason for accepting one nonblocking validation warning."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    finding_code: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=128),
+    ]
+    reason: OverrideReason
+
+
+class ArticleWarningOverrideRead(BaseModel):
+    """Audit data for one warning acknowledgement."""
+
+    id: int
+    article_version_id: int
+    finding_code: str
+    reason: str
+    overridden_by: str
+    created_at: datetime
+
+
+class ArticleReadyCreate(BaseModel):
+    """An explicit human readiness decision for one immutable version."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    warning_overrides: list[ArticleWarningOverrideCreate] = Field(
+        default_factory=list,
+        max_length=50,
+    )
+
+
+class ArticleReadinessDecisionRead(BaseModel):
+    """One append-only ready or reopen audit event."""
+
+    id: int
+    article_id: int
+    article_version_id: int
+    action: Literal["ready", "reopened"]
+    actor: str
+    reason: str | None
+    created_at: datetime
+
+
+class ArticleReadyRead(BaseModel):
+    """The resulting Article state after a readiness decision."""
+
+    article_id: int
+    status: ArticleStatus
+    ready_version: ArticleVersionRead
+    decision: ArticleReadinessDecisionRead
 
 
 class ArticleGenerationJobCreate(BaseModel):
@@ -232,6 +311,8 @@ class ArticleGenerationJobCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     idempotency_key: IdempotencyKey
+    base_version_id: int | None = Field(default=None, gt=0)
+    editor_instructions: EditorInstructions | None = None
 
 
 class ArticleGenerationJobRead(BaseModel):
@@ -244,11 +325,13 @@ class ArticleGenerationJobRead(BaseModel):
     attempt_count: int
     evidence_bundle_id: int
     style_guide_version_id: int
+    base_version_id: int | None
     style_snapshot: dict
     style_hash: str
     provider: str
     model: str
     prompt_version: str
+    editor_instructions: str | None
     input_hash: str
     output_hash: str | None
     validation_results: list[ArticleValidationFindingRead]
@@ -275,3 +358,28 @@ class ArticleBriefRead(BaseModel):
     evidence_bundle: EvidenceBundleRead
     latest_generation_job: ArticleGenerationJobRead | None = None
     latest_version: ArticleVersionRead | None = None
+    ready_version: ArticleVersionRead | None = None
+    versions: list[ArticleVersionRead] = Field(default_factory=list)
+    readiness_history: list[ArticleReadinessDecisionRead] = Field(default_factory=list)
+
+
+class ArticleQueueItemRead(BaseModel):
+    """One Article row for the SID editorial queue."""
+
+    id: int
+    status: ArticleStatus
+    article_type: ArticleType
+    angle: str
+    owner: str
+    created_at: datetime
+    game_date: str | None
+    game_title: str | None
+    latest_version: ArticleVersionRead | None = None
+    ready_version: ArticleVersionRead | None = None
+
+
+class ArticleQueueRead(BaseModel):
+    """The current SID Article work queue."""
+
+    items: list[ArticleQueueItemRead]
+    total: int

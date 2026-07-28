@@ -59,6 +59,15 @@ class Article(Base):
     created_by: Mapped[str] = mapped_column(String(128), index=True)
     idempotency_key: Mapped[str] = mapped_column(String(255))
     request_hash: Mapped[str] = mapped_column(String(64))
+    ready_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "article_versions.id",
+            name="fk_articles_ready_version_id_article_versions",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -83,6 +92,15 @@ class Article(Base):
         cascade="all, delete-orphan",
         order_by="ArticleVersion.version",
         foreign_keys="ArticleVersion.article_id",
+    )
+    ready_version: Mapped[ArticleVersion | None] = relationship(
+        foreign_keys=[ready_version_id],
+        post_update=True,
+    )
+    readiness_decisions: Mapped[list[ArticleReadinessDecision]] = relationship(
+        back_populates="article",
+        cascade="all, delete-orphan",
+        order_by="ArticleReadinessDecision.created_at",
     )
 
 
@@ -207,6 +225,15 @@ class ArticleGenerationJob(Base):
     style_guide_version_id: Mapped[int] = mapped_column(
         ForeignKey("style_guide_versions.id", ondelete="RESTRICT"), index=True
     )
+    base_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "article_versions.id",
+            name="fk_article_generation_jobs_base_version_id_article_versions",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        index=True,
+    )
     state: Mapped[str] = mapped_column(
         String(32), default="queued", server_default="queued", index=True
     )
@@ -217,6 +244,7 @@ class ArticleGenerationJob(Base):
     provider: Mapped[str] = mapped_column(String(64))
     model: Mapped[str] = mapped_column(String(128))
     prompt_version: Mapped[str] = mapped_column(String(64))
+    editor_instructions: Mapped[str | None] = mapped_column(Text)
     input_hash: Mapped[str] = mapped_column(String(64))
     writer_input: Mapped[dict] = mapped_column(JSONType, nullable=False)
     style_snapshot: Mapped[dict] = mapped_column(JSONType, nullable=False)
@@ -245,6 +273,10 @@ class ArticleGenerationJob(Base):
     article_version: Mapped[ArticleVersion | None] = relationship(
         back_populates="generation_job",
         uselist=False,
+        foreign_keys="ArticleVersion.generation_job_id",
+    )
+    base_version: Mapped[ArticleVersion | None] = relationship(
+        foreign_keys=[base_version_id]
     )
 
 
@@ -285,6 +317,7 @@ class ArticleVersion(Base):
     provider: Mapped[str | None] = mapped_column(String(64))
     model: Mapped[str | None] = mapped_column(String(128))
     prompt_version: Mapped[str | None] = mapped_column(String(64))
+    editor_instructions: Mapped[str | None] = mapped_column(Text)
     evidence_hash: Mapped[str] = mapped_column(String(64), index=True)
     style_snapshot: Mapped[dict] = mapped_column(JSONType, nullable=False)
     style_hash: Mapped[str] = mapped_column(String(64), index=True)
@@ -304,7 +337,70 @@ class ArticleVersion(Base):
     evidence_bundle: Mapped[EvidenceBundle] = relationship()
     style_guide_version: Mapped[StyleGuideVersion] = relationship()
     generation_job: Mapped[ArticleGenerationJob | None] = relationship(
-        back_populates="article_version"
+        back_populates="article_version",
+        foreign_keys=[generation_job_id],
+    )
+    warning_overrides: Mapped[list[ArticleWarningOverride]] = relationship(
+        back_populates="article_version",
+        cascade="all, delete-orphan",
+        order_by="ArticleWarningOverride.created_at",
+    )
+    readiness_decisions: Mapped[list[ArticleReadinessDecision]] = relationship(
+        back_populates="article_version",
+        cascade="all, delete-orphan",
+        order_by="ArticleReadinessDecision.created_at",
+    )
+
+
+class ArticleWarningOverride(Base):
+    """An append-only human acknowledgement of one warning on a version."""
+
+    __tablename__ = "article_warning_overrides"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_version_id: Mapped[int] = mapped_column(
+        ForeignKey("article_versions.id", ondelete="CASCADE"), index=True
+    )
+    finding_code: Mapped[str] = mapped_column(String(128), index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    overridden_by: Mapped[str] = mapped_column(String(128), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    article_version: Mapped[ArticleVersion] = relationship(
+        back_populates="warning_overrides"
+    )
+
+
+class ArticleReadinessDecision(Base):
+    """An append-only record of a human readiness or reopen decision."""
+
+    __tablename__ = "article_readiness_decisions"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('ready', 'reopened')",
+            name="ck_article_readiness_action",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), index=True
+    )
+    article_version_id: Mapped[int] = mapped_column(
+        ForeignKey("article_versions.id", ondelete="RESTRICT"), index=True
+    )
+    action: Mapped[str] = mapped_column(String(16), index=True)
+    actor: Mapped[str] = mapped_column(String(128), index=True)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    article: Mapped[Article] = relationship(back_populates="readiness_decisions")
+    article_version: Mapped[ArticleVersion] = relationship(
+        back_populates="readiness_decisions"
     )
 
 

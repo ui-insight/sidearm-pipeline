@@ -327,3 +327,40 @@ async def test_writer_provider_receives_only_bounded_editorial_inputs(
         "style_guide",
     }
     assert provider_input == writer_input
+
+
+async def test_writer_provider_receives_bounded_editor_revision(monkeypatch) -> None:
+    output = {
+        "headline": "Idaho wins 72-66",
+        "headline_evidence_ids": ["game:1"],
+        "blocks": [
+            {
+                "kind": "lead",
+                "text": "Idaho won 72-66.",
+                "evidence_ids": ["game:1"],
+            }
+        ],
+    }
+    fake_client = _FakeAnthropic(output)
+    monkeypatch.setattr(article_writer, "_get_client", lambda: fake_client)
+    writer_input = {
+        "article_brief": {"angle": "Lead with the result."},
+        "evidence_bundle": {"content_hash": "evidence-hash"},
+        "style_guide": {"rules": []},
+        "editor_revision": {
+            "instructions": "Tighten the lead without adding facts.",
+            "base_version": {
+                "id": 4,
+                "version": 2,
+                "headline": "Idaho earns a road victory",
+                "headline_evidence_ids": ["game:1"],
+                "blocks": output["blocks"],
+            },
+        },
+    }
+
+    await article_writer.generate_article_draft(writer_input)
+
+    call = fake_client.messages.calls[0]
+    provider_input = json.loads(call["messages"][0]["content"])
+    assert provider_input == writer_input

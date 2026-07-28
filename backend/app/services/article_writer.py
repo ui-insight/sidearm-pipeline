@@ -67,6 +67,8 @@ async def generate_article_draft(writer_input: dict) -> ArticleDraftOutput:
         "evidence_bundle": writer_input["evidence_bundle"],
         "style_guide": writer_input["style_guide"],
     }
+    if "editor_revision" in writer_input:
+        request_payload["editor_revision"] = writer_input["editor_revision"]
     try:
         response = await client.messages.create(
             model=article_model(),

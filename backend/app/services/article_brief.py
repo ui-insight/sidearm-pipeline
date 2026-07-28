@@ -18,6 +18,7 @@ from app.models.article import (
     Article,
     ArticleAchievementSuggestion,
     ArticleGenerationJob,
+    ArticleReadinessDecision,
     ArticleVersion,
     EvidenceBundle,
 )
@@ -25,7 +26,15 @@ from app.models.coverage_window import CoverageWindow
 from app.models.game import Game, SourceSnapshot
 from app.models.player import Player
 from app.models.stat_definition import StatDefinition
-from app.schemas.article import ArticleBriefCreate, ArticleBriefRead
+from app.schemas.article import (
+    ArticleBriefCreate,
+    ArticleBriefRead,
+    ArticleReadinessDecisionRead,
+)
+from app.services.article_editing import (
+    article_version_read_with_audit,
+    read_article_versions,
+)
 from app.services.article_generation import (
     article_generation_job_read,
     article_version_read,
@@ -504,4 +513,27 @@ async def read_article_brief(
     )
     if latest_job is not None:
         brief.latest_generation_job = await article_generation_job_read(db, latest_job)
+    brief.versions = await read_article_versions(db, article.id)
+    if brief.versions:
+        brief.latest_version = brief.versions[-1]
+    if article.ready_version_id is not None:
+        ready_version = await db.get(ArticleVersion, article.ready_version_id)
+        if ready_version is not None:
+            brief.ready_version = await article_version_read_with_audit(
+                db, ready_version
+            )
+    decisions = list(
+        await db.scalars(
+            select(ArticleReadinessDecision)
+            .where(ArticleReadinessDecision.article_id == article.id)
+            .order_by(
+                ArticleReadinessDecision.created_at,
+                ArticleReadinessDecision.id,
+            )
+        )
+    )
+    brief.readiness_history = [
+        ArticleReadinessDecisionRead.model_validate(decision, from_attributes=True)
+        for decision in decisions
+    ]
     return brief

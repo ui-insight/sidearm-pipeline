@@ -113,12 +113,29 @@ const articleVersion = {
   style_snapshot: {},
   style_hash: "b".repeat(64),
   prompt_version: "article-writer-v1",
+  editor_instructions: null,
   provider: "anthropic-messages",
   model: "test-model",
   output_hash: "c".repeat(64),
   validation_results: [],
   author: null,
   created_at: "2026-07-28T18:00:00Z",
+  warning_overrides: [],
+};
+
+const humanVersion = {
+  ...articleVersion,
+  id: 901,
+  version: 2,
+  origin: "human",
+  parent_version_id: 900,
+  headline: "Avery Adams records 31 points since 2023-24",
+  author: "sid-user",
+  provider: null,
+  model: null,
+  prompt_version: null,
+  output_hash: "f".repeat(64),
+  created_at: "2026-07-28T18:05:00Z",
 };
 
 const queuedJob = {
@@ -288,5 +305,155 @@ describe("ArticleBriefPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Unsupported numeral: 99.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry draft" })).toBeInTheDocument();
+  });
+
+  it("saves human edits as a new version based on the latest checkpoint", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...brief,
+          status: "in_edit",
+          latest_version: articleVersion,
+          versions: [articleVersion],
+          readiness_history: [],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse(humanVersion, { status: 201 }));
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const headline = await screen.findByLabelText("Headline");
+    await user.clear(headline);
+    await user.type(headline, humanVersion.headline);
+    await user.click(screen.getByRole("button", { name: "Save new version" }));
+
+    expect((await screen.findAllByText("Version 2")).length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/articles/401/versions",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const request = fetchMock.mock.calls[1][1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      base_version_id: articleVersion.id,
+      headline: humanVersion.headline,
+    });
+  });
+
+  it("compares the original and current versions side by side and inline", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ...brief,
+        status: "in_edit",
+        latest_version: humanVersion,
+        versions: [articleVersion, humanVersion],
+        readiness_history: [],
+      }),
+    );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Side by side" }));
+    expect(screen.getByText(/Original · v1/)).toBeInTheDocument();
+    expect(screen.getByText(/Selected · v2/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: articleVersion.headline })).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("heading", { name: humanVersion.headline }).length,
+    ).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "changes" }));
+    expect(screen.getByText(/Inline diff/)).toBeInTheDocument();
+    expect(document.querySelector("ins")).toBeInTheDocument();
+    expect(document.querySelector("del")).toBeInTheDocument();
+  });
+
+  it("records a warning reason before marking the exact version ready", async () => {
+    const warningVersion = {
+      ...humanVersion,
+      headline: `${humanVersion.headline}!`,
+      validation_results: [
+        {
+          code: "style:no-exclamation",
+          severity: "warning",
+          message: "Forbidden Style Guide term(s): !.",
+          block_index: null,
+          evidence_ids: [],
+        },
+      ],
+    };
+    const decision = {
+      id: 300,
+      article_id: 401,
+      article_version_id: warningVersion.id,
+      action: "ready",
+      actor: "sid-user",
+      reason: "Acknowledged 1 nonblocking warning(s).",
+      created_at: "2026-07-28T18:10:00Z",
+    };
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...brief,
+          status: "in_edit",
+          latest_version: warningVersion,
+          versions: [articleVersion, warningVersion],
+          readiness_history: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          article_id: 401,
+          status: "ready",
+          ready_version: {
+            ...warningVersion,
+            warning_overrides: [
+              {
+                id: 200,
+                article_version_id: warningVersion.id,
+                finding_code: "style:no-exclamation",
+                reason: "Approved punctuation for this prototype story.",
+                overridden_by: "sid-user",
+                created_at: "2026-07-28T18:10:00Z",
+              },
+            ],
+          },
+          decision,
+        }),
+      );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.type(
+      await screen.findByLabelText("Reason for style:no-exclamation"),
+      "Approved punctuation for this prototype story.",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Mark version 2 ready" }),
+    );
+
+    expect(await screen.findByText("Version 2 approved")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/articles/401/versions/901/ready",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 });
