@@ -17,6 +17,8 @@ from app.models.achievement import (
 from app.models.article import (
     Article,
     ArticleAchievementSuggestion,
+    ArticleGenerationJob,
+    ArticleVersion,
     EvidenceBundle,
 )
 from app.models.coverage_window import CoverageWindow
@@ -24,6 +26,10 @@ from app.models.game import Game, SourceSnapshot
 from app.models.player import Player
 from app.models.stat_definition import StatDefinition
 from app.schemas.article import ArticleBriefCreate, ArticleBriefRead
+from app.services.article_generation import (
+    article_generation_job_read,
+    article_version_read,
+)
 
 EVIDENCE_SCHEMA_VERSION = "article-evidence-bundle-v1"
 SUPPORTED_ARTICLE_SPORT = "womens-basketball"
@@ -426,6 +432,8 @@ async def create_article_brief(
 def _article_brief_read(
     article: Article,
     bundle: EvidenceBundle,
+    *,
+    latest_version: ArticleVersion | None = None,
 ) -> ArticleBriefRead:
     content = bundle.content
     return ArticleBriefRead.model_validate(
@@ -448,6 +456,12 @@ def _article_brief_read(
                 "created_at": bundle.created_at,
                 "suggestions": content["suggestions"],
             },
+            "latest_generation_job": None,
+            "latest_version": (
+                article_version_read(latest_version).model_dump(mode="python")
+                if latest_version
+                else None
+            ),
         }
     )
 
@@ -468,4 +482,26 @@ async def read_article_brief(
     )
     if bundle is None:
         raise ArticleBriefConflictError("Article has no Evidence Bundle.")
-    return _article_brief_read(article, bundle)
+    latest_job = await db.scalar(
+        select(ArticleGenerationJob)
+        .where(ArticleGenerationJob.article_id == article.id)
+        .order_by(
+            ArticleGenerationJob.created_at.desc(),
+            ArticleGenerationJob.id.desc(),
+        )
+        .limit(1)
+    )
+    latest_version = await db.scalar(
+        select(ArticleVersion)
+        .where(ArticleVersion.article_id == article.id)
+        .order_by(ArticleVersion.version.desc())
+        .limit(1)
+    )
+    brief = _article_brief_read(
+        article,
+        bundle,
+        latest_version=latest_version,
+    )
+    if latest_job is not None:
+        brief.latest_generation_job = await article_generation_job_read(db, latest_job)
+    return brief

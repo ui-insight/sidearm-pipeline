@@ -31,6 +31,10 @@ class Settings(BaseSettings):
         None  # e.g. https://mindrouter.uidaho.edu/anthropic
     )
     CONTENT_MODEL: str = "claude-opus-4-7"
+    ARTICLE_MODEL: str | None = None
+    ARTICLE_GENERATION_MAX_TOKENS: int = Field(default=4000, ge=256, le=16000)
+    ARTICLE_GENERATION_POLL_SECONDS: float = Field(default=2.0, ge=0.1, le=60)
+    ARTICLE_GENERATION_LEASE_SECONDS: int = Field(default=300, ge=30, le=3600)
     ACHIEVEMENT_MODEL: str = "claude-opus-4-7"
     ACHIEVEMENT_AI_MAX_CANDIDATES: int = Field(default=100, ge=1, le=100)
     NLQ_MODEL: str | None = None

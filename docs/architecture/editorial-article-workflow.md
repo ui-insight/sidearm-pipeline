@@ -124,6 +124,14 @@ Generation jobs are durable database records, not process-local background-task
 dictionaries. A worker may reclaim abandoned `running` work using an explicit lease
 and attempt record. A failed or unsafe response creates no partial Article Version.
 
+The Release 1 implementation queues jobs through
+`POST /api/v1/articles/{article_id}/generation-jobs` and exposes durable status through
+`GET /api/v1/articles/{article_id}/generation-jobs/{job_id}`. The backend worker claims
+the oldest eligible job, records an attempt and lease before contacting the provider,
+and reclaims expired work after restart. Provider failures and deterministic
+validation failures return the Article to `brief` so the SID can retry without
+recreating its Evidence Bundle.
+
 ## Distribution state machine
 
 ```mermaid
@@ -181,6 +189,10 @@ one or more Evidence Bundle item IDs. Validation occurs before persistence:
 
 The validator rejects the complete response on any blocking failure. Model-reported
 confidence cannot override deterministic validation.
+
+The seeded prototype Style Guide is an immutable shared-athletics version. It applies
+headline length, unsupported-fact-class, measured-language, and punctuation rules
+until issue #148 adds the maintainer workflow for scoped successor versions.
 
 A human editor may add a fact not present in the Evidence Bundle only by recording a
 source reference and an explicit verification attestation. The added fact is marked

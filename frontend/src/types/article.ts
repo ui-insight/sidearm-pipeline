@@ -3,6 +3,20 @@ export type ArticleType =
   | "player_spotlight"
   | "achievement_story";
 
+export type ArticleStatus =
+  | "brief"
+  | "generating"
+  | "in_edit"
+  | "ready"
+  | "needs_revalidation"
+  | "archived";
+
+export type ArticleGenerationJobState =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed";
+
 export interface ArticleBriefCreate {
   suggestion_ids: number[];
   article_type: ArticleType;
@@ -83,9 +97,82 @@ export interface EvidenceBundle {
   suggestions: ArticleEvidenceSuggestion[];
 }
 
+export interface ArticleDraftBlock {
+  kind: "lead" | "body" | "closing";
+  text: string;
+  evidence_ids: string[];
+}
+
+export interface ArticleValidationFinding {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+  block_index: number | null;
+  evidence_ids: string[];
+}
+
+export interface ArticleVersion {
+  id: number;
+  article_id: number;
+  version: number;
+  origin: "ai" | "human";
+  parent_version_id: number | null;
+  headline: string;
+  headline_evidence_ids: string[];
+  body: string;
+  blocks: ArticleDraftBlock[];
+  evidence_bundle_id: number;
+  evidence_hash: string;
+  style_guide_version_id: number;
+  style_snapshot: Record<string, unknown>;
+  style_hash: string;
+  prompt_version: string | null;
+  provider: string | null;
+  model: string | null;
+  output_hash: string | null;
+  validation_results: ArticleValidationFinding[];
+  author: string | null;
+  created_at: string;
+}
+
+export interface ArticleGenerationJob {
+  id: number;
+  article_id: number;
+  state: ArticleGenerationJobState;
+  requested_by: string;
+  attempt_count: number;
+  evidence_bundle_id: number;
+  style_guide_version_id: number;
+  style_snapshot: {
+    versions?: Array<{
+      id: number;
+      guide_key: string;
+      version: number;
+      name: string;
+      scope_type: string;
+      scope_value: string | null;
+      content_hash: string;
+    }>;
+    [key: string]: unknown;
+  };
+  style_hash: string;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  input_hash: string;
+  output_hash: string | null;
+  validation_results: ArticleValidationFinding[];
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  article_version: ArticleVersion | null;
+}
+
 export interface ArticleBrief {
   id: number;
-  status: "brief";
+  status: ArticleStatus;
   article_type: ArticleType;
   angle: string;
   audience: string;
@@ -94,4 +181,6 @@ export interface ArticleBrief {
   created_at: string;
   game: ArticleGameEvidence;
   evidence_bundle: EvidenceBundle;
+  latest_generation_job?: ArticleGenerationJob | null;
+  latest_version?: ArticleVersion | null;
 }

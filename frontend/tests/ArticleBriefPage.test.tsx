@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ArticleBriefPage from "../src/pages/ArticleBriefPage";
@@ -90,6 +91,72 @@ const brief = {
   },
 };
 
+const articleVersion = {
+  id: 900,
+  article_id: 401,
+  version: 1,
+  origin: "ai",
+  parent_version_id: null,
+  headline: "Avery Adams reaches 31 points since 2023-24",
+  headline_evidence_ids: ["achievement-suggestion:17"],
+  body: "Avery Adams set a career high with 31 points since 2023-24.",
+  blocks: [
+    {
+      kind: "lead",
+      text: "Avery Adams set a career high with 31 points since 2023-24.",
+      evidence_ids: ["achievement-suggestion:17"],
+    },
+  ],
+  evidence_bundle_id: 700,
+  evidence_hash: "a".repeat(64),
+  style_guide_version_id: 5,
+  style_snapshot: {},
+  style_hash: "b".repeat(64),
+  prompt_version: "article-writer-v1",
+  provider: "anthropic-messages",
+  model: "test-model",
+  output_hash: "c".repeat(64),
+  validation_results: [],
+  author: null,
+  created_at: "2026-07-28T18:00:00Z",
+};
+
+const queuedJob = {
+  id: 800,
+  article_id: 401,
+  state: "queued",
+  requested_by: "sid-user",
+  attempt_count: 0,
+  evidence_bundle_id: 700,
+  style_guide_version_id: 5,
+  style_snapshot: {
+    versions: [
+      {
+        id: 5,
+        guide_key: "athletics-default",
+        version: 1,
+        name: "Vandals Athletics seed guide",
+        scope_type: "shared_athletics",
+        scope_value: null,
+        content_hash: "d".repeat(64),
+      },
+    ],
+  },
+  style_hash: "b".repeat(64),
+  provider: "anthropic-messages",
+  model: "test-model",
+  prompt_version: "article-writer-v1",
+  input_hash: "e".repeat(64),
+  output_hash: null,
+  validation_results: [],
+  error_code: null,
+  error_message: null,
+  created_at: "2026-07-28T18:00:00Z",
+  started_at: null,
+  completed_at: null,
+  article_version: null,
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(jsonResponse(brief));
@@ -129,5 +196,97 @@ describe("ArticleBriefPage", () => {
       "href",
       "https://govandals.com/boxscore/61",
     );
+  });
+
+  it("queues a durable evidence-bound draft from the brief", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(brief))
+      .mockResolvedValueOnce(jsonResponse(queuedJob, { status: 202 }));
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Generate draft" }),
+    );
+
+    expect(await screen.findByText("Draft queued")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/articles/401/generation-jobs",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const request = fetchMock.mock.calls[1][1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      idempotency_key: expect.stringContaining("article-draft-401-"),
+    });
+  });
+
+  it("shows the validated immutable AI draft and its evidence references", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ...brief,
+        status: "in_edit",
+        latest_version: articleVersion,
+      }),
+    );
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: articleVersion.headline }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Evidence: achievement-suggestion:17"),
+    ).toHaveLength(2);
+    expect(screen.getByText(/Draft validated/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate draft" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed brief retryable and shows deterministic findings", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ...brief,
+        latest_generation_job: {
+          ...queuedJob,
+          state: "failed",
+          error_code: "validation_failed",
+          error_message: "The generated draft failed validation.",
+          validation_results: [
+            {
+              code: "unsupported_numeral",
+              severity: "error",
+              message: "Unsupported numeral: 99.",
+              block_index: 0,
+              evidence_ids: ["achievement-suggestion:17"],
+            },
+          ],
+          completed_at: "2026-07-28T18:01:00Z",
+        },
+      }),
+    );
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("The generated draft failed validation."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unsupported numeral: 99.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry draft" })).toBeInTheDocument();
   });
 });
