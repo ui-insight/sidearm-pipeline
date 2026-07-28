@@ -12,7 +12,10 @@ from app.models.achievement import (
 from app.models.article import (
     Article,
     ArticleAchievementSuggestion,
+    ArticleGenerationJob,
+    ArticleVersion,
     EvidenceBundle,
+    StyleGuideVersion,
 )
 from app.models.content import GeneratedContent
 from app.models.coverage_window import CoverageWindow
@@ -42,6 +45,8 @@ __all__ = [
     "AchievementSuggestion",
     "Article",
     "ArticleAchievementSuggestion",
+    "ArticleGenerationJob",
+    "ArticleVersion",
     "CoverageWindow",
     "DataQualityIssue",
     "EventSource",
@@ -64,6 +69,7 @@ __all__ = [
     "SourceSnapshot",
     "SportProgram",
     "StatDefinition",
+    "StyleGuideVersion",
     "Team",
     "TeamGameStat",
     "TeamSeasonStat",

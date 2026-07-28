@@ -9,6 +9,7 @@ from app.models.achievement import NotabilityPolicy, NotabilityPolicyMetric
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.models.team import Team
+from app.services.article_style import ensure_seed_style_guide
 
 WBB_PROGRAM_SLUG = "womens-basketball"
 IDAHO_TEAM_SLUG = "idaho"
@@ -187,6 +188,7 @@ WBB_NOTABILITY_METRICS = {
 
 async def seed_warehouse_reference_data(session: AsyncSession) -> None:
     """Create the WBB program, Idaho team, and atomic stat definitions once."""
+    await ensure_seed_style_guide(session)
     program = await session.scalar(
         select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
     )

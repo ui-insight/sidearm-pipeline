@@ -7,6 +7,15 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 ArticleType = Literal["game_recap", "player_spotlight", "achievement_story"]
+ArticleStatus = Literal[
+    "brief",
+    "generating",
+    "in_edit",
+    "ready",
+    "needs_revalidation",
+    "archived",
+]
+GenerationJobState = Literal["queued", "running", "succeeded", "failed"]
 TrimmedAngle = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=1000),
@@ -133,11 +142,129 @@ class EvidenceBundleRead(BaseModel):
     suggestions: list[ArticleEvidenceSuggestionRead]
 
 
+class ArticleDraftBlock(BaseModel):
+    """One writer-produced block with explicit supporting evidence IDs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["lead", "body", "closing"]
+    text: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=5000),
+    ]
+    evidence_ids: list[str] = Field(min_length=1, max_length=25)
+
+    @field_validator("evidence_ids")
+    @classmethod
+    def validate_evidence_ids(cls, values: list[str]) -> list[str]:
+        """Require unique, non-empty evidence references."""
+        normalized = [value.strip() for value in values]
+        if any(not value for value in normalized):
+            raise ValueError("evidence IDs must not be empty")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("evidence IDs must be unique")
+        return normalized
+
+
+class ArticleDraftOutput(BaseModel):
+    """Strict structured payload returned by the evidence-bound writer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    headline: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=255),
+    ]
+    headline_evidence_ids: list[str] = Field(min_length=1, max_length=25)
+    blocks: list[ArticleDraftBlock] = Field(min_length=1, max_length=20)
+
+    @field_validator("headline_evidence_ids")
+    @classmethod
+    def validate_headline_evidence_ids(cls, values: list[str]) -> list[str]:
+        """Require unique evidence references for the headline."""
+        normalized = [value.strip() for value in values]
+        if any(not value for value in normalized):
+            raise ValueError("headline evidence IDs must not be empty")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("headline evidence IDs must be unique")
+        return normalized
+
+
+class ArticleValidationFindingRead(BaseModel):
+    """One deterministic fact or Style Guide validation result."""
+
+    code: str
+    severity: Literal["error", "warning"]
+    message: str
+    block_index: int | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ArticleVersionRead(BaseModel):
+    """One immutable Article draft checkpoint."""
+
+    id: int
+    article_id: int
+    version: int
+    origin: Literal["ai", "human"]
+    parent_version_id: int | None
+    headline: str
+    headline_evidence_ids: list[str]
+    body: str
+    blocks: list[ArticleDraftBlock]
+    evidence_bundle_id: int
+    evidence_hash: str
+    style_guide_version_id: int
+    style_snapshot: dict
+    style_hash: str
+    prompt_version: str | None
+    provider: str | None
+    model: str | None
+    output_hash: str | None
+    validation_results: list[ArticleValidationFindingRead]
+    author: str | None
+    created_at: datetime
+
+
+class ArticleGenerationJobCreate(BaseModel):
+    """An idempotent human request for an evidence-bound Article Draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: IdempotencyKey
+
+
+class ArticleGenerationJobRead(BaseModel):
+    """Durable status and audit metadata for a writer job."""
+
+    id: int
+    article_id: int
+    state: GenerationJobState
+    requested_by: str
+    attempt_count: int
+    evidence_bundle_id: int
+    style_guide_version_id: int
+    style_snapshot: dict
+    style_hash: str
+    provider: str
+    model: str
+    prompt_version: str
+    input_hash: str
+    output_hash: str | None
+    validation_results: list[ArticleValidationFindingRead]
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    article_version: ArticleVersionRead | None = None
+
+
 class ArticleBriefRead(BaseModel):
     """A complete SID-facing Article Brief and its evidence audit data."""
 
     id: int
-    status: Literal["brief"]
+    status: ArticleStatus
     article_type: ArticleType
     angle: str
     audience: str
@@ -146,3 +273,5 @@ class ArticleBriefRead(BaseModel):
     created_at: datetime
     game: ArticleGameEvidenceRead
     evidence_bundle: EvidenceBundleRead
+    latest_generation_job: ArticleGenerationJobRead | None = None
+    latest_version: ArticleVersionRead | None = None

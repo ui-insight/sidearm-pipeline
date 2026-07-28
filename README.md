@@ -22,6 +22,7 @@ The project currently provides:
 - **Record Book preview**: evidence-backed WBB leaderboards driven by the eligible metric catalog, with explicit coverage windows
 - **Governed questions**: deterministic semantic-query catalog, Ask-a-Question mapping, and historical pregame briefs
 - **Achievement workflow**: deterministic suggestions, optional validated AI ranking/phrasing, and SID verdict capture
+- **Evidence-bound Articles**: approved suggestions become frozen Article Briefs and durable, validated AI Article Versions under an immutable Style Guide
 - **Documentation Standards**: MkDocs Material site with architecture, governance, and security docs
 - **Data Governance**: classification, lineage, retention, and schema-versioning guidance
 - **Security Standards**: dependency scanning, configuration checks, and launch-readiness guidance

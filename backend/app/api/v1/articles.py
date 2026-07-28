@@ -5,12 +5,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.engine import get_db
-from app.schemas.article import ArticleBriefCreate, ArticleBriefRead
+from app.schemas.article import (
+    ArticleBriefCreate,
+    ArticleBriefRead,
+    ArticleGenerationJobCreate,
+    ArticleGenerationJobRead,
+)
 from app.services.article_brief import (
     ArticleBriefConflictError,
     ArticleBriefNotFoundError,
     create_article_brief,
     read_article_brief,
+)
+from app.services.article_generation import (
+    ArticleGenerationConflictError,
+    ArticleGenerationNotFoundError,
+    read_article_generation_job,
+    request_article_generation,
 )
 
 router = APIRouter()
@@ -79,5 +90,61 @@ async def get_article_brief(
     except ArticleBriefConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/{article_id}/generation-jobs",
+    response_model=ArticleGenerationJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Queue an evidence-bound Article Draft generation job",
+)
+async def post_article_generation_job(
+    article_id: int,
+    payload: ArticleGenerationJobCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleGenerationJobRead:
+    """Queue a durable writer job without changing the frozen Article Brief."""
+    try:
+        job = await request_article_generation(
+            db,
+            article_id,
+            payload,
+            requested_by=_request_username(request),
+        )
+        await db.commit()
+        return job
+    except ArticleGenerationNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ArticleGenerationConflictError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/{article_id}/generation-jobs/{job_id}",
+    response_model=ArticleGenerationJobRead,
+    summary="Read an Article Draft generation job",
+)
+async def get_article_generation_job(
+    article_id: int,
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleGenerationJobRead:
+    """Return durable writer status, failures, validation, and resulting version."""
+    try:
+        return await read_article_generation_job(db, article_id, job_id)
+    except ArticleGenerationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc

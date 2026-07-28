@@ -241,11 +241,32 @@ The row stores the current verdict rather than an immutable verdict-event
 history. Prior verdict counts used by feedback calibration are captured in each
 new suggestion's context; see ADR-009.
 
+### `articles`, `article_achievement_suggestions`, and `evidence_bundles`
+
+An Article begins as SID-authored editorial intent linked to approved Achievement
+Suggestions from one game. Its immutable Evidence Bundles preserve the exact facts,
+Coverage Windows, verdict metadata, source provenance, and canonical content hash
+available to the writer.
+
+### `style_guide_versions`
+
+Immutable editorial policy snapshots with scope, rules, instructions, author, version,
+and content hash. Release 1 seeds a shared-athletics version; scoped authoring and
+activation are added under issue #148.
+
+### `article_generation_jobs` and `article_versions`
+
+Durable generation jobs persist queued/running/succeeded/failed state, worker lease,
+attempt count, exact bounded writer input, resolved Style Guide snapshot, provider
+metadata, validation findings, and hashes. A successful safe result creates one
+append-only AI Article Version. Failed or unsafe output creates no partial version.
+
 ### `generated_content`
 
 Optional AI-generated headline, recap, spotlight, and social-copy drafts for a
 game, with model and generation time. These are Internal until explicitly
-published elsewhere.
+published elsewhere. This is the legacy ungoverned path retained temporarily for
+comparison; it is not used by evidence-bound Article generation.
 
 ### `workspace_views`
 
@@ -267,7 +288,6 @@ are not stored as separate result tables.
   parent/child tournament structures for non-team-contest sports
 - immutable operator and verdict audit-event history
 - individual users, institutional SSO, and role-based authorization
-- scheduled job definitions and distributed worker/lease state
 - website-syndication publications, versions, and delivery receipts
 - automated retention/disposal state for raw snapshots and operational metadata
 
