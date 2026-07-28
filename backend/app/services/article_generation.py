@@ -15,8 +15,10 @@ from app.config import settings
 from app.models.article import (
     Article,
     ArticleGenerationJob,
+    ArticleReadinessDecision,
     ArticleVersion,
     EvidenceBundle,
+    StyleGuideVersion,
 )
 from app.models.game import Game
 from app.schemas.article import (
@@ -70,17 +72,20 @@ def _game_evidence_id(content: dict) -> str:
     return f"game:{content['game']['id']}"
 
 
-def _writer_input(
+def build_writer_input(
     article: Article,
     bundle: EvidenceBundle,
     style_snapshot: dict,
+    *,
+    base_version: ArticleVersion | None = None,
+    editor_instructions: str | None = None,
 ) -> dict:
     evidence = dict(bundle.content)
     evidence["game"] = {
         "evidence_item_id": _game_evidence_id(bundle.content),
         **evidence["game"],
     }
-    return {
+    writer_input = {
         "article_brief": {
             "article_id": article.id,
             "article_type": article.article_type,
@@ -97,6 +102,18 @@ def _writer_input(
         },
         "style_guide": style_snapshot,
     }
+    if base_version is not None and editor_instructions is not None:
+        writer_input["editor_revision"] = {
+            "instructions": editor_instructions,
+            "base_version": {
+                "id": base_version.id,
+                "version": base_version.version,
+                "headline": base_version.headline,
+                "headline_evidence_ids": base_version.headline_evidence_ids,
+                "blocks": base_version.blocks,
+            },
+        }
+    return writer_input
 
 
 async def request_article_generation(
@@ -137,10 +154,41 @@ async def request_article_generation(
         raise ArticleGenerationConflictError(
             "This Article already has an active generation job."
         )
-    if article.status != "brief":
-        raise ArticleGenerationConflictError(
-            "The first Article Draft can be generated only from a brief."
-        )
+    if article.status == "archived":
+        raise ArticleGenerationConflictError("Archived Articles cannot be revised.")
+
+    latest_version = await db.scalar(
+        select(ArticleVersion)
+        .where(ArticleVersion.article_id == article_id)
+        .order_by(ArticleVersion.version.desc())
+        .limit(1)
+    )
+    if latest_version is None:
+        if article.status != "brief":
+            raise ArticleGenerationConflictError(
+                "The first Article Draft can be generated only from a brief."
+            )
+        if (
+            payload.base_version_id is not None
+            or payload.editor_instructions is not None
+        ):
+            raise ArticleGenerationConflictError(
+                "A first draft does not accept revision instructions."
+            )
+    else:
+        if article.status not in {"in_edit", "ready"}:
+            raise ArticleGenerationConflictError(
+                "This Article cannot accept an AI revision in its current state."
+            )
+        if payload.base_version_id != latest_version.id:
+            raise ArticleGenerationConflictError(
+                "The base Article Version is stale. Reload before requesting "
+                "a revision."
+            )
+        if payload.editor_instructions is None:
+            raise ArticleGenerationConflictError(
+                "Editor instructions are required for an AI revision."
+            )
 
     bundle = await db.scalar(
         select(EvidenceBundle)
@@ -150,23 +198,39 @@ async def request_article_generation(
     )
     if bundle is None:
         raise ArticleGenerationConflictError("Article has no Evidence Bundle.")
-    game = await db.get(Game, article.game_id)
-    if game is None:
-        raise ArticleGenerationNotFoundError("Article game not found.")
-
-    try:
-        guide, style_snapshot, style_hash = await resolve_article_style(
-            db,
-            sport=game.sport,
-            article_type=article.article_type,
-        )
-    except RuntimeError as exc:
-        raise ArticleGenerationConflictError(str(exc)) from exc
-    writer_input = _writer_input(article, bundle, style_snapshot)
+    if latest_version is None:
+        game = await db.get(Game, article.game_id)
+        if game is None:
+            raise ArticleGenerationNotFoundError("Article game not found.")
+        try:
+            guide, style_snapshot, style_hash = await resolve_article_style(
+                db,
+                sport=game.sport,
+                article_type=article.article_type,
+            )
+        except RuntimeError as exc:
+            raise ArticleGenerationConflictError(str(exc)) from exc
+    else:
+        guide = await db.get(StyleGuideVersion, latest_version.style_guide_version_id)
+        if guide is None:
+            raise ArticleGenerationConflictError("Article Style Guide not found.")
+        bundle = await db.get(EvidenceBundle, latest_version.evidence_bundle_id)
+        if bundle is None:
+            raise ArticleGenerationConflictError("Article Evidence Bundle not found.")
+        style_snapshot = latest_version.style_snapshot
+        style_hash = latest_version.style_hash
+    writer_input = build_writer_input(
+        article,
+        bundle,
+        style_snapshot,
+        base_version=latest_version,
+        editor_instructions=payload.editor_instructions,
+    )
     job = ArticleGenerationJob(
         article_id=article.id,
         evidence_bundle_id=bundle.id,
         style_guide_version_id=guide.id,
+        base_version_id=latest_version.id if latest_version else None,
         state="queued",
         requested_by=requested_by,
         idempotency_key=payload.idempotency_key,
@@ -174,6 +238,7 @@ async def request_article_generation(
         provider=ARTICLE_PROVIDER,
         model=article_model(),
         prompt_version=ARTICLE_PROMPT_VERSION,
+        editor_instructions=payload.editor_instructions,
         input_hash=canonical_hash(writer_input),
         writer_input=writer_input,
         style_snapshot=style_snapshot,
@@ -489,12 +554,14 @@ def article_version_read(version: ArticleVersion) -> ArticleVersionRead:
             "style_snapshot": version.style_snapshot,
             "style_hash": version.style_hash,
             "prompt_version": version.prompt_version,
+            "editor_instructions": version.editor_instructions,
             "provider": version.provider,
             "model": version.model,
             "output_hash": version.output_hash,
             "validation_results": version.validation_results,
             "author": version.author,
             "created_at": version.created_at,
+            "warning_overrides": [],
         }
     )
 
@@ -516,11 +583,13 @@ async def article_generation_job_read(
             "attempt_count": job.attempt_count,
             "evidence_bundle_id": job.evidence_bundle_id,
             "style_guide_version_id": job.style_guide_version_id,
+            "base_version_id": job.base_version_id,
             "style_snapshot": job.style_snapshot,
             "style_hash": job.style_hash,
             "provider": job.provider,
             "model": job.model,
             "prompt_version": job.prompt_version,
+            "editor_instructions": job.editor_instructions,
             "input_hash": job.input_hash,
             "output_hash": job.output_hash,
             "validation_results": job.validation_results,
@@ -566,7 +635,10 @@ async def _restore_article_status(db: AsyncSession, article: Article) -> None:
             ArticleVersion.article_id == article.id
         )
     )
-    article.status = "in_edit" if version_count else "brief"
+    if article.ready_version_id is not None:
+        article.status = "ready"
+    else:
+        article.status = "in_edit" if version_count else "brief"
 
 
 async def process_article_generation_job(
@@ -677,7 +749,7 @@ async def process_article_generation_job(
         body = "\n\n".join(block.text for block in draft.blocks)
         version = ArticleVersion(
             article_id=article.id,
-            parent_version_id=latest_version.id if latest_version else None,
+            parent_version_id=job.base_version_id,
             evidence_bundle_id=job.evidence_bundle_id,
             style_guide_version_id=job.style_guide_version_id,
             generation_job_id=job.id,
@@ -691,6 +763,7 @@ async def process_article_generation_job(
             provider=job.provider,
             model=job.model,
             prompt_version=job.prompt_version,
+            editor_instructions=job.editor_instructions,
             evidence_hash=job.writer_input["evidence_bundle"]["content_hash"],
             style_snapshot=job.style_snapshot,
             style_hash=job.style_hash,
@@ -698,6 +771,18 @@ async def process_article_generation_job(
             validation_results=findings,
         )
         db.add(version)
+        await db.flush()
+        if article.ready_version_id is not None:
+            db.add(
+                ArticleReadinessDecision(
+                    article_id=article.id,
+                    article_version_id=article.ready_version_id,
+                    action="reopened",
+                    actor=job.requested_by,
+                    reason="AI revision requested and completed.",
+                )
+            )
+            article.ready_version_id = None
     job.state = "succeeded"
     article.status = "in_edit"
     await db.commit()

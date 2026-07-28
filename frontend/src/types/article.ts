@@ -127,12 +127,47 @@ export interface ArticleVersion {
   style_snapshot: Record<string, unknown>;
   style_hash: string;
   prompt_version: string | null;
+  editor_instructions: string | null;
   provider: string | null;
   model: string | null;
   output_hash: string | null;
   validation_results: ArticleValidationFinding[];
   author: string | null;
   created_at: string;
+  warning_overrides: ArticleWarningOverride[];
+}
+
+export interface ArticleWarningOverride {
+  id: number;
+  article_version_id: number;
+  finding_code: string;
+  reason: string;
+  overridden_by: string;
+  created_at: string;
+}
+
+export interface ArticleReadinessDecision {
+  id: number;
+  article_id: number;
+  article_version_id: number;
+  action: "ready" | "reopened";
+  actor: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface ArticleVersionCreate {
+  base_version_id: number;
+  headline: string;
+  headline_evidence_ids: string[];
+  blocks: ArticleDraftBlock[];
+}
+
+export interface ArticleReadyResult {
+  article_id: number;
+  status: "ready";
+  ready_version: ArticleVersion;
+  decision: ArticleReadinessDecision;
 }
 
 export interface ArticleGenerationJob {
@@ -143,6 +178,7 @@ export interface ArticleGenerationJob {
   attempt_count: number;
   evidence_bundle_id: number;
   style_guide_version_id: number;
+  base_version_id: number | null;
   style_snapshot: {
     versions?: Array<{
       id: number;
@@ -159,6 +195,7 @@ export interface ArticleGenerationJob {
   provider: string;
   model: string;
   prompt_version: string;
+  editor_instructions: string | null;
   input_hash: string;
   output_hash: string | null;
   validation_results: ArticleValidationFinding[];
@@ -183,4 +220,25 @@ export interface ArticleBrief {
   evidence_bundle: EvidenceBundle;
   latest_generation_job?: ArticleGenerationJob | null;
   latest_version?: ArticleVersion | null;
+  ready_version?: ArticleVersion | null;
+  versions: ArticleVersion[];
+  readiness_history: ArticleReadinessDecision[];
+}
+
+export interface ArticleQueueItem {
+  id: number;
+  status: ArticleStatus;
+  article_type: ArticleType;
+  angle: string;
+  owner: string;
+  created_at: string;
+  game_date: string | null;
+  game_title: string | null;
+  latest_version: ArticleVersion | null;
+  ready_version: ArticleVersion | null;
+}
+
+export interface ArticleQueue {
+  items: ArticleQueueItem[];
+  total: number;
 }

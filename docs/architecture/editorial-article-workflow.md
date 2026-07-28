@@ -221,6 +221,18 @@ reconciliation.
 The Article points to a selected ready version for convenient reads, but that pointer
 does not make the underlying version mutable.
 
+The Release 1 implementation exposes this contract through:
+
+- `GET /api/v1/articles` for the SID queue with owner, latest, and ready state
+- `GET /api/v1/articles/{article_id}/versions` for immutable history
+- `POST /api/v1/articles/{article_id}/versions` for optimistic-concurrency human saves
+- `POST /api/v1/articles/{article_id}/versions/{version_id}/ready` for the human gate
+
+The Article workspace keeps evidence adjacent to the copy, supports original/current,
+side-by-side, and inline-diff review, and requires a written reason for every warning
+before readiness. Requesting an AI revision adds editor instructions and the selected
+base version to the bounded writer input but does not expand the Evidence Bundle.
+
 ## Style Guide resolution
 
 Style Guides are immutable versions. Active rules resolve in this order, with later

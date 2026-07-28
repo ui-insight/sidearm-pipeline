@@ -12,6 +12,7 @@ import AthleticsDemoPage from "./pages/AthleticsDemoPage";
 import AchievementReviewPage from "./pages/AchievementReviewPage";
 import AskWarehousePage from "./pages/AskWarehousePage";
 import ArticleBriefPage from "./pages/ArticleBriefPage";
+import ArticleQueuePage from "./pages/ArticleQueuePage";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
               <Route path="/workspace/compare" element={<PlayerComparisonPage />} />
               <Route path="/record-book" element={<RecordBookPage />} />
               <Route path="/achievements" element={<AchievementReviewPage />} />
+              <Route path="/articles" element={<ArticleQueuePage />} />
               <Route path="/articles/:id" element={<ArticleBriefPage />} />
               <Route path="/identity-queue" element={<IdentityQueuePage />} />
               <Route path="/backfills" element={<HistoricalBackfillPage />} />

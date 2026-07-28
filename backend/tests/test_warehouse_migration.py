@@ -76,6 +76,14 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
                 "article_achievement_suggestions"
             )
         }
+        generation_job_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("article_generation_jobs")
+        }
+        article_version_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("article_versions")
+        }
         policy_count = connection.scalar(
             select(func.count()).select_from(
                 Table("notability_policies", metadata, autoload_with=connection)
@@ -108,6 +116,10 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "articles",
         "article_achievement_suggestions",
         "evidence_bundles",
+        "article_generation_jobs",
+        "article_versions",
+        "article_warning_overrides",
+        "article_readiness_decisions",
     }.issubset(tables)
     assert definition_count == 16
     assert policy_count == 1
@@ -167,6 +179,7 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "created_by",
         "idempotency_key",
         "request_hash",
+        "ready_version_id",
     }.issubset(article_columns)
     assert {
         "article_id",
@@ -183,6 +196,8 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "reviewed_fact_hash",
         "linked_at",
     }.issubset(article_suggestion_columns)
+    assert {"base_version_id", "editor_instructions"}.issubset(generation_job_columns)
+    assert "editor_instructions" in article_version_columns
 
     subprocess.run(
         [
