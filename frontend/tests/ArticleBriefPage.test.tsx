@@ -174,6 +174,41 @@ const queuedJob = {
   article_version: null,
 };
 
+const activeRevalidation = {
+  id: 77,
+  article_id: 401,
+  previous_evidence_bundle_id: 700,
+  refreshed_evidence_bundle_id: null,
+  change_hash: "9".repeat(64),
+  detected_at: "2026-07-29T16:00:00Z",
+  resolved_at: null,
+  resolved_by: null,
+  changes: [
+    {
+      change_type: "fact_changed",
+      suggestion_key: "career_high:9:points",
+      label: "The verified achievement fact changed.",
+      previous_value: {
+        player_name: "Avery Adams",
+        computed_value: "31.000000",
+        stat_label: "Points",
+      },
+      current_value: {
+        player_name: "Avery Adams",
+        computed_value: "36.000000",
+        stat_label: "Points",
+      },
+    },
+    {
+      change_type: "approval_changed",
+      suggestion_key: "career_high:9:points",
+      label: "The current evidence no longer has a valid SID approval.",
+      previous_value: "approved",
+      current_value: "pending",
+    },
+  ],
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(jsonResponse(brief));
@@ -455,5 +490,80 @@ describe("ArticleBriefPage", () => {
       "/api/v1/articles/401/versions/901/ready",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("explains changed evidence and refreshes only after deliberate review", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...brief,
+          status: "needs_revalidation",
+          latest_version: articleVersion,
+          versions: [articleVersion],
+          readiness_history: [],
+          active_revalidation: activeRevalidation,
+          revalidation_history: [activeRevalidation],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...brief,
+          status: "in_edit",
+          evidence_bundle: {
+            ...brief.evidence_bundle,
+            id: 701,
+            version: 2,
+            content_hash: "2".repeat(64),
+          },
+          latest_version: humanVersion,
+          versions: [articleVersion, humanVersion],
+          readiness_history: [],
+          active_revalidation: null,
+          revalidation_history: [
+            {
+              ...activeRevalidation,
+              refreshed_evidence_bundle_id: 701,
+              resolved_at: "2026-07-29T16:10:00Z",
+              resolved_by: "sid-user",
+            },
+          ],
+        }),
+      );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/articles/401"]}>
+        <Routes>
+          <Route path="/articles/:id" element={<ArticleBriefPage />} />
+          <Route path="/achievements" element={<p>Achievement review queue</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Source evidence changed" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Avery Adams · 31.000000 · Points")).toBeInTheDocument();
+    expect(screen.getByText("Avery Adams · 36.000000 · Points")).toBeInTheDocument();
+    expect(screen.getByText("pending")).toBeInTheDocument();
+    expect(screen.getByLabelText("Headline")).toBeDisabled();
+    expect(
+      screen.getByRole("link", { name: "Review source suggestions" }),
+    ).toHaveAttribute("href", "/achievements");
+
+    await user.click(
+      screen.getByRole("button", { name: "Refresh approved evidence" }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/articles/401/revalidation/refresh",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: humanVersion.headline }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Source evidence changed" }),
+    ).not.toBeInTheDocument();
   });
 });

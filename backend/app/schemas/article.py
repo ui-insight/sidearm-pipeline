@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -296,6 +296,37 @@ class ArticleReadinessDecisionRead(BaseModel):
     created_at: datetime
 
 
+class ArticleEvidenceChangeRead(BaseModel):
+    """One material difference between frozen and current Article evidence."""
+
+    change_type: Literal[
+        "game_changed",
+        "suggestion_removed",
+        "fact_changed",
+        "coverage_changed",
+        "source_changed",
+        "approval_changed",
+    ]
+    suggestion_key: str | None = None
+    label: str
+    previous_value: Any = None
+    current_value: Any = None
+
+
+class ArticleEvidenceRevalidationRead(BaseModel):
+    """An append-only source-drift detection and its resolution state."""
+
+    id: int
+    article_id: int
+    previous_evidence_bundle_id: int
+    refreshed_evidence_bundle_id: int | None
+    change_hash: str
+    changes: list[ArticleEvidenceChangeRead]
+    detected_at: datetime
+    resolved_at: datetime | None
+    resolved_by: str | None
+
+
 class ArticleReadyRead(BaseModel):
     """The resulting Article state after a readiness decision."""
 
@@ -361,6 +392,10 @@ class ArticleBriefRead(BaseModel):
     ready_version: ArticleVersionRead | None = None
     versions: list[ArticleVersionRead] = Field(default_factory=list)
     readiness_history: list[ArticleReadinessDecisionRead] = Field(default_factory=list)
+    active_revalidation: ArticleEvidenceRevalidationRead | None = None
+    revalidation_history: list[ArticleEvidenceRevalidationRead] = Field(
+        default_factory=list
+    )
 
 
 class ArticleQueueItemRead(BaseModel):
@@ -376,6 +411,7 @@ class ArticleQueueItemRead(BaseModel):
     game_title: str | None
     latest_version: ArticleVersionRead | None = None
     ready_version: ArticleVersionRead | None = None
+    active_revalidation: ArticleEvidenceRevalidationRead | None = None
 
 
 class ArticleQueueRead(BaseModel):

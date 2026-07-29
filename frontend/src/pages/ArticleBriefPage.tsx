@@ -4,6 +4,7 @@ import { articlesApi } from "../api/articles";
 import type {
   ArticleBrief,
   ArticleDraftBlock,
+  ArticleEvidenceChange,
   ArticleGenerationJob,
   ArticleStatus,
   ArticleType,
@@ -77,6 +78,49 @@ function versionLabel(version: ArticleVersion): string {
   return `Version ${version.version}`;
 }
 
+function valueRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function evidenceValueSummary(
+  change: ArticleEvidenceChange,
+  value: unknown,
+): string {
+  if (value === null || value === undefined) return "Not available";
+  if (typeof value === "string") {
+    return value.replace(/_/g, " ");
+  }
+  const record = valueRecord(value);
+  if (!record) return String(value);
+  if (change.change_type === "fact_changed") {
+    return [record.player_name, record.computed_value, record.stat_label]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (change.change_type === "coverage_changed") {
+    return [record.claim_scope, record.completeness]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (change.change_type === "source_changed") {
+    const hash = typeof record.content_hash === "string"
+      ? record.content_hash.slice(0, 12)
+      : null;
+    return [record.source_type, hash ? `SHA ${hash}` : null]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (change.change_type === "game_changed") {
+    const score = record.away_score !== undefined && record.home_score !== undefined
+      ? `${String(record.away_score)}–${String(record.home_score)}`
+      : null;
+    return [record.title, score].filter(Boolean).join(" · ");
+  }
+  return JSON.stringify(record);
+}
+
 interface DiffToken {
   value: string;
   kind: "same" | "added" | "removed";
@@ -131,6 +175,7 @@ function ArticleBriefPage() {
   const [revisionInstructions, setRevisionInstructions] = useState("");
   const [warningReasons, setWarningReasons] = useState<Record<string, string>>({});
   const [markingReady, setMarkingReady] = useState(false);
+  const [refreshingEvidence, setRefreshingEvidence] = useState(false);
 
   const loadBrief = useCallback(async () => {
     if (!Number.isInteger(articleId) || articleId <= 0) {
@@ -327,6 +372,26 @@ function ArticleBriefPage() {
     }
   }
 
+  async function refreshEvidence() {
+    if (!brief) return;
+    setRefreshingEvidence(true);
+    setActionError(null);
+    try {
+      const refreshed = await articlesApi.refreshEvidence(brief.id);
+      setBrief(refreshed);
+      const latest = refreshed.latest_version ?? null;
+      setSelectedVersionId(latest?.id ?? null);
+      setHeadline(latest?.headline ?? "");
+      setBlocks(latest?.blocks ?? []);
+      setGenerationJob(refreshed.latest_generation_job ?? null);
+      setWarningReasons({});
+    } catch (refreshError) {
+      setActionError(apiErrorMessage(refreshError));
+    } finally {
+      setRefreshingEvidence(false);
+    }
+  }
+
   if (loading) {
     return (
       <div aria-label="Loading Article Brief" className="mx-auto max-w-7xl animate-pulse px-4 py-10 sm:px-6 lg:px-8">
@@ -361,6 +426,7 @@ function ArticleBriefPage() {
       brief.status !== "needs_revalidation" &&
       brief.ready_version?.id !== selectedVersion.id,
   );
+  const evidenceBlocked = brief.status === "needs_revalidation";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -395,6 +461,80 @@ function ArticleBriefPage() {
         </div>
       ) : null}
 
+      {brief.active_revalidation ? (
+        <section
+          aria-labelledby="evidence-change-heading"
+          className="mt-6 border-y border-red-300 bg-red-50 px-5 py-6 sm:px-7"
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-red-800">
+                Editorial hold
+              </p>
+              <h2 id="evidence-change-heading" className="mt-2 text-2xl font-black text-gray-950">
+                Source evidence changed
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-700">
+                This Article is locked against new drafts, edits, readiness, and
+                distribution. Review the changed suggestions, renew the SID
+                approvals, then refresh the evidence for a new review checkpoint.
+              </p>
+              <p className="mt-2 text-xs text-gray-600">
+                Detected {formatDateTime(brief.active_revalidation.detected_at)}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link
+                to="/achievements"
+                className="rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-800 hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
+              >
+                Review source suggestions
+              </Link>
+              <button
+                type="button"
+                onClick={() => void refreshEvidence()}
+                disabled={refreshingEvidence}
+                className="rounded-md bg-yellow-400 px-4 py-2.5 text-sm font-black text-gray-950 hover:bg-yellow-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-wait disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {refreshingEvidence ? "Refreshing evidence" : "Refresh approved evidence"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-red-200">
+            {brief.active_revalidation.changes.map((change, index) => (
+              <div
+                key={`${change.change_type}-${change.suggestion_key ?? "game"}-${index}`}
+                className="grid gap-3 border-b border-red-200 py-4 md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1fr)]"
+              >
+                <div>
+                  <p className="text-sm font-bold text-gray-950">{change.label}</p>
+                  {change.suggestion_key ? (
+                    <p className="mt-1 break-all font-mono text-[11px] text-gray-600">
+                      {change.suggestion_key}
+                    </p>
+                  ) : null}
+                </div>
+                <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                  <div>
+                    <dt className="font-bold uppercase tracking-[0.06em] text-gray-500">Frozen</dt>
+                    <dd className="mt-1 leading-5 text-gray-800">
+                      {evidenceValueSummary(change, change.previous_value)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold uppercase tracking-[0.06em] text-red-800">Current</dt>
+                    <dd className="mt-1 leading-5 text-gray-950">
+                      {evidenceValueSummary(change, change.current_value)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {latestVersion && generationJob?.state === "failed" ? (
         <div className="mt-5 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <p role="alert" className="font-semibold">
@@ -413,7 +553,7 @@ function ArticleBriefPage() {
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Frozen evidence</p>
             <h2 className="mt-2 text-2xl font-black text-gray-950">Brief ready for a first draft</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">The writer receives only the approved facts shown here and the active versioned athletics Style Guide.</p>
-            <button type="button" onClick={() => void generateDraft()} disabled={activeGeneration} className="mt-6 rounded-md bg-gray-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-wait disabled:bg-gray-400">
+            <button type="button" onClick={() => void generateDraft()} disabled={activeGeneration || evidenceBlocked} className="mt-6 rounded-md bg-gray-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:bg-gray-400">
               {activeGeneration ? "Generating draft" : generationJob?.state === "failed" ? "Retry draft" : "Generate draft"}
             </button>
             {activeGeneration ? (
@@ -499,7 +639,7 @@ function ArticleBriefPage() {
                   <p className="mb-5 border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">This historical version is read-only. Select the latest version to continue editing.</p>
                 ) : null}
                 <label className="block text-xs font-bold uppercase tracking-[0.06em] text-gray-600" htmlFor="article-headline">Headline</label>
-                <textarea id="article-headline" value={headline} onChange={(event) => setHeadline(event.target.value)} disabled={!isLatestSelected || activeGeneration} rows={2} className="mt-2 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-2xl font-black leading-tight text-gray-950 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:bg-gray-50 disabled:text-gray-600" />
+                <textarea id="article-headline" value={headline} onChange={(event) => setHeadline(event.target.value)} disabled={!isLatestSelected || activeGeneration || evidenceBlocked} rows={2} className="mt-2 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-2xl font-black leading-tight text-gray-950 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:bg-gray-50 disabled:text-gray-600" />
                 <p className="mt-2 font-mono text-[11px] text-gray-500">Evidence: {selectedVersion?.headline_evidence_ids.join(", ")}</p>
 
                 <div className="mt-7 space-y-6">
@@ -509,13 +649,13 @@ function ArticleBriefPage() {
                         <label className="text-xs font-bold uppercase tracking-[0.06em] text-gray-600" htmlFor={`article-block-${index}`}>{block.kind}</label>
                         <span className="font-mono text-[11px] text-gray-500">Evidence: {block.evidence_ids.join(", ")}</span>
                       </div>
-                      <textarea id={`article-block-${index}`} value={block.text} onChange={(event) => setBlocks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} disabled={!isLatestSelected || activeGeneration} rows={Math.max(5, Math.ceil(block.text.length / 80))} className="mt-2 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-3 text-base leading-7 text-gray-800 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:bg-gray-50 disabled:text-gray-600" />
+                      <textarea id={`article-block-${index}`} value={block.text} onChange={(event) => setBlocks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} disabled={!isLatestSelected || activeGeneration || evidenceBlocked} rows={Math.max(5, Math.ceil(block.text.length / 80))} className="mt-2 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-3 text-base leading-7 text-gray-800 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:bg-gray-50 disabled:text-gray-600" />
                     </div>
                   ))}
                 </div>
                 {isLatestSelected ? (
                   <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-5">
-                    <button type="button" onClick={() => void saveVersion()} disabled={!dirty || saving || activeGeneration || !headline.trim() || blocks.some((block) => !block.text.trim())} className="rounded-md bg-gray-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600">
+                    <button type="button" onClick={() => void saveVersion()} disabled={!dirty || saving || activeGeneration || evidenceBlocked || !headline.trim() || blocks.some((block) => !block.text.trim())} className="rounded-md bg-gray-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600">
                       {saving ? "Saving checkpoint" : "Save new version"}
                     </button>
                     <p className="text-xs text-gray-500">Saving creates a new immutable checkpoint. Version {selectedVersion?.version} never changes.</p>
@@ -593,7 +733,7 @@ function ArticleBriefPage() {
                 <p className="mt-2 text-xs leading-5 text-gray-600">Instructions and the current copy go to the writer. The evidence boundary stays frozen.</p>
                 <label htmlFor="revision-instructions" className="sr-only">AI revision instructions</label>
                 <textarea id="revision-instructions" value={revisionInstructions} onChange={(event) => setRevisionInstructions(event.target.value)} rows={4} maxLength={2000} placeholder="For example: tighten the lead and move the score to the second paragraph." className="mt-3 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-gray-950 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2" />
-                <button type="button" onClick={() => void requestRevision()} disabled={activeGeneration || dirty || !revisionInstructions.trim()} className="mt-3 w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:text-gray-400">
+                <button type="button" onClick={() => void requestRevision()} disabled={activeGeneration || evidenceBlocked || dirty || !revisionInstructions.trim()} className="mt-3 w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800 hover:border-gray-400 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 disabled:cursor-not-allowed disabled:text-gray-400">
                   {activeGeneration ? "AI revision in progress" : "Request evidence-bound revision"}
                 </button>
               </section>

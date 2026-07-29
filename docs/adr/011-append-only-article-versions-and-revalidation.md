@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted for prototype implementation on July 27, 2026. Athletics feedback is
-required before production channel enablement.
+Implemented for the prototype on July 29, 2026. Athletics feedback is required before
+production channel enablement.
 
 ## Context
 

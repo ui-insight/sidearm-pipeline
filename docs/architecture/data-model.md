@@ -2,7 +2,7 @@
 
 This document is the authoritative human-readable inventory of the persisted
 Vandals Stats Pipeline schema. It describes the SQLAlchemy metadata and Alembic
-head at migration `0010_achievement_review_verdicts`.
+head at migration `0014_article_evidence_revalidation`.
 
 The executable schema remains defined by `backend/app/models/` and
 `backend/migrations/versions/`. Update this page in the same change set whenever
@@ -23,6 +23,8 @@ The current schema supports:
 - generated editorial drafts
 - versioned Notability policies, deterministic Achievement Suggestions, optional
   AI ranking/phrasing, and SID verdict provenance
+- evidence-bound Articles, immutable editorial versions, readiness decisions, and
+  source-drift revalidation history
 
 The schema does not yet provide generalized participants/results for non-team
 contest shapes, scheduled job definitions, immutable operator audit events,
@@ -52,6 +54,7 @@ erDiagram
     GAMES ||--o{ PLAYER_GAME_STATS : contains
     GAMES ||--o{ TEAM_GAME_STATS : contains
     GAMES ||--o{ ACHIEVEMENT_SUGGESTIONS : produces
+    GAMES ||--o{ ARTICLES : anchors
 
     EVENT_SOURCES ||--o{ SOURCE_SNAPSHOTS : yields
     SOURCE_SNAPSHOTS ||--o{ PLAYER_GAME_STATS : supports
@@ -65,9 +68,13 @@ erDiagram
     NOTABILITY_POLICIES ||--o{ NOTABILITY_POLICY_METRICS : contains
     NOTABILITY_POLICIES ||--o{ ACHIEVEMENT_SUGGESTIONS : scores
     COVERAGE_WINDOWS ||--o{ ACHIEVEMENT_SUGGESTIONS : qualifies
+    ARTICLES ||--o{ EVIDENCE_BUNDLES : freezes
+    ARTICLES ||--o{ ARTICLE_VERSIONS : versions
+    ARTICLES ||--o{ ARTICLE_EVIDENCE_REVALIDATIONS : audits
+    EVIDENCE_BUNDLES ||--o{ ARTICLE_EVIDENCE_REVALIDATIONS : compares
 ```
 
-The diagram emphasizes the normalized warehouse. The complete 27-table
+The diagram emphasizes the normalized warehouse. The complete 36-table
 inventory follows.
 
 ## Canonical events, sources, and operations
@@ -272,6 +279,15 @@ Warning overrides record the affected validation rule, the SID's reason, identit
 and timestamp. Readiness decisions record each ready or reopen event against an exact
 Article Version. Both histories are append-only Internal audit data. They do not
 publish content or mutate the selected Article Version.
+
+### `article_evidence_revalidations`
+
+Append-only audits of material drift between an Article's frozen Evidence Bundle and
+current warehouse evidence. Each row stores the prior bundle, a canonical change hash,
+typed frozen/current differences, detection time, and the optional refreshed bundle,
+resolver, and resolution time. Unresolved records drive the `needs_revalidation`
+editorial hold. Resolution appends a new Evidence Bundle and version lineage rather
+than updating historical evidence or copy.
 
 ### `generated_content`
 

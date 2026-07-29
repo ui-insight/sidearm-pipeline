@@ -14,6 +14,8 @@ export const articlesApi = {
   create: (payload: ArticleBriefCreate) =>
     api.post<ArticleBrief>("/articles", payload),
   get: (articleId: number) => api.get<ArticleBrief>(`/articles/${articleId}`),
+  refreshEvidence: (articleId: number) =>
+    api.post<ArticleBrief>(`/articles/${articleId}/revalidation/refresh`),
   generateDraft: (
     articleId: number,
     idempotencyKey: string,

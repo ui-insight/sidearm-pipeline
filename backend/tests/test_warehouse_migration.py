@@ -84,6 +84,12 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
             column["name"]
             for column in inspect(connection).get_columns("article_versions")
         }
+        article_revalidation_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "article_evidence_revalidations"
+            )
+        }
         policy_count = connection.scalar(
             select(func.count()).select_from(
                 Table("notability_policies", metadata, autoload_with=connection)
@@ -120,6 +126,7 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "article_versions",
         "article_warning_overrides",
         "article_readiness_decisions",
+        "article_evidence_revalidations",
     }.issubset(tables)
     assert definition_count == 16
     assert policy_count == 1
@@ -198,6 +205,16 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
     }.issubset(article_suggestion_columns)
     assert {"base_version_id", "editor_instructions"}.issubset(generation_job_columns)
     assert "editor_instructions" in article_version_columns
+    assert {
+        "article_id",
+        "previous_evidence_bundle_id",
+        "refreshed_evidence_bundle_id",
+        "change_hash",
+        "changes",
+        "detected_at",
+        "resolved_at",
+        "resolved_by",
+    }.issubset(article_revalidation_columns)
 
     subprocess.run(
         [

@@ -21,6 +21,7 @@ from app.models.player_game_stat import PlayerGameStat
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.models.team import Team
+from app.services.article_revalidation import detect_article_evidence_drift
 
 SUPPORTED_ACHIEVEMENT_TYPES = (
     "career_high",
@@ -38,6 +39,7 @@ class AchievementDetectionResult:
     players_evaluated: int
     metrics_evaluated: int
     policy_version: int | None
+    articles_revalidation_required: int = 0
 
 
 @dataclass(frozen=True)
@@ -102,7 +104,9 @@ async def detect_achievement_suggestions(
         or game.event_status != "final"
         or game.exhibition
     ):
-        return AchievementDetectionResult(0, 0, 0, None)
+        await db.flush()
+        affected = await detect_article_evidence_drift(db, game=game)
+        return AchievementDetectionResult(0, 0, 0, None, affected)
 
     program = await db.scalar(
         select(SportProgram).where(SportProgram.slug == WBB_PROGRAM_SLUG)
@@ -121,7 +125,9 @@ async def detect_achievement_suggestions(
         .limit(1)
     )
     if policy is None:
-        return AchievementDetectionResult(0, 0, 0, None)
+        await db.flush()
+        affected = await detect_article_evidence_drift(db, game=game)
+        return AchievementDetectionResult(0, 0, 0, None, affected)
 
     current_rows = (
         await db.execute(
@@ -197,11 +203,13 @@ async def detect_achievement_suggestions(
 
     db.add_all(suggestions)
     await db.flush()
+    affected = await detect_article_evidence_drift(db, game=game)
     return AchievementDetectionResult(
         suggestions_written=len(suggestions),
         players_evaluated=len(players),
         metrics_evaluated=len(metrics),
         policy_version=policy.version,
+        articles_revalidation_required=affected,
     )
 
 
