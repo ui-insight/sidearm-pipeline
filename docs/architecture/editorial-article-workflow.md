@@ -289,6 +289,36 @@ changes the Style Guide snapshot stored on an existing Article Version or rendit
 An error blocks persistence or readiness as defined by the rule. A warning requires
 resolution or a recorded human reason. Guidance is visible but nonblocking.
 
+The implemented rule enforcement vocabulary is:
+
+- prompt guidance, which must use `guidance` severity and is passed to the writer
+- controlled deterministic lint for exclamation marks, all-caps words, and double spaces
+- required and forbidden terminology
+- headline and body character limits
+- forbidden unsupported fact classes retained by the seeded athletics guide
+
+Error findings reject an AI result and prevent readiness on human versions. Warning
+findings preserve the immutable version but require an attributed acknowledgement and
+reason before readiness. Guidance findings are retained for review and never block
+persistence or readiness.
+
+The `style_steward` role is enforced by the backend on every management endpoint:
+
+- `GET /api/v1/style-guides` and `GET /api/v1/style-guides/{version_id}` list and read history
+- `POST /api/v1/style-guides` creates version 1 in a new scoped lineage
+- `POST /api/v1/style-guides/{version_id}/successors` creates an immutable draft successor
+- `POST /api/v1/style-guides/preview` previews active resolution and may substitute a draft
+- `POST /api/v1/style-guides/{version_id}/activate` validates conflicts before activation
+- `POST /api/v1/style-guides/{version_id}/retire` explicitly retires an active version
+
+Activation checks every affected known sport, article-type, and channel context. A
+same-key rule at a more specific scope must declare `override=true`; competing rules at
+the same scope, orphan overrides, required/forbidden term collisions, and disagreeing
+length constraints reject activation. Successful same-lineage activation retires the
+previous active version in the same transaction. The administration UI exposes the
+same preview, successor, activation, and retirement workflow without relying on UI
+visibility for authorization.
+
 ## Article Renditions
 
 An Article Rendition is derived from one ready Article Version for one Channel Profile.

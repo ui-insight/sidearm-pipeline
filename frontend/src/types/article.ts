@@ -105,7 +105,7 @@ export interface ArticleDraftBlock {
 
 export interface ArticleValidationFinding {
   code: string;
-  severity: "error" | "warning";
+  severity: "error" | "warning" | "guidance";
   message: string;
   block_index: number | null;
   evidence_ids: string[];

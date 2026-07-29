@@ -15,3 +15,4 @@ class PrototypeSessionRead(BaseModel):
 
     authenticated: bool
     username: str | None = None
+    roles: list[str] = Field(default_factory=list)

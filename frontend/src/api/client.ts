@@ -94,7 +94,7 @@ async function parseResponseBody(response: Response): Promise<ApiResponseBody> {
 }
 
 function isAuthFailureStatus(status: number): boolean {
-  return status === 401 || status === 403;
+  return status === 401;
 }
 
 /**

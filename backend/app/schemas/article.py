@@ -202,7 +202,7 @@ class ArticleValidationFindingRead(BaseModel):
     """One deterministic fact or Style Guide validation result."""
 
     code: str
-    severity: Literal["error", "warning"]
+    severity: Literal["error", "warning", "guidance"]
     message: str
     block_index: int | None = None
     evidence_ids: list[str] = Field(default_factory=list)

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     PROTOTYPE_AUTH_ENABLED: bool = False
     PROTOTYPE_AUTH_USERNAME: str = "prototype"
     PROTOTYPE_AUTH_PASSWORD: str = ""
+    PROTOTYPE_AUTH_ROLES: str = (
+        "sid_editor,publisher,style_steward,channel_administrator"
+    )
     DEV_MODE: bool = True
     UPLOAD_DIR: str = "./uploads"
     CORS_ORIGINS: str = '["http://localhost:5173", "http://localhost:9200"]'
@@ -119,6 +122,16 @@ class Settings(BaseSettings):
     @property
     def rate_limit_exempt_paths_list(self) -> list[str]:
         return self.parse_rate_limit_exempt_paths(self.RATE_LIMIT_EXEMPT_PATHS)
+
+    @property
+    def prototype_auth_roles_list(self) -> list[str]:
+        """Return the shared prototype account's normalized role names."""
+        roles = [
+            role.strip()
+            for role in self.PROTOTYPE_AUTH_ROLES.split(",")
+            if role.strip()
+        ]
+        return list(dict.fromkeys(roles))
 
     def check_security(self) -> None:
         """Raise if default secrets are used in production."""

@@ -506,13 +506,31 @@ def validate_article_draft(
     for rule in style_snapshot["rules"]:
         enforcement = rule["enforcement"]
         severity = rule["severity"]
-        if enforcement == "headline_max_chars" and len(draft.headline) > int(
+        if enforcement == "prompt_guidance":
+            findings.append(
+                _finding(
+                    f"style:{rule['key']}",
+                    str(rule["value"]),
+                    severity="guidance",
+                )
+            )
+        elif enforcement == "headline_max_chars" and len(draft.headline) > int(
             rule["value"]
         ):
             findings.append(
                 _finding(
                     f"style:{rule['key']}",
                     f"Headline exceeds {rule['value']} characters.",
+                    severity=severity,
+                )
+            )
+        elif enforcement == "body_max_chars" and len(
+            "\n\n".join(block.text for block in draft.blocks)
+        ) > int(rule["value"]):
+            findings.append(
+                _finding(
+                    f"style:{rule['key']}",
+                    f"Article body exceeds {rule['value']} characters.",
                     severity=severity,
                 )
             )
@@ -528,6 +546,76 @@ def validate_article_draft(
                         f"style:{rule['key']}",
                         "Forbidden Style Guide term(s): "
                         + ", ".join(str(term) for term in matched)
+                        + ".",
+                        severity=severity,
+                    )
+                )
+        elif enforcement == "required_terms":
+            missing = [
+                term
+                for term in rule["value"]
+                if str(term).casefold() not in full_text.casefold()
+            ]
+            if missing:
+                findings.append(
+                    _finding(
+                        f"style:{rule['key']}",
+                        "Required Style Guide term(s) missing: "
+                        + ", ".join(str(term) for term in missing)
+                        + ".",
+                        severity=severity,
+                    )
+                )
+        elif enforcement == "deterministic_lint":
+            lint = str(rule["value"])
+            lint_failed = (
+                (lint == "no_exclamation" and "!" in full_text)
+                or (lint == "no_double_space" and "  " in full_text)
+                or (
+                    lint == "no_all_caps"
+                    and any(
+                        len(word) >= 4 and word.isalpha() and word.isupper()
+                        for word in full_text.split()
+                    )
+                )
+            )
+            if lint_failed:
+                labels = {
+                    "no_exclamation": "Exclamation marks are not allowed.",
+                    "no_double_space": "Double spaces are not allowed.",
+                    "no_all_caps": "All-caps words are not allowed.",
+                }
+                findings.append(
+                    _finding(
+                        f"style:{rule['key']}",
+                        labels[lint],
+                        severity=severity,
+                    )
+                )
+        elif enforcement == "forbidden_fact_classes":
+            fact_patterns = {
+                "quotes": ('"', "“", "”", " said ", " says "),
+                "injuries": (" injury", " injured", " illness"),
+                "attendance": (" attendance", " crowd"),
+                "weather": (" weather", " rain", " snow", " wind"),
+            }
+            normalized_text = f" {full_text.casefold()} "
+            matched_classes = [
+                fact_class
+                for fact_class in rule["value"]
+                if any(
+                    marker.casefold() in normalized_text
+                    for marker in fact_patterns.get(
+                        str(fact_class), (str(fact_class).casefold(),)
+                    )
+                )
+            ]
+            if matched_classes:
+                findings.append(
+                    _finding(
+                        f"style:{rule['key']}",
+                        "Forbidden unsupported fact class(es): "
+                        + ", ".join(str(value) for value in matched_classes)
                         + ".",
                         severity=severity,
                     )

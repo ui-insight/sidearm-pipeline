@@ -6,6 +6,7 @@ import type { AuthSession } from "../types/auth";
 
 interface AuthenticatedView {
   username: string;
+  roles: string[];
   logoutPending: boolean;
   logoutError: string | null;
   onLogout: () => Promise<void>;
@@ -27,7 +28,7 @@ function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
 
     setAuthFailureHandler(() => {
       if (active) {
-        setSession({ authenticated: false, username: null });
+        setSession({ authenticated: false, username: null, roles: [] });
         setSessionError("Your session ended. Sign in again to continue.");
       }
     });
@@ -41,7 +42,7 @@ function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
       })
       .catch(() => {
         if (active) {
-          setSession({ authenticated: false, username: null });
+          setSession({ authenticated: false, username: null, roles: [] });
           setSessionError("Unable to verify access. Try signing in.");
         }
       })
@@ -69,7 +70,7 @@ function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
     try {
       await authApi.logout();
       setSessionError(null);
-      setSession({ authenticated: false, username: null });
+      setSession({ authenticated: false, username: null, roles: [] });
     } catch {
       setLogoutError("Unable to sign out. Check the connection and try again.");
     } finally {
@@ -101,6 +102,7 @@ function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
 
   return children({
     username: session.username ?? "Prototype user",
+    roles: session.roles,
     logoutPending,
     logoutError,
     onLogout: logout,

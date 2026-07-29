@@ -27,12 +27,14 @@ async def read_prototype_session(
         return PrototypeSessionRead(
             authenticated=True,
             username=settings.PROTOTYPE_AUTH_USERNAME,
+            roles=settings.prototype_auth_roles_list,
         )
 
     username = session_username(request.cookies.get(SESSION_COOKIE_NAME))
     return PrototypeSessionRead(
         authenticated=username is not None,
         username=username,
+        roles=settings.prototype_auth_roles_list if username is not None else [],
     )
 
 
@@ -46,6 +48,7 @@ async def login_prototype_user(
         return PrototypeSessionRead(
             authenticated=True,
             username=settings.PROTOTYPE_AUTH_USERNAME,
+            roles=settings.prototype_auth_roles_list,
         )
 
     if not credentials_are_valid(payload.username, payload.password):
@@ -58,7 +61,11 @@ async def login_prototype_user(
     token = issue_session_token(payload.username)
     set_session_cookie(response, token)
     response.headers["Cache-Control"] = "no-store"
-    return PrototypeSessionRead(authenticated=True, username=payload.username)
+    return PrototypeSessionRead(
+        authenticated=True,
+        username=payload.username,
+        roles=settings.prototype_auth_roles_list,
+    )
 
 
 @router.post("/logout", response_model=PrototypeSessionRead)

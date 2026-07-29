@@ -2,7 +2,7 @@
 
 This document is the authoritative human-readable inventory of the persisted
 Vandals Stats Pipeline schema. It describes the SQLAlchemy metadata and Alembic
-head at migration `0014_article_revalidation`.
+head at migration `0015_style_guide_lifecycle`.
 
 The executable schema remains defined by `backend/app/models/` and
 `backend/migrations/versions/`. Update this page in the same change set whenever
@@ -72,6 +72,8 @@ erDiagram
     ARTICLES ||--o{ ARTICLE_VERSIONS : versions
     ARTICLES ||--o{ ARTICLE_EVIDENCE_REVALIDATIONS : audits
     EVIDENCE_BUNDLES ||--o{ ARTICLE_EVIDENCE_REVALIDATIONS : compares
+    STYLE_GUIDE_VERSIONS ||--o{ STYLE_GUIDE_VERSIONS : succeeds
+    STYLE_GUIDE_VERSIONS ||--o{ ARTICLE_VERSIONS : governs
 ```
 
 The diagram emphasizes the normalized warehouse. The complete 36-table
@@ -257,9 +259,16 @@ available to the writer.
 
 ### `style_guide_versions`
 
-Immutable editorial policy snapshots with scope, rules, instructions, author, version,
-and content hash. Release 1 seeds a shared-athletics version; scoped authoring and
-activation are added under issue #148.
+Immutable editorial policy snapshots with stable guide key, version, optional
+predecessor, scope, validated stable-keyed rules, writer instructions, author, and
+content hash. Lifecycle state is `draft`, `active`, or `retired`; activation and
+retirement actors/times are stored separately from hashed policy content. `effective_at`
+determines when an active version participates in resolution. The database enforces
+that shared-athletics scope has no value and sport, article-type, and channel scopes do.
+
+The seeded shared-athletics version keeps Article generation operational before custom
+policy exists. Activating a successor retires the active version in the same lineage,
+but existing `article_versions.style_snapshot` values and hashes remain unchanged.
 
 ### `article_generation_jobs` and `article_versions`
 

@@ -16,6 +16,7 @@ from app.api.v1 import (
     record_book,
     semantic_queries,
     sources,
+    style_guides,
     workspace_views,
 )
 from app.db.engine import get_db
@@ -51,6 +52,11 @@ api_router.include_router(
     tags=["ingest-runs"],
 )
 api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
+api_router.include_router(
+    style_guides.router,
+    prefix="/style-guides",
+    tags=["style-guides"],
+)
 api_router.include_router(
     workspace_views.router,
     prefix="/workspace-views",

@@ -14,6 +14,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 interface AppShellProps {
   children: ReactNode;
   username: string;
+  roles: string[];
   logoutPending: boolean;
   logoutError: string | null;
   onLogout: () => Promise<void>;
@@ -22,6 +23,7 @@ interface AppShellProps {
 function AppShell({
   children,
   username,
+  roles,
   logoutPending,
   logoutError,
   onLogout,
@@ -74,6 +76,11 @@ function AppShell({
             <NavLink to="/articles" className={navClass}>
               Articles
             </NavLink>
+            {roles.includes("style_steward") ? (
+              <NavLink to="/style-guides" className={navClass}>
+                Style Guides
+              </NavLink>
+            ) : null}
             <NavLink to="/record-book" className={navClass}>
               Record Book
             </NavLink>
