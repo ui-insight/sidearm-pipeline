@@ -1,6 +1,6 @@
 """Add Article evidence revalidation audit records.
 
-Revision ID: 0014_article_evidence_revalidation
+Revision ID: 0014_article_revalidation
 Revises: 0013_article_editorial_versions
 Create Date: 2026-07-29
 """
@@ -13,7 +13,7 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0014_article_evidence_revalidation"
+revision: str = "0014_article_revalidation"
 down_revision: str | None = "0013_article_editorial_versions"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
