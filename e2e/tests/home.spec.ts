@@ -5,7 +5,11 @@ test("pipeline homepage renders ingest form", async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ authenticated: true, username: "e2e-user" }),
+      body: JSON.stringify({
+        authenticated: true,
+        username: "e2e-user",
+        roles: [],
+      }),
     });
   });
 

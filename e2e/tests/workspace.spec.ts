@@ -5,7 +5,11 @@ test("season desk assembles evidence and exports it", async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ authenticated: true, username: "e2e-user" }),
+      body: JSON.stringify({
+        authenticated: true,
+        username: "e2e-user",
+        roles: [],
+      }),
     });
   });
   await page.route("**/api/v1/semantic-queries/options", async (route) => {
