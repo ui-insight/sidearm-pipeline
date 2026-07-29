@@ -13,14 +13,17 @@ import AchievementReviewPage from "./pages/AchievementReviewPage";
 import AskWarehousePage from "./pages/AskWarehousePage";
 import ArticleBriefPage from "./pages/ArticleBriefPage";
 import ArticleQueuePage from "./pages/ArticleQueuePage";
+import AccessDeniedPage from "./pages/AccessDeniedPage";
+import StyleGuidesPage from "./pages/StyleGuidesPage";
 
 function App() {
   return (
     <BrowserRouter>
       <AuthenticationBoundary>
-        {({ username, logoutPending, logoutError, onLogout }) => (
+        {({ username, roles, logoutPending, logoutError, onLogout }) => (
           <AppShell
             username={username}
+            roles={roles}
             logoutPending={logoutPending}
             logoutError={logoutError}
             onLogout={onLogout}
@@ -35,6 +38,16 @@ function App() {
               <Route path="/achievements" element={<AchievementReviewPage />} />
               <Route path="/articles" element={<ArticleQueuePage />} />
               <Route path="/articles/:id" element={<ArticleBriefPage />} />
+              <Route
+                path="/style-guides"
+                element={
+                  roles.includes("style_steward") ? (
+                    <StyleGuidesPage />
+                  ) : (
+                    <AccessDeniedPage />
+                  )
+                }
+              />
               <Route path="/identity-queue" element={<IdentityQueuePage />} />
               <Route path="/backfills" element={<HistoricalBackfillPage />} />
               <Route path="/demo" element={<AthleticsDemoPage />} />

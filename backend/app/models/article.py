@@ -183,11 +183,23 @@ class StyleGuideVersion(Base):
             "scope_type IN ('shared_athletics', 'sport', 'article_type', 'channel')",
             name="ck_style_guide_scope_type",
         ),
+        CheckConstraint(
+            "(scope_type = 'shared_athletics' AND scope_value IS NULL) OR "
+            "(scope_type <> 'shared_athletics' AND scope_value IS NOT NULL)",
+            name="ck_style_guide_scope_value",
+        ),
+        CheckConstraint(
+            "lifecycle_state IN ('draft', 'active', 'retired')",
+            name="ck_style_guide_lifecycle_state",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     guide_key: Mapped[str] = mapped_column(String(128), index=True)
     version: Mapped[int] = mapped_column(Integer)
+    predecessor_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("style_guide_versions.id", ondelete="RESTRICT"), index=True
+    )
     name: Mapped[str] = mapped_column(String(255))
     scope_type: Mapped[str] = mapped_column(String(32), index=True)
     scope_value: Mapped[str | None] = mapped_column(String(128), index=True)
@@ -195,11 +207,25 @@ class StyleGuideVersion(Base):
     rules: Mapped[list[dict]] = mapped_column(JSONType, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     active: Mapped[bool] = mapped_column(
-        Boolean, default=True, server_default="true", index=True
+        Boolean, default=False, server_default="false", index=True
+    )
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(16), default="draft", server_default="draft", index=True
     )
     created_by: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    effective_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    activated_by: Mapped[str | None] = mapped_column(String(128))
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retired_by: Mapped[str | None] = mapped_column(String(128))
+
+    predecessor_version: Mapped[StyleGuideVersion | None] = relationship(
+        remote_side="StyleGuideVersion.id"
     )
 
 

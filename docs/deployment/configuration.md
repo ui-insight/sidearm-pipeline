@@ -12,6 +12,7 @@ This page describes the baseline environment variables included in the template.
 | `PROTOTYPE_AUTH_ENABLED` | `false` | Enables the shared-credential prototype session gate |
 | `PROTOTYPE_AUTH_USERNAME` | `prototype` | Shared prototype username supplied by the deployment environment |
 | `PROTOTYPE_AUTH_PASSWORD` | empty | Shared prototype password; required when the gate is enabled |
+| `PROTOTYPE_AUTH_ROLES` | `sid_editor,publisher,style_steward,channel_administrator` | Comma-separated roles granted to the shared prototype account; Style Guide management requires `style_steward` |
 | `DEV_MODE` | `true` | Enables development-friendly behavior |
 | `UPLOAD_DIR` | `./uploads` | Root directory for uploaded files |
 | `CORS_ORIGINS` | `["http://localhost:5173","http://localhost:9200"]` | Allowed frontend origins |
@@ -40,6 +41,9 @@ This page describes the baseline environment variables included in the template.
 - Keep prototype credentials in the deployment environment, never in source
   control. The prototype gate is a temporary shared-account control, not a
   replacement for individual accounts, SSO, or production RBAC.
+- Restrict `PROTOTYPE_AUTH_ROLES` to the actions approved for that deployment.
+  The shared role list supports prototype enforcement but does not provide
+  per-person accountability.
 - Set `DEV_MODE=false` in staging and production.
 - PostgreSQL is the standard app database for local, staging, and production environments.
 - Keep SQLite only as an isolated fallback for tests or temporary experiments.

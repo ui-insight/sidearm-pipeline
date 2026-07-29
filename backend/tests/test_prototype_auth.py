@@ -26,7 +26,7 @@ async def test_protected_api_requires_a_session_but_health_stays_public(client):
     health = await client.get("/api/v1/health")
 
     assert session.status_code == 200
-    assert session.json() == {"authenticated": False, "username": None}
+    assert session.json() == {"authenticated": False, "username": None, "roles": []}
     assert session.headers["cache-control"] == "no-store"
     assert protected.status_code == 401
     assert protected.json() == {"detail": "Authentication required"}
@@ -56,6 +56,12 @@ async def test_login_cookie_unlocks_the_api_and_logout_clears_it(client):
     assert login.json() == {
         "authenticated": True,
         "username": "prototype-user",
+        "roles": [
+            "sid_editor",
+            "publisher",
+            "style_steward",
+            "channel_administrator",
+        ],
     }
     cookie_header = login.headers["set-cookie"].lower()
     assert "httponly" in cookie_header
@@ -83,7 +89,11 @@ async def test_login_cookie_unlocks_the_api_and_logout_clears_it(client):
 
     logout = await client.post("/api/v1/auth/logout")
     assert logout.status_code == 200
-    assert logout.json() == {"authenticated": False, "username": None}
+    assert logout.json() == {
+        "authenticated": False,
+        "username": None,
+        "roles": [],
+    }
     assert "max-age=0" in logout.headers["set-cookie"].lower()
 
     protected_after_logout = await client.get("/api/v1/games")
@@ -111,5 +121,11 @@ async def test_disabled_prototype_gate_preserves_local_access(client, monkeypatc
     assert session.json() == {
         "authenticated": True,
         "username": "prototype-user",
+        "roles": [
+            "sid_editor",
+            "publisher",
+            "style_steward",
+            "channel_administrator",
+        ],
     }
     assert games.status_code == 200

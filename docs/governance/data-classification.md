@@ -2,7 +2,7 @@
 
 All data stored or processed by Vandals Stats Pipeline must be classified before
 implementation. This inventory describes the schema at migration
-`0010_achievement_review_verdicts`.
+`0015_style_guide_lifecycle`.
 
 ## Classification levels
 
@@ -46,6 +46,8 @@ implementation. This inventory describes the schema at migration
 | Data-quality issues and identity-resolution decisions | Internal | `data_quality_issues`, `player_identity_resolutions` | May contain free-text notes; do not enter medical, academic, contact, or other regulated information |
 | Notability-policy weights, thresholds, and suppression rules | Internal | `notability_policies`, `notability_policy_metrics` | Editorial policy, versioned for reproducibility |
 | Unapproved Achievement Suggestions, AI phrasing/provenance, reviewer label, and verdict state | Internal | `achievement_suggestions` | Authenticated SID/editorial workflow; approved wording is not automatically public until published elsewhere |
+| Style Guide content, lifecycle decisions, and steward identities | Internal | `style_guide_versions` | Server-enforced `style_steward` access; immutable content and activation/retirement audit metadata support reproducibility |
+| Article Briefs, Evidence Bundles, Article Versions, validation findings, warning acknowledgements, readiness decisions, and revalidation history | Internal | `articles`, `evidence_bundles`, `article_versions`, `article_warning_overrides`, `article_readiness_decisions`, `article_evidence_revalidations` | Unpublished editorial work; historical Evidence and Style Guide snapshots remain immutable |
 | Generated recaps, spotlights, and social drafts | Internal | `generated_content` | Unpublished editorial work; athletics communications and maintainers only |
 | Shared workspace names, filters, creator label, and timestamp | Internal | `workspace_views` | Shared across authenticated users; current prototype has no per-user ownership boundary |
 | Semantic questions, Record Book results, pregame briefs, and CSV exports | Classification inherited from their inputs; normally Public facts in an Internal workflow | Computed in transit; not persisted as dedicated result tables | Avoid placing confidential prompts or notes into natural-language questions; exported files leave application control |

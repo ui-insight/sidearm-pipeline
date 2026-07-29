@@ -3,9 +3,11 @@
 This document describes the security architecture and practices for Vandals Stats Pipeline.
 
 The application includes a small shared-credential session gate for internal
-prototype deployments. It does not yet include individual accounts, a user
-model, or RBAC enforcement. Treat the prototype gate as a temporary access
-boundary, not a production identity system.
+prototype deployments. It does not yet include individual accounts or a user
+model. A configured role list provides server-enforced prototype authorization
+for Style Guide stewardship, but it is still shared by every user of the
+credential. Treat the prototype gate as a temporary access boundary, not a
+production identity system.
 
 ## Authentication
 
@@ -21,7 +23,10 @@ boundary, not a production identity system.
 
 ## Authorization
 
-- **Status**: RBAC is an extension point, not a built-in feature
+- **Status**: the shared prototype account receives roles from
+  `PROTOTYPE_AUTH_ROLES`; all Style Guide endpoints require `style_steward`
+- **Limitation**: roles are deployment-wide for one shared identity, not
+  individual RBAC or sufficient production accountability
 - **Shared-view implication**: all authenticated operators can create, open,
   and delete deployment-wide workspace views; the recorded creator is context,
   not an ownership check
@@ -106,8 +111,8 @@ may require network access to install audit or SBOM tooling.
 !!! warning "Development Defaults"
     The following are acceptable for development but must be addressed before production:
 
-    - The shared prototype credential does not provide individual identity or
-      RBAC; replace it before a production launch that requires accountability
+    - The shared prototype credential and role list do not provide individual
+      identity or accountability; replace them before production editorial use
     - If a project stores bearer tokens in localStorage during development,
       replace that with a safer production approach such as httpOnly cookies or
       another documented strategy

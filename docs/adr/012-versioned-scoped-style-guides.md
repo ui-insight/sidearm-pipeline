@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted for prototype implementation on July 27, 2026. Athletics feedback is
-required before production channel enablement.
+Implemented for the prototype on July 29, 2026. Athletics feedback is required
+before production channel enablement.
 
 ## Context
 
@@ -33,6 +33,12 @@ length or structure constraints, and writer instructions.
 Conflicting active rules are rejected before activation. An activated successor does
 not mutate its predecessor. Every Article Version and Article Rendition stores the
 resolved Style Guide version identifiers and a snapshot hash.
+
+The prototype stores immutable guide content and stable-keyed rules together in one
+version row. Lifecycle metadata is separate from the hashed content. New versions
+begin as `draft`; activation records actor and effective time and atomically retires
+the prior active version in the same guide lineage. Explicit retirement is also
+available, but the final effective shared-athletics guide cannot be retired.
 
 Errors block the operation defined by the rule. Warnings require correction or an
 attributed human acknowledgement with a reason. Guidance is visible but nonblocking.

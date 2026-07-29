@@ -130,4 +130,5 @@ class PrototypeAuthMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.authenticated_username = username
+        request.state.authenticated_roles = settings.prototype_auth_roles_list
         return await call_next(request)

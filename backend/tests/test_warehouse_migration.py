@@ -94,6 +94,10 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
             column["name"]
             for column in inspect(connection).get_columns("article_generation_jobs")
         }
+        style_guide_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("style_guide_versions")
+        }
         article_version_columns = {
             column["name"]
             for column in inspect(connection).get_columns("article_versions")
@@ -136,6 +140,7 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "articles",
         "article_achievement_suggestions",
         "evidence_bundles",
+        "style_guide_versions",
         "article_generation_jobs",
         "article_versions",
         "article_warning_overrides",
@@ -218,6 +223,15 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
         "linked_at",
     }.issubset(article_suggestion_columns)
     assert {"base_version_id", "editor_instructions"}.issubset(generation_job_columns)
+    assert {
+        "predecessor_version_id",
+        "lifecycle_state",
+        "effective_at",
+        "activated_at",
+        "activated_by",
+        "retired_at",
+        "retired_by",
+    }.issubset(style_guide_columns)
     assert "editor_instructions" in article_version_columns
     assert {
         "article_id",
@@ -398,6 +412,80 @@ def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> Non
 
     assert "games" in remaining_tables
     assert "stat_definitions" not in remaining_tables
+
+
+def test_style_guide_lifecycle_migration_round_trip(tmp_path) -> None:
+    backend_dir = Path(__file__).parents[1]
+    database_path = tmp_path / "style-guide-migration.sqlite3"
+    env = {
+        **os.environ,
+        "DATABASE_URL": f"sqlite+aiosqlite:///{database_path}",
+    }
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "0014_article_revalidation"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    before = {
+        column["name"] for column in inspect(engine).get_columns("style_guide_versions")
+    }
+    engine.dispose()
+    assert "lifecycle_state" not in before
+
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    metadata = MetaData()
+    with engine.connect() as connection:
+        columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("style_guide_versions")
+        }
+        guides = Table("style_guide_versions", metadata, autoload_with=connection)
+        seeded = connection.execute(
+            select(
+                guides.c.lifecycle_state,
+                guides.c.effective_at,
+                guides.c.activated_by,
+            ).where(guides.c.guide_key == "athletics-default")
+        ).one()
+    engine.dispose()
+    assert {"lifecycle_state", "effective_at", "activated_by"}.issubset(columns)
+    assert seeded.lifecycle_state == "active"
+    assert seeded.effective_at is not None
+    assert seeded.activated_by == "system-seed"
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "downgrade",
+            "0014_article_revalidation",
+        ],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    engine = create_engine(f"sqlite:///{database_path}")
+    after = {
+        column["name"] for column in inspect(engine).get_columns("style_guide_versions")
+    }
+    engine.dispose()
+    assert "lifecycle_state" not in after
 
 
 def test_engine_registers_normalized_models_in_a_fresh_process() -> None:

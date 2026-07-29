@@ -41,7 +41,7 @@ describe("AuthenticationBoundary", () => {
   });
 
   it("shows the login screen when no session exists", async () => {
-    sessionMock.mockResolvedValue({ authenticated: false, username: null });
+    sessionMock.mockResolvedValue({ authenticated: false, username: null, roles: [] });
 
     renderBoundary();
 
@@ -53,7 +53,7 @@ describe("AuthenticationBoundary", () => {
 
   it("keeps invalid credential feedback beside the form", async () => {
     const user = userEvent.setup();
-    sessionMock.mockResolvedValue({ authenticated: false, username: null });
+    sessionMock.mockResolvedValue({ authenticated: false, username: null, roles: [] });
     loginMock.mockRejectedValue(new Error("Username or password is incorrect"));
     renderBoundary();
 
@@ -68,10 +68,11 @@ describe("AuthenticationBoundary", () => {
 
   it("opens the authenticated workspace after login", async () => {
     const user = userEvent.setup();
-    sessionMock.mockResolvedValue({ authenticated: false, username: null });
+    sessionMock.mockResolvedValue({ authenticated: false, username: null, roles: [] });
     loginMock.mockResolvedValue({
       authenticated: true,
       username: "prototype-user",
+      roles: ["style_steward"],
     });
     renderBoundary();
 
@@ -87,8 +88,9 @@ describe("AuthenticationBoundary", () => {
     sessionMock.mockResolvedValue({
       authenticated: true,
       username: "prototype-user",
+      roles: ["style_steward"],
     });
-    logoutMock.mockResolvedValue({ authenticated: false, username: null });
+    logoutMock.mockResolvedValue({ authenticated: false, username: null, roles: [] });
     renderBoundary();
 
     await user.click(await screen.findByRole("button", { name: "Sign out" }));

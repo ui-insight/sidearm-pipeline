@@ -700,7 +700,7 @@ function ArticleBriefPage() {
               ) : (
                 <ul className="mt-3 space-y-3">
                   {findings.map((finding, index) => (
-                    <li key={`${finding.code}-${index}`} className={`border p-3 text-xs leading-5 ${finding.severity === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-yellow-200 bg-yellow-50 text-yellow-900"}`}>
+                    <li key={`${finding.code}-${index}`} className={`border p-3 text-xs leading-5 ${finding.severity === "error" ? "border-red-200 bg-red-50 text-red-800" : finding.severity === "warning" ? "border-yellow-200 bg-yellow-50 text-yellow-900" : "border-blue-200 bg-blue-50 text-blue-800"}`}>
                       <p className="font-bold uppercase tracking-wide">{finding.severity}</p>
                       <p className="mt-1">{finding.message}</p>
                     </li>
