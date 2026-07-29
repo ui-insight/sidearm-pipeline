@@ -27,6 +27,7 @@ from app.services.achievement_ai import (
     rank_and_phrase_achievement_suggestions,
 )
 from app.services.article_brief import achievement_fact_hash
+from app.services.article_revalidation import detect_article_evidence_drift
 
 router = APIRouter()
 ReviewState = Literal["pending", "approved", "rejected"]
@@ -178,6 +179,8 @@ async def record_achievement_verdict(
         source=source,
         coverage=coverage,
     )
+    if game is not None:
+        await detect_article_evidence_drift(db, game=game)
     await db.commit()
     rows = await _suggestion_reads(db, game_id=suggestion.game_id)
     return next(row for row in rows if row.id == suggestion_id)

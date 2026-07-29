@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.article import (
     Article,
+    ArticleEvidenceRevalidation,
     ArticleGenerationJob,
     ArticleReadinessDecision,
     ArticleVersion,
@@ -16,6 +17,7 @@ from app.models.article import (
 from app.models.game import Game
 from app.schemas.article import (
     ArticleDraftOutput,
+    ArticleEvidenceRevalidationRead,
     ArticleQueueItemRead,
     ArticleQueueRead,
     ArticleReadinessDecisionRead,
@@ -325,6 +327,18 @@ async def read_article_queue(db: AsyncSession) -> ArticleQueueRead:
             if article.ready_version_id is not None
             else None
         )
+        active_revalidation = await db.scalar(
+            select(ArticleEvidenceRevalidation)
+            .where(
+                ArticleEvidenceRevalidation.article_id == article.id,
+                ArticleEvidenceRevalidation.resolved_at.is_(None),
+            )
+            .order_by(
+                ArticleEvidenceRevalidation.detected_at.desc(),
+                ArticleEvidenceRevalidation.id.desc(),
+            )
+            .limit(1)
+        )
         items.append(
             ArticleQueueItemRead(
                 id=article.id,
@@ -342,6 +356,13 @@ async def read_article_queue(db: AsyncSession) -> ArticleQueueRead:
                 ),
                 ready_version=(
                     await article_version_read_with_audit(db, ready) if ready else None
+                ),
+                active_revalidation=(
+                    ArticleEvidenceRevalidationRead.model_validate(
+                        active_revalidation, from_attributes=True
+                    )
+                    if active_revalidation
+                    else None
                 ),
             )
         )

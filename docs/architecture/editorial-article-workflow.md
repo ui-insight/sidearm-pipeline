@@ -113,6 +113,36 @@ An Article in `needs_revalidation` cannot generate, become ready, create renditi
 or be submitted. Delivered records remain immutable; revalidation governs only new
 versions and new submissions.
 
+### Source evidence revalidation
+
+Achievement redetection and explicit verdict changes compare each active Article's
+latest frozen Evidence Bundle with the current warehouse evidence. The comparison
+uses material values rather than transient fetch identifiers. A repeated fetch with
+the same facts, game inputs, source content hash, Coverage Window, and valid approval
+preserves the Article state and Evidence Bundle identity.
+
+Material changes append an `ArticleEvidenceRevalidation` record containing typed,
+human-readable frozen and current values. The detector covers:
+
+- game identity, result, and other Evidence Bundle inputs
+- Achievement Suggestion facts, phrasing, and disappearance
+- source system, type, URL, and content hash
+- Coverage Window scope, completeness, and limitations
+- current SID approval and its deterministic fact hash
+
+Detection moves the Article to `needs_revalidation`, clears any convenience pointer
+to a ready version, records a reopen decision, and fails queued or running generation
+work before it can persist a version. Existing Evidence Bundles, Article Versions,
+readiness decisions, and delivered history remain unchanged.
+
+The Article workspace shows the frozen and current values and links to the Achievement
+review queue. After every current suggestion is re-approved, the SID uses
+`POST /api/v1/articles/{article_id}/revalidation/refresh`. The refresh appends a new
+Evidence Bundle and, when copy already exists, a child human Article Version bound to
+that bundle. Deterministic validation runs against the copied checkpoint so changed
+numbers or claims become blocking findings for human correction. A brief without a
+draft returns to `brief`; an Article with a prior version returns to `in_edit`.
+
 ## Generation job state machine
 
 ```text
@@ -227,6 +257,7 @@ The Release 1 implementation exposes this contract through:
 - `GET /api/v1/articles/{article_id}/versions` for immutable history
 - `POST /api/v1/articles/{article_id}/versions` for optimistic-concurrency human saves
 - `POST /api/v1/articles/{article_id}/versions/{version_id}/ready` for the human gate
+- `POST /api/v1/articles/{article_id}/revalidation/refresh` for deliberate refresh
 
 The Article workspace keeps evidence adjacent to the copy, supports original/current,
 side-by-side, and inline-diff review, and requires a written reason for every warning
@@ -302,8 +333,9 @@ Profiles remain disabled.
 - Channel credentials and signing secrets are **Restricted** and remain outside the
   application database.
 
-Audit records are append-only for Verdict events, Article Versions, readiness actions,
-warning acknowledgements, Distribution Submissions, and Distribution Attempts.
+Audit records are append-only for Verdict events, Article Versions, evidence
+revalidations, readiness actions, warning acknowledgements, Distribution Submissions,
+and Distribution Attempts.
 Application logs may reference their identifiers but must not duplicate full content,
 secret values, or provider payloads.
 

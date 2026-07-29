@@ -17,6 +17,7 @@ from app.models.achievement import (
 from app.models.article import (
     Article,
     ArticleAchievementSuggestion,
+    ArticleEvidenceRevalidation,
     ArticleGenerationJob,
     ArticleReadinessDecision,
     ArticleVersion,
@@ -29,6 +30,7 @@ from app.models.stat_definition import StatDefinition
 from app.schemas.article import (
     ArticleBriefCreate,
     ArticleBriefRead,
+    ArticleEvidenceRevalidationRead,
     ArticleReadinessDecisionRead,
 )
 from app.services.article_editing import (
@@ -122,32 +124,23 @@ def achievement_fact_hash(
             ),
             "source": (
                 {
-                    "id": source.id,
-                    "game_id": source.game_id,
                     "source_system": source.source_system,
                     "source_type": source.source_type,
                     "source_url": source.source_url,
                     "parser_version": source.parser_version,
                     "content_hash": source.content_hash,
-                    "fetched_at": source.fetched_at.isoformat(),
                 }
                 if source is not None
                 else None
             ),
             "coverage_window": (
                 {
-                    "id": coverage.id,
                     "grain": coverage.grain,
                     "first_season": coverage.first_season,
                     "last_season": coverage.last_season,
                     "completeness": coverage.completeness,
                     "known_limitations": coverage.known_limitations,
                     "source_system": coverage.source_system,
-                    "verified_at": (
-                        coverage.verified_at.isoformat()
-                        if coverage.verified_at is not None
-                        else None
-                    ),
                 }
                 if coverage is not None
                 else None
@@ -536,4 +529,27 @@ async def read_article_brief(
         ArticleReadinessDecisionRead.model_validate(decision, from_attributes=True)
         for decision in decisions
     ]
+    revalidations = list(
+        await db.scalars(
+            select(ArticleEvidenceRevalidation)
+            .where(ArticleEvidenceRevalidation.article_id == article.id)
+            .order_by(
+                ArticleEvidenceRevalidation.detected_at,
+                ArticleEvidenceRevalidation.id,
+            )
+        )
+    )
+    brief.revalidation_history = [
+        ArticleEvidenceRevalidationRead.model_validate(row, from_attributes=True)
+        for row in revalidations
+    ]
+    active = next(
+        (
+            row
+            for row in reversed(brief.revalidation_history)
+            if row.resolved_at is None
+        ),
+        None,
+    )
+    brief.active_revalidation = active
     return brief

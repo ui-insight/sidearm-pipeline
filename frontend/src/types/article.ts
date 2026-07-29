@@ -156,6 +156,34 @@ export interface ArticleReadinessDecision {
   created_at: string;
 }
 
+export type ArticleEvidenceChangeType =
+  | "game_changed"
+  | "suggestion_removed"
+  | "fact_changed"
+  | "coverage_changed"
+  | "source_changed"
+  | "approval_changed";
+
+export interface ArticleEvidenceChange {
+  change_type: ArticleEvidenceChangeType;
+  suggestion_key: string | null;
+  label: string;
+  previous_value: unknown;
+  current_value: unknown;
+}
+
+export interface ArticleEvidenceRevalidation {
+  id: number;
+  article_id: number;
+  previous_evidence_bundle_id: number;
+  refreshed_evidence_bundle_id: number | null;
+  change_hash: string;
+  changes: ArticleEvidenceChange[];
+  detected_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
 export interface ArticleVersionCreate {
   base_version_id: number;
   headline: string;
@@ -223,6 +251,8 @@ export interface ArticleBrief {
   ready_version?: ArticleVersion | null;
   versions: ArticleVersion[];
   readiness_history: ArticleReadinessDecision[];
+  active_revalidation?: ArticleEvidenceRevalidation | null;
+  revalidation_history?: ArticleEvidenceRevalidation[];
 }
 
 export interface ArticleQueueItem {
@@ -236,6 +266,7 @@ export interface ArticleQueueItem {
   game_title: string | null;
   latest_version: ArticleVersion | null;
   ready_version: ArticleVersion | null;
+  active_revalidation?: ArticleEvidenceRevalidation | null;
 }
 
 export interface ArticleQueue {

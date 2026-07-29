@@ -120,6 +120,9 @@ async def ingest_boxscore(
             **ingest_run.run_metadata,
             "achievement_suggestions_written": (achievement_result.suggestions_written),
             "achievement_policy_version": achievement_result.policy_version,
+            "articles_revalidation_required": (
+                achievement_result.articles_revalidation_required
+            ),
         }
     await db.commit()
     await db.refresh(

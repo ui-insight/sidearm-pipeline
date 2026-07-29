@@ -102,6 +102,12 @@ class Article(Base):
         cascade="all, delete-orphan",
         order_by="ArticleReadinessDecision.created_at",
     )
+    evidence_revalidations: Mapped[list[ArticleEvidenceRevalidation]] = relationship(
+        back_populates="article",
+        cascade="all, delete-orphan",
+        order_by="ArticleEvidenceRevalidation.detected_at",
+        foreign_keys="ArticleEvidenceRevalidation.article_id",
+    )
 
 
 class ArticleAchievementSuggestion(Base):
@@ -401,6 +407,41 @@ class ArticleReadinessDecision(Base):
     article: Mapped[Article] = relationship(back_populates="readiness_decisions")
     article_version: Mapped[ArticleVersion] = relationship(
         back_populates="readiness_decisions"
+    )
+
+
+class ArticleEvidenceRevalidation(Base):
+    """Append-only audit of material source evidence drift for one Article."""
+
+    __tablename__ = "article_evidence_revalidations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"), index=True
+    )
+    previous_evidence_bundle_id: Mapped[int] = mapped_column(
+        ForeignKey("evidence_bundles.id", ondelete="RESTRICT"), index=True
+    )
+    refreshed_evidence_bundle_id: Mapped[int | None] = mapped_column(
+        ForeignKey("evidence_bundles.id", ondelete="RESTRICT"), index=True
+    )
+    change_hash: Mapped[str] = mapped_column(String(64), index=True)
+    changes: Mapped[list[dict]] = mapped_column(JSONType, nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[str | None] = mapped_column(String(128), index=True)
+
+    article: Mapped[Article] = relationship(
+        back_populates="evidence_revalidations",
+        foreign_keys=[article_id],
+    )
+    previous_evidence_bundle: Mapped[EvidenceBundle] = relationship(
+        foreign_keys=[previous_evidence_bundle_id]
+    )
+    refreshed_evidence_bundle: Mapped[EvidenceBundle | None] = relationship(
+        foreign_keys=[refreshed_evidence_bundle_id]
     )
 
 

@@ -12,6 +12,7 @@ from app.models.achievement import (
 from app.models.article import (
     Article,
     ArticleAchievementSuggestion,
+    ArticleEvidenceRevalidation,
     ArticleGenerationJob,
     ArticleReadinessDecision,
     ArticleVersion,
@@ -47,6 +48,7 @@ __all__ = [
     "AchievementSuggestion",
     "Article",
     "ArticleAchievementSuggestion",
+    "ArticleEvidenceRevalidation",
     "ArticleGenerationJob",
     "ArticleReadinessDecision",
     "ArticleVersion",

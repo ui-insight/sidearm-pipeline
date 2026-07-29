@@ -36,6 +36,11 @@ from app.services.article_generation import (
     read_article_generation_job,
     request_article_generation,
 )
+from app.services.article_revalidation import (
+    ArticleRevalidationConflictError,
+    ArticleRevalidationNotFoundError,
+    refresh_article_evidence,
+)
 
 router = APIRouter()
 
@@ -113,6 +118,39 @@ async def get_article_brief(
             detail=str(exc),
         ) from exc
     except ArticleBriefConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/{article_id}/revalidation/refresh",
+    response_model=ArticleBriefRead,
+    summary="Refresh an Article from re-approved source evidence",
+)
+async def post_article_evidence_refresh(
+    article_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> ArticleBriefRead:
+    """Append a refreshed Evidence Bundle and human-review version lineage."""
+    try:
+        brief = await refresh_article_evidence(
+            db,
+            article_id,
+            actor=_request_username(request),
+        )
+        await db.commit()
+        return brief
+    except ArticleRevalidationNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ArticleRevalidationConflictError as exc:
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
