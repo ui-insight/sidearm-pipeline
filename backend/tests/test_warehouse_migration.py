@@ -5,7 +5,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import MetaData, Table, create_engine, func, inspect, select
+
+
+def test_alembic_revision_ids_fit_version_table() -> None:
+    backend_dir = Path(__file__).parents[1]
+    config = Config(str(backend_dir / "alembic.ini"))
+    revisions = ScriptDirectory.from_config(config).walk_revisions()
+
+    overlong_revisions = [
+        revision.revision for revision in revisions if len(revision.revision) > 32
+    ]
+
+    assert overlong_revisions == []
 
 
 def test_normalized_warehouse_migration_upgrades_and_downgrades(tmp_path) -> None:

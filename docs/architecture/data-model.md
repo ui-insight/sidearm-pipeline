@@ -2,7 +2,7 @@
 
 This document is the authoritative human-readable inventory of the persisted
 Vandals Stats Pipeline schema. It describes the SQLAlchemy metadata and Alembic
-head at migration `0014_article_evidence_revalidation`.
+head at migration `0014_article_revalidation`.
 
 The executable schema remains defined by `backend/app/models/` and
 `backend/migrations/versions/`. Update this page in the same change set whenever
