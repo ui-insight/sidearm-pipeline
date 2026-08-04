@@ -179,6 +179,28 @@ describe("AchievementReviewPage", () => {
     expect(screen.getByText(/Approved by/)).toHaveTextContent("sid-user");
   });
 
+  it("opens a deep-linked game and review state", async () => {
+    const secondGame = {
+      ...pendingQueue.items[0],
+      game_id: 62,
+      title: "Montana State at Idaho",
+      suggestions: [{ ...suggestion, id: 18, game_id: 62 }],
+    };
+    fetchMock.mockResolvedValue(
+      jsonResponse({ ...pendingQueue, items: [pendingQueue.items[0], secondGame] }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/achievements?state=pending&game=62"]}>
+        <AchievementReviewPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Montana State at Idaho" }),
+    ).toBeInTheDocument();
+  });
+
   it("creates an Article Brief from selected approved suggestions", async () => {
     const approvedSuggestion = {
       ...suggestion,

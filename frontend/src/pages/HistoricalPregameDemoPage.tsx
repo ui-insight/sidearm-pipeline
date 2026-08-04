@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { pregameBriefsApi } from "../api/pregameBriefs";
 import type {
@@ -54,7 +55,6 @@ function HistoricalPregameDemoPage() {
   const [brief, setBrief] = useState<HistoricalPregameBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resultRevealed, setResultRevealed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -331,30 +331,18 @@ function HistoricalPregameDemoPage() {
         <div className="border border-gray-300 bg-white px-5 py-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500">After the briefing</p>
-            <h2 className="mt-2 text-xl font-black text-gray-950">Reveal what happened</h2>
+            <h2 className="mt-2 text-xl font-black text-gray-950">Continue to the postgame desk</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-              The result stays separate from every pregame calculation, making the historical replay auditable.
+              Reveal the result in Idaho&apos;s verified game workspace, then review the source-backed story themes the desk can pursue.
             </p>
           </div>
-          <button
-            type="button"
-            aria-expanded={resultRevealed}
-            onClick={() => setResultRevealed((current) => !current)}
-            className="mt-5 shrink-0 rounded-md bg-gray-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:mt-0"
+          <Link
+            to={`/games/${target.game_id}?from=pregame-demo`}
+            className="mt-5 inline-flex min-h-10 shrink-0 items-center justify-center rounded-md bg-gray-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:mt-0"
           >
-            {resultRevealed ? "Hide result" : "Reveal result"}
-          </button>
+            Reveal result and open game
+          </Link>
         </div>
-        {resultRevealed ? (
-          <div className="border-x border-b border-gray-300 bg-amber-50 px-5 py-5" role="status">
-            <p className="text-xs font-black uppercase tracking-[0.08em] text-amber-800">Actual result</p>
-            <p className="mt-2 text-2xl font-black tabular-nums text-gray-950">
-              Idaho {target.idaho_score}, {target.opponent} {target.opponent_score}
-            </p>
-            <p className="mt-2 text-sm text-gray-700">The Vandals answered the rematch question with a three-point home win.</p>
-            <a className="mt-3 inline-block text-sm font-bold text-gray-800 underline decoration-amber-500 underline-offset-4" href={target.source_url} target="_blank" rel="noreferrer">Open the final box score</a>
-          </div>
-        ) : null}
         <p className="mt-5 max-w-3xl text-xs leading-5 text-gray-500">
           Method: {brief.methodology} {brief.evidence_game_count} eligible games were checked.
         </p>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { achievementsApi } from "../api/achievements";
 import { articlesApi } from "../api/articles";
 import { ApiError } from "../api/client";
@@ -103,7 +103,14 @@ function QueueSkeleton() {
 
 function AchievementReviewPage() {
   const navigate = useNavigate();
-  const [state, setState] = useState<AchievementReviewState>("pending");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedState = searchParams.get("state");
+  const initialState: AchievementReviewState =
+    requestedState === "approved" || requestedState === "rejected"
+      ? requestedState
+      : "pending";
+  const requestedGameId = Number(searchParams.get("game"));
+  const [state, setState] = useState<AchievementReviewState>(initialState);
   const [queue, setQueue] = useState<AchievementReviewQueue | null>(null);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,9 +137,11 @@ function AchievementReviewPage() {
         if (!active) return;
         setQueue(result);
         setSelectedGameId((current) =>
-          result.items.some((game) => game.game_id === current)
-            ? current
-            : (result.items[0]?.game_id ?? null),
+          result.items.some((game) => game.game_id === requestedGameId)
+            ? requestedGameId
+            : result.items.some((game) => game.game_id === current)
+              ? current
+              : (result.items[0]?.game_id ?? null),
         );
       } catch (loadError) {
         if (active) setError(apiErrorMessage(loadError));
@@ -144,7 +153,7 @@ function AchievementReviewPage() {
     return () => {
       active = false;
     };
-  }, [reloadKey, state]);
+  }, [reloadKey, requestedGameId, state]);
 
   const selectedGame = useMemo(
     () => queue?.items.find((game) => game.game_id === selectedGameId) ?? null,
@@ -164,12 +173,19 @@ function AchievementReviewPage() {
     setSelectedSuggestionIds([]);
     setIdempotencyKey(null);
     setNotice(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("state", nextState);
+    setSearchParams(nextParams);
   }
 
   function selectGame(gameId: number) {
     setSelectedGameId(gameId);
     setSelectedSuggestionIds([]);
     setIdempotencyKey(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("game", String(gameId));
+    nextParams.set("state", state);
+    setSearchParams(nextParams);
   }
 
   function toggleSuggestion(suggestionId: number) {

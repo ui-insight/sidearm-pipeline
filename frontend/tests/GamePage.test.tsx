@@ -95,6 +95,35 @@ const facts = [
   },
 ];
 
+const suggestion = {
+  id: 17,
+  game_id: 42,
+  player_id: 3,
+  player_name: "Kyra Gardner",
+  stat_key: "points",
+  stat_label: "Points",
+  suggestion_key: "career_high:3:points",
+  achievement_type: "career_high",
+  scope: "career",
+  computed_value: "31.000000",
+  comparison_value: "27.000000",
+  rank: null,
+  deterministic_notability_score: "4.500",
+  context: {},
+  coverage_context: { claim_scope: "since 2023-24" },
+  phrasing: "Kyra Gardner set a career high with 31 points since 2023-24.",
+  ai_rank: 1,
+  ai_model: "qwen/qwen3.6-27b",
+  ai_prompt_version: "achievement-ranking-v1",
+  ai_output_hash: "hash",
+  ai_ranked_at: "2026-07-27T16:00:00Z",
+  source_url: game.source_url,
+  reviewed_at: null,
+  reviewed_by: null,
+  reviewed_fact_hash: null,
+  state: "pending",
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => {
@@ -103,6 +132,9 @@ beforeEach(() => {
     }
     if (String(input) === "/api/v1/games/42") {
       return jsonResponse(game);
+    }
+    if (String(input) === "/api/v1/achievement-suggestions/games/42") {
+      return jsonResponse([suggestion]);
     }
     return jsonResponse({}, { status: 404 });
   });
@@ -139,5 +171,30 @@ describe("GamePage", () => {
     expect(
       screen.getByRole("link", { name: "Open original boxscore" }),
     ).toHaveAttribute("href", game.source_url);
+    expect(
+      screen.getByRole("heading", { name: "Suggested story themes" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(suggestion.phrasing)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review theme" })).toHaveAttribute(
+      "href",
+      "/achievements?state=pending&game=42",
+    );
+  });
+
+  it("marks the internal game as the next step from the pregame replay", async () => {
+    render(
+      <MemoryRouter initialEntries={["/games/42?from=pregame-demo"]}>
+        <Routes>
+          <Route path="/games/:id" element={<GamePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Now viewing the verified result" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Return to pregame brief" }),
+    ).toHaveAttribute("href", "/demo/pregame-brief");
   });
 });
