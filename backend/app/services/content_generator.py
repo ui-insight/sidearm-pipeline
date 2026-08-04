@@ -23,6 +23,7 @@ import logging
 import re
 
 from anthropic import APIStatusError, AsyncAnthropic, AuthenticationError
+from pydantic import ValidationError
 
 from app.config import settings
 from app.models.game import Game
@@ -52,6 +53,7 @@ JSON, no markdown code fences, no commentary."""
 
 
 _client: AsyncAnthropic | None = None
+_MAX_GENERATION_ATTEMPTS = 2
 
 
 def _get_client() -> AsyncAnthropic:
@@ -137,49 +139,67 @@ async def generate_coverage(game: Game) -> GeneratedCoverage:
         f"BOXSCORE:\n{json.dumps(payload, indent=2)}"
     )
 
-    try:
-        response = await client.messages.create(
-            model=settings.CONTENT_MODEL,
-            max_tokens=4000,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-        )
-    except AuthenticationError as exc:
-        raise RuntimeError(
-            "Upstream rejected the API key. Check ANTHROPIC_API_KEY "
-            "(and ANTHROPIC_BASE_URL if using a gateway like MindRouter)."
-        ) from exc
-    except APIStatusError as exc:
-        if exc.status_code == 404:
+    for attempt in range(1, _MAX_GENERATION_ATTEMPTS + 1):
+        try:
+            response = await client.messages.create(
+                model=settings.CONTENT_MODEL,
+                max_tokens=4000,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_message}],
+            )
+        except AuthenticationError as exc:
             raise RuntimeError(
-                f"Configured content model '{settings.CONTENT_MODEL}' is unavailable "
-                "from the upstream provider. Check CONTENT_MODEL and "
-                "ANTHROPIC_BASE_URL."
+                "Upstream rejected the API key. Check ANTHROPIC_API_KEY "
+                "(and ANTHROPIC_BASE_URL if using a gateway like MindRouter)."
             ) from exc
-        raise RuntimeError(
-            f"Upstream content provider returned status {exc.status_code}. "
-            "Try again or check the configured provider."
-        ) from exc
+        except APIStatusError as exc:
+            if exc.status_code == 404:
+                raise RuntimeError(
+                    f"Configured content model '{settings.CONTENT_MODEL}' is "
+                    "unavailable from the upstream provider. Check CONTENT_MODEL "
+                    "and ANTHROPIC_BASE_URL."
+                ) from exc
+            raise RuntimeError(
+                f"Upstream content provider returned status {exc.status_code}. "
+                "Try again or check the configured provider."
+            ) from exc
 
-    text = next(
-        (block.text for block in response.content if block.type == "text"),
-        None,
-    )
-    if not text:
+        text = next(
+            (block.text for block in response.content if block.type == "text"),
+            None,
+        )
+        payload_json = _extract_json(text) if text else None
+        if payload_json is not None:
+            try:
+                coverage = GeneratedCoverage.model_validate(payload_json)
+            except ValidationError:
+                coverage = None
+            if coverage is not None:
+                logger.info(
+                    "Generated coverage game_id=%s model=%s usage=%s attempt=%s",
+                    game.id,
+                    settings.CONTENT_MODEL,
+                    getattr(response, "usage", None),
+                    attempt,
+                )
+                return coverage
+
+        if attempt < _MAX_GENERATION_ATTEMPTS:
+            logger.warning(
+                "Coverage response was not valid structured content; retrying "
+                "game_id=%s model=%s attempt=%s",
+                game.id,
+                settings.CONTENT_MODEL,
+                attempt,
+            )
+            continue
+
+        if text:
+            logger.error("Could not validate model output: %s", text[:500])
+            raise RuntimeError("Model response was not valid structured content.")
         raise RuntimeError("Model returned no text block.")
 
-    payload_json = _extract_json(text)
-    if payload_json is None:
-        logger.error("Could not extract JSON from model output: %s", text[:500])
-        raise RuntimeError("Model response was not parseable JSON.")
-
-    logger.info(
-        "Generated coverage game_id=%s model=%s usage=%s",
-        game.id,
-        settings.CONTENT_MODEL,
-        getattr(response, "usage", None),
-    )
-    return GeneratedCoverage.model_validate(payload_json)
+    raise RuntimeError("Coverage generation exhausted its retry budget.")
 
 
 def _extract_json(text: str) -> dict | None:
