@@ -6,6 +6,8 @@ import type {
 } from "../types/achievement";
 
 export const achievementsApi = {
+  forGame: (gameId: number) =>
+    api.get<AchievementSuggestion[]>(`/achievement-suggestions/games/${gameId}`),
   reviewQueue: (state: AchievementReviewState, limit = 25, offset = 0) =>
     api.get<AchievementReviewQueue>("/achievement-suggestions/review-queue", {
       state,

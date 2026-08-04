@@ -1,5 +1,4 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HistoricalPregameDemoPage from "../src/pages/HistoricalPregameDemoPage";
@@ -172,27 +171,22 @@ describe("HistoricalPregameDemoPage", () => {
     );
   });
 
-  it("keeps the actual result hidden until explicitly revealed", async () => {
-    const user = userEvent.setup();
+  it("keeps the result separate and continues into the internal game workspace", async () => {
     render(
       <MemoryRouter>
         <HistoricalPregameDemoPage />
       </MemoryRouter>,
     );
 
-    const revealButton = await screen.findByRole("button", {
-      name: "Reveal result",
+    const revealLink = await screen.findByRole("link", {
+      name: "Reveal result and open game",
     });
     expect(
       screen.queryByText("Idaho 73, Montana State 70"),
     ).not.toBeInTheDocument();
-
-    await user.click(revealButton);
-
-    expect(screen.getByText("Idaho 73, Montana State 70")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the final box score" })).toHaveAttribute(
+    expect(revealLink).toHaveAttribute(
       "href",
-      "https://govandals.com/boxscore/23",
+      "/games/23?from=pregame-demo",
     );
   });
 

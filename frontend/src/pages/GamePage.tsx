@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
+import { achievementsApi } from "../api/achievements";
 import { ApiError } from "../api/client";
 import { gamesApi } from "../api/games";
+import type { AchievementSuggestion } from "../types/achievement";
 import type {
   GameDetail,
   GeneratedContent,
@@ -88,11 +90,15 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 
 function GamePage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [game, setGame] = useState<GameDetail | null>(null);
   const [facts, setFacts] = useState<NormalizedPlayerGameStat[]>([]);
+  const [suggestions, setSuggestions] = useState<AchievementSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [factsError, setFactsError] = useState<string | null>(null);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [factsLoading, setFactsLoading] = useState(true);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
@@ -126,6 +132,22 @@ function GamePage() {
       })
       .finally(() => {
         if (active) setFactsLoading(false);
+      });
+
+    achievementsApi
+      .forGame(gameId)
+      .then((loadedSuggestions) => {
+        if (active) setSuggestions(loadedSuggestions);
+      })
+      .catch((loadError) => {
+        if (active) {
+          setSuggestionsError(
+            apiErrorMessage(loadError, "Failed to load suggested story themes"),
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setSuggestionsLoading(false);
       });
 
     return () => {
@@ -173,6 +195,7 @@ function GamePage() {
       new Date(right.fetched_at).getTime() - new Date(left.fetched_at).getTime(),
   )[0];
   const rows = normalizedRows(facts);
+  const fromPregameDemo = searchParams.get("from") === "pregame-demo";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -183,7 +206,32 @@ function GamePage() {
         Back to games
       </Link>
 
-      <header className="mt-5 border-y border-gray-300 bg-white">
+      {fromPregameDemo ? (
+        <section
+          className="mt-5 border-y border-yellow-300 bg-yellow-50 px-5 py-4 sm:flex sm:items-center sm:justify-between sm:gap-8"
+          aria-labelledby="pregame-handoff-heading"
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-yellow-800">
+              Pregame replay complete
+            </p>
+            <h2 id="pregame-handoff-heading" className="mt-1 text-lg font-bold text-gray-950">
+              Now viewing the verified result
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+              Compare the pregame question with the final box score, then move a source-backed story theme into editorial review.
+            </p>
+          </div>
+          <Link
+            to="/demo/pregame-brief"
+            className="mt-3 inline-block shrink-0 text-sm font-semibold text-gray-800 underline decoration-yellow-500 decoration-2 underline-offset-4 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:mt-0"
+          >
+            Return to pregame brief
+          </Link>
+        </section>
+      ) : null}
+
+      <header className={`${fromPregameDemo ? "mt-0 border-t-0" : "mt-5"} border-y border-gray-300 bg-white`}>
         <div className="flex flex-col gap-6 px-5 py-6 sm:px-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
@@ -330,7 +378,13 @@ function GamePage() {
           )}
         </div>
 
-        <div className="xl:sticky xl:top-6">
+        <div className="space-y-6 xl:sticky xl:top-6">
+          <StoryThemesSection
+            gameId={game.id}
+            suggestions={suggestions}
+            loading={suggestionsLoading}
+            error={suggestionsError}
+          />
           <CoverageSection
             content={game.generated_content[0] ?? null}
             history={game.generated_content.slice(1)}
@@ -341,6 +395,93 @@ function GamePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function achievementLabel(value: string): string {
+  const labels: Record<string, string> = {
+    career_high: "Career high",
+    season_high: "Season high",
+    threshold_crossing: "Career milestone",
+    all_time_top_n: "Program ranking",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function StoryThemesSection({
+  gameId,
+  suggestions,
+  loading,
+  error,
+}: {
+  gameId: number;
+  suggestions: AchievementSuggestion[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const themes = suggestions
+    .filter(
+      (suggestion) =>
+        suggestion.state !== "rejected" &&
+        suggestion.ai_rank !== null &&
+        Boolean(suggestion.phrasing),
+    )
+    .slice(0, 3);
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-yellow-700">
+        Editorial next step
+      </p>
+      <h2 className="mt-1 text-lg font-semibold text-gray-950">
+        Suggested story themes
+      </h2>
+      <p className="mt-1 text-xs leading-5 text-gray-500">
+        Ranked angles remain attached to verified game facts and require SID review.
+      </p>
+
+      {loading ? (
+        <div className="mt-4 animate-pulse space-y-3" aria-label="Loading suggested story themes">
+          <div className="h-16 rounded bg-gray-100" />
+          <div className="h-16 rounded bg-gray-100" />
+        </div>
+      ) : error ? (
+        <p role="alert" className="mt-4 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </p>
+      ) : themes.length > 0 ? (
+        <ol className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
+          {themes.map((suggestion) => (
+            <li key={suggestion.id} className="py-4">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-gray-600">
+                  {achievementLabel(suggestion.achievement_type)}
+                </span>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold capitalize text-gray-600">
+                  {suggestion.state === "pending" ? "Needs review" : suggestion.state}
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-semibold leading-5 text-gray-950">
+                {suggestion.phrasing}
+              </p>
+              <Link
+                to={`/achievements?state=${suggestion.state}&game=${gameId}`}
+                className="mt-3 inline-block text-sm font-semibold text-gray-800 underline decoration-yellow-500 decoration-2 underline-offset-4 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
+              >
+                {suggestion.state === "approved" ? "Develop article brief" : "Review theme"}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="mt-4 border-y border-gray-200 py-4">
+          <p className="text-sm font-semibold text-gray-950">No ranked themes yet</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            The box score is verified, but no publishable story candidate has been ranked for this game.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
