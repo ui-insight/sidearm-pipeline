@@ -17,9 +17,12 @@ describe("ProjectOverviewPage", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "One trusted place to find the facts behind every game.",
+        name: "The data foundation for every Vandal sport.",
       }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Sidearm ingestion")).toBeInTheDocument();
+    expect(screen.getByText("One all-sport warehouse")).toBeInTheDocument();
+    expect(screen.getByText("Athletics intelligence")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "What this platform is here to do" }),
     ).toBeInTheDocument();
@@ -51,10 +54,10 @@ describe("ProjectOverviewPage", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "Start the Athletics demo" }),
+      screen.getByRole("link", { name: "Explore the Athletics demo" }),
     ).toHaveAttribute("href", "/demo");
     expect(
-      screen.getByRole("link", { name: "Open the games desk" }),
+      screen.getByRole("link", { name: "View ingested games" }),
     ).toHaveAttribute("href", "/games");
   });
 });

@@ -67,22 +67,24 @@ function ProjectOverviewPage() {
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] lg:items-end lg:gap-20 lg:px-8 lg:py-20">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-yellow-400">
-              University of Idaho Athletics
+              Vandal athletics data platform
             </p>
             <h1 className="mt-5 max-w-3xl text-4xl font-bold tracking-[-0.03em] text-gray-50 sm:text-5xl sm:leading-[1.08]">
-              One trusted place to find the facts behind every game.
+              The data foundation for every Vandal sport.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-gray-300">
-              Vandals Stats Desk brings schedules, rosters, box scores, player
-              history, and source evidence together so Athletics staff can
-              research faster, resolve questions, and prepare accurate coverage.
+              Vandals Stats Desk ingests Sidearm schedules, rosters, box scores,
+              and play-by-play into one comprehensive athletics warehouse. It
+              gives communications staff trusted answers today and creates the
+              foundation for analytics that can serve coaches, performance
+              staff, and Athletics leadership.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link
                 to="/demo"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-yellow-400 px-5 py-2.5 text-sm font-bold text-gray-950 transition-colors hover:bg-yellow-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
               >
-                Start the Athletics demo
+                Explore the Athletics demo
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 20 20"
@@ -102,29 +104,41 @@ function ProjectOverviewPage() {
                 to="/games"
                 className="inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800 hover:text-gray-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
               >
-                Open the games desk
+                View ingested games
               </Link>
             </div>
           </div>
 
           <div className="border-t border-gray-700 pt-6 lg:border-t-0 lg:border-l lg:pb-1 lg:pl-8">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-gray-400">
-              The working rhythm
+              From source to strategy
             </p>
-            <ol className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-1">
-              {["Collect", "Verify", "Explore", "Prepare"].map(
-                (step, index) => (
-                  <li key={step} className="flex items-center gap-3">
-                    <span className="font-mono text-xs tabular-nums text-yellow-400">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="text-sm font-semibold text-gray-100">
-                      {step}
-                    </span>
-                  </li>
-                ),
-              )}
-            </ol>
+            <dl className="mt-5 divide-y divide-gray-800 border-y border-gray-800">
+              <div className="py-4 first:pt-0">
+                <dt className="text-sm font-bold text-gray-100">
+                  Sidearm ingestion
+                </dt>
+                <dd className="mt-1 text-sm leading-5 text-gray-400">
+                  Schedules, rosters, box scores, and play-by-play
+                </dd>
+              </div>
+              <div className="py-4">
+                <dt className="text-sm font-bold text-gray-100">
+                  One all-sport warehouse
+                </dt>
+                <dd className="mt-1 text-sm leading-5 text-gray-400">
+                  Connected teams, seasons, athletes, games, and source evidence
+                </dd>
+              </div>
+              <div className="py-4 last:pb-0">
+                <dt className="text-sm font-bold text-gray-100">
+                  Athletics intelligence
+                </dt>
+                <dd className="mt-1 text-sm leading-5 text-gray-400">
+                  Communications, coaching, performance analysis, and leadership
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
       </section>
