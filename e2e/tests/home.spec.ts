@@ -17,14 +17,14 @@ test("post-login landing page introduces the project and opens the demo", async 
 
   await expect(
     page.getByRole("heading", {
-      name: "One trusted place to find the facts behind every game.",
+      name: "The data foundation for every Vandal sport.",
     }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Available in this prototype" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Start the Athletics demo" }),
+    page.getByRole("link", { name: "Explore the Athletics demo" }),
   ).toHaveAttribute("href", "/demo");
 });
 
