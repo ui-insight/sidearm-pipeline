@@ -10,6 +10,7 @@ import RecordBookPage from "./pages/RecordBookPage";
 import ExploratoryWorkspacePage from "./pages/ExploratoryWorkspacePage";
 import PlayerComparisonPage from "./pages/PlayerComparisonPage";
 import AthleticsDemoPage from "./pages/AthleticsDemoPage";
+import HistoricalPregameDemoPage from "./pages/HistoricalPregameDemoPage";
 import AchievementReviewPage from "./pages/AchievementReviewPage";
 import AskWarehousePage from "./pages/AskWarehousePage";
 import ArticleBriefPage from "./pages/ArticleBriefPage";
@@ -53,6 +54,10 @@ function App() {
               <Route path="/identity-queue" element={<IdentityQueuePage />} />
               <Route path="/backfills" element={<HistoricalBackfillPage />} />
               <Route path="/demo" element={<AthleticsDemoPage />} />
+              <Route
+                path="/demo/pregame-brief"
+                element={<HistoricalPregameDemoPage />}
+              />
             </Routes>
           </AppShell>
         )}
