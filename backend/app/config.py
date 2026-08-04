@@ -34,7 +34,9 @@ class Settings(BaseSettings):
         None  # e.g. https://mindrouter.uidaho.edu/anthropic
     )
     CONTENT_MODEL: str = "claude-opus-4-7"
-    ARTICLE_MODEL: str | None = None
+    MINDROUTER_API_KEY: str | None = None
+    MINDROUTER_BASE_URL: str = "https://mindrouter.uidaho.edu/anthropic"
+    ARTICLE_MODEL: str = "qwen/qwen3.6-27b"
     ARTICLE_GENERATION_MAX_TOKENS: int = Field(default=4000, ge=256, le=16000)
     ARTICLE_GENERATION_POLL_SECONDS: float = Field(default=2.0, ge=0.1, le=60)
     ARTICLE_GENERATION_LEASE_SECONDS: int = Field(default=300, ge=30, le=3600)

@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import HomePage from "../src/pages/HomePage";
+import GamesDeskPage from "../src/pages/GamesDeskPage";
 
 const SAMPLE_BOXSCORE_URL =
   "https://govandals.com/sports/football/stats/2025/uc-davis/boxscore/8467";
@@ -38,11 +38,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("HomePage", () => {
+describe("GamesDeskPage", () => {
   it("renders the games desk heading and empty state", async () => {
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 
@@ -58,7 +58,7 @@ describe("HomePage", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 
@@ -125,7 +125,7 @@ describe("HomePage", () => {
     });
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 
@@ -188,7 +188,7 @@ describe("HomePage", () => {
 
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 
@@ -220,7 +220,7 @@ describe("HomePage", () => {
 
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 
@@ -287,7 +287,7 @@ describe("HomePage", () => {
 
     render(
       <MemoryRouter>
-        <HomePage />
+        <GamesDeskPage />
       </MemoryRouter>,
     );
 

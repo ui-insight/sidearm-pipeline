@@ -156,7 +156,7 @@ function GamePage() {
         <div className="max-w-md text-center">
           <p className="text-sm font-semibold text-red-800">{error}</p>
           <Link
-            to="/"
+            to="/games"
             className="mt-3 inline-block text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-yellow-500 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
           >
             Back to games
@@ -177,7 +177,7 @@ function GamePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <Link
-        to="/"
+        to="/games"
         className="text-sm font-medium text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-950 hover:decoration-yellow-500 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500"
       >
         Back to games

@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import func, select
 
 from app.models.article import ArticleGenerationJob, ArticleVersion
@@ -27,6 +28,38 @@ class _FakeMessages:
 class _FakeAnthropic:
     def __init__(self, payload: dict) -> None:
         self.messages = _FakeMessages(payload)
+
+
+def test_article_writer_builds_a_mindrouter_client(monkeypatch) -> None:
+    captured: dict = {}
+    fake_client = object()
+
+    def fake_anthropic(**kwargs):
+        captured.update(kwargs)
+        return fake_client
+
+    monkeypatch.setattr(article_writer.settings, "MINDROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        article_writer.settings,
+        "MINDROUTER_BASE_URL",
+        "https://mindrouter.example.edu/anthropic",
+    )
+    monkeypatch.setattr(article_writer, "AsyncAnthropic", fake_anthropic)
+    monkeypatch.setattr(article_writer, "_client", None)
+
+    assert article_writer._get_client() is fake_client
+    assert captured == {
+        "api_key": "test-key",
+        "base_url": "https://mindrouter.example.edu/anthropic",
+    }
+
+
+def test_article_writer_requires_a_mindrouter_key(monkeypatch) -> None:
+    monkeypatch.setattr(article_writer.settings, "MINDROUTER_API_KEY", None)
+    monkeypatch.setattr(article_writer, "_client", None)
+
+    with pytest.raises(RuntimeError, match="MINDROUTER_API_KEY"):
+        article_writer._get_client()
 
 
 async def _article_brief(client, db_session) -> dict:
@@ -100,6 +133,8 @@ async def test_generation_job_creates_validated_immutable_ai_version(
     job = queued.json()
     assert job["state"] == "queued"
     assert job["attempt_count"] == 0
+    assert job["provider"] == "mindrouter-anthropic"
+    assert job["model"] == "qwen/qwen3.6-27b"
     assert job["style_snapshot"]["versions"][0]["guide_key"] == ("athletics-default")
 
     processed = await article_generation.process_article_generation_job(
@@ -127,6 +162,8 @@ async def test_generation_job_creates_validated_immutable_ai_version(
     version = completed["article_version"]
     assert version["version"] == 1
     assert version["origin"] == "ai"
+    assert version["provider"] == "mindrouter-anthropic"
+    assert version["model"] == "qwen/qwen3.6-27b"
     assert version["headline_evidence_ids"] == _safe_draft(brief).headline_evidence_ids
     assert version["evidence_hash"] == brief["evidence_bundle"]["content_hash"]
     assert version["style_hash"] == completed["style_hash"]

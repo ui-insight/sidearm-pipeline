@@ -220,6 +220,21 @@ one or more Evidence Bundle item IDs. Validation occurs before persistence:
 The validator rejects the complete response on any blocking failure. Model-reported
 confidence cannot override deterministic validation.
 
+### Article writer provider
+
+The evidence-bound Article writer calls the University of Idaho MindRouter through
+its Anthropic-compatible Messages endpoint. The default registered model is
+`qwen/qwen3.6-27b`; deployments may override the model identifier while preserving
+the same structured output and validation contract. Article generation uses a
+dedicated `MINDROUTER_API_KEY` rather than sharing the credential used by legacy
+content generation, Achievement ranking, or semantic questions.
+
+Every generation job and Article Version records `mindrouter-anthropic` plus the
+exact model identifier. Missing or rejected credentials and provider failures leave
+the Article Brief unchanged and produce a retryable failed job. Switching the model
+does not relax Evidence Bundle boundaries, deterministic validation, append-only
+versioning, or either human gate.
+
 The seeded prototype Style Guide is an immutable shared-athletics version. It applies
 headline length, unsupported-fact-class, measured-language, and punctuation rules
 until issue #148 adds the maintainer workflow for scoped successor versions.

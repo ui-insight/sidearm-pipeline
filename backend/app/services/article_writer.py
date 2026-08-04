@@ -12,7 +12,7 @@ from app.schemas.article import ArticleDraftOutput
 from app.services.content_generator import _extract_json
 
 ARTICLE_PROMPT_VERSION = "article-writer-v1"
-ARTICLE_PROVIDER = "anthropic-messages"
+ARTICLE_PROVIDER = "mindrouter-anthropic"
 
 OUTPUT_CONTRACT = {
     "headline": "string",
@@ -39,23 +39,23 @@ _client: AsyncAnthropic | None = None
 
 
 def article_model() -> str:
-    """Return the configured Article writer model."""
-    return settings.ARTICLE_MODEL or settings.CONTENT_MODEL
+    """Return the MindRouter model configured for Article writing."""
+    return settings.ARTICLE_MODEL
 
 
 def _get_client() -> AsyncAnthropic:
-    if not settings.ANTHROPIC_API_KEY:
+    if not settings.MINDROUTER_API_KEY:
         raise RuntimeError(
-            "The Article writer is unavailable because ANTHROPIC_API_KEY is not "
+            "The Article writer is unavailable because MINDROUTER_API_KEY is not "
             "configured. The Article Brief is unchanged and can be retried."
         )
 
     global _client
     if _client is None:
-        kwargs = {"api_key": settings.ANTHROPIC_API_KEY}
-        if settings.ANTHROPIC_BASE_URL:
-            kwargs["base_url"] = settings.ANTHROPIC_BASE_URL
-        _client = AsyncAnthropic(**kwargs)
+        _client = AsyncAnthropic(
+            api_key=settings.MINDROUTER_API_KEY,
+            base_url=settings.MINDROUTER_BASE_URL,
+        )
     return _client
 
 
@@ -88,13 +88,13 @@ async def generate_article_draft(writer_input: dict) -> ArticleDraftOutput:
         )
     except AuthenticationError as exc:
         raise RuntimeError(
-            "The Article writer rejected its API credentials. The Article Brief "
-            "is unchanged and can be retried after configuration is corrected."
+            "MindRouter rejected the Article writer API credentials. The Article "
+            "Brief is unchanged and can be retried after configuration is corrected."
         ) from exc
     except APIError as exc:
         raise RuntimeError(
-            "The Article writer provider is unavailable. The Article Brief is "
-            "unchanged and can be retried."
+            "MindRouter is unavailable to the Article writer. The Article Brief "
+            "is unchanged and can be retried."
         ) from exc
 
     text = next(

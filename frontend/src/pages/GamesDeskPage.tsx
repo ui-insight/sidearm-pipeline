@@ -50,7 +50,7 @@ function syncReasonLabel(reason: string): string {
   return labels[reason] ?? formatStatus(reason);
 }
 
-function HomePage() {
+function GamesDeskPage() {
   const [games, setGames] = useState<GameSummary[]>([]);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -655,4 +655,4 @@ function HomePage() {
   );
 }
 
-export default HomePage;
+export default GamesDeskPage;
