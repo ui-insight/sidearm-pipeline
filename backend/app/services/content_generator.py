@@ -22,7 +22,7 @@ import json
 import logging
 import re
 
-from anthropic import AsyncAnthropic, AuthenticationError
+from anthropic import APIStatusError, AsyncAnthropic, AuthenticationError
 
 from app.config import settings
 from app.models.game import Game
@@ -148,6 +148,17 @@ async def generate_coverage(game: Game) -> GeneratedCoverage:
         raise RuntimeError(
             "Upstream rejected the API key. Check ANTHROPIC_API_KEY "
             "(and ANTHROPIC_BASE_URL if using a gateway like MindRouter)."
+        ) from exc
+    except APIStatusError as exc:
+        if exc.status_code == 404:
+            raise RuntimeError(
+                f"Configured content model '{settings.CONTENT_MODEL}' is unavailable "
+                "from the upstream provider. Check CONTENT_MODEL and "
+                "ANTHROPIC_BASE_URL."
+            ) from exc
+        raise RuntimeError(
+            f"Upstream content provider returned status {exc.status_code}. "
+            "Try again or check the configured provider."
         ) from exc
 
     text = next(
