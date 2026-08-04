@@ -32,10 +32,10 @@ class GeneratedCoverage(BaseModel):
     recap: str = Field(
         ...,
         description=(
-            "A 2-3 paragraph game recap (250-350 words) in AP sports-news style. "
-            "Lead with the final score and the key narrative, then support with "
-            "specific stats and plays. No hashtags, no emoji. Write in third "
-            "person, past tense."
+            "An evidence-limited game recap in AP sports-news style. Its requested "
+            "length and permission to describe chronology depend on the supplied "
+            "box-score evidence. No hashtags or emoji. Write in third person, "
+            "past tense."
         ),
     )
     spotlight_player: str = Field(

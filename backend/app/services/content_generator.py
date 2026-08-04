@@ -28,6 +28,7 @@ from pydantic import ValidationError
 from app.config import settings
 from app.models.game import Game
 from app.schemas.content import GeneratedCoverage
+from app.schemas.game import NormalizedPlayerGameStatRead
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,9 @@ website and social accounts.
 
 House style:
 - AP style, third person, past tense.
-- Lead with the outcome (score and who won), then the turning point, then \
-  supporting context.
+- Lead with the outcome (score and who won), then verified performance details.
+- Describe game flow or a turning point only when the supplied scoring plays \
+  directly support it.
 - Name players as they appear in the stat tables ("Last, First").
 - Cite concrete numbers from the provided stats — never invent statistics, \
   quotes, attendance, weather, or injuries.
@@ -54,6 +56,10 @@ JSON, no markdown code fences, no commentary."""
 
 _client: AsyncAnthropic | None = None
 _MAX_GENERATION_ATTEMPTS = 2
+
+
+class InsufficientGameEvidenceError(RuntimeError):
+    """Raised when a game lacks enough box-score detail for grounded coverage."""
 
 
 def _get_client() -> AsyncAnthropic:
@@ -72,7 +78,10 @@ def _get_client() -> AsyncAnthropic:
     return _client
 
 
-def _serialize_game(game: Game) -> dict:
+def _serialize_game(
+    game: Game,
+    normalized_player_stats: list[NormalizedPlayerGameStatRead],
+) -> dict:
     """Flatten a Game ORM record into a compact JSON payload for the model."""
     return {
         "sport": game.sport,
@@ -111,41 +120,195 @@ def _serialize_game(game: Game) -> dict:
             }
             for group in game.player_stats
         ],
+        "normalized_player_stats": _group_normalized_player_stats(
+            normalized_player_stats
+        ),
     }
 
 
-_SCHEMA_DOC = """Your JSON object must have exactly these keys:
-{
+def _group_normalized_player_stats(
+    stats: list[NormalizedPlayerGameStatRead],
+) -> list[dict]:
+    """Group atomic warehouse facts into compact, source-backed player lines."""
+    players: dict[tuple[int, str, str | None], dict] = {}
+    for stat in stats:
+        key = (stat.player_id, stat.player_name, stat.team_name)
+        player = players.setdefault(
+            key,
+            {
+                "player": stat.player_name,
+                "team": stat.team_name,
+                "stats": {},
+            },
+        )
+        player["stats"][stat.stat_key] = {
+            "label": stat.display_label,
+            "value": str(stat.value),
+            "source_field": stat.source_field,
+            "source_value": stat.source_value,
+        }
+    return list(players.values())
+
+
+def _schema_doc(recap_contract: str) -> str:
+    return f"""Your JSON object must have exactly these keys:
+{{
   "headline":         string  // punchy news headline under 90 characters
-  "recap":            string  // 250-350 word, 2-3 paragraph game recap in AP style
+  "recap":            string  // {recap_contract}
   "spotlight_player": string  // standout player name as written in the stats
   "spotlight_body":   string  // 2-3 sentence feature with concrete stats
   "social_post":      string  // under 280 characters with score + stat nugget
-}"""
+}}"""
 
 
-async def generate_coverage(game: Game) -> GeneratedCoverage:
+def _evidence_rules(payload: dict) -> tuple[str, str]:
+    if payload["scoring_plays"]:
+        return (
+            "200-300 words in 2-3 short paragraphs; describe chronology only from "
+            "the supplied scoring plays",
+            "Scoring plays are available. Any statement about game flow, a run, a "
+            "turning point, or late-game execution must cite those plays directly.",
+        )
+    return (
+        "140-200 words in 2 short paragraphs focused on the result and stat lines",
+        "No scoring plays are available. Do not describe game flow, turning points, "
+        "runs, rallies, momentum, late-game execution, or how the score developed.",
+    )
+
+
+def _has_detailed_evidence(payload: dict) -> bool:
+    return bool(
+        payload["team_stats"]
+        or payload["scoring_plays"]
+        or any(group["rows"] for group in payload["player_stats"])
+        or payload["normalized_player_stats"]
+    )
+
+
+_UNSUPPORTED_WITHOUT_PLAYS = (
+    "late push",
+    "down the stretch",
+    "final minutes",
+    "key possessions",
+    "crucial free throws",
+    "timely possessions",
+    "when the game was on the line",
+    "pulled away",
+    "pull away",
+    "rallied",
+    "survived",
+)
+
+_UNSUPPORTED_FROM_BOXSCORE = (
+    "home crowd",
+    "coaching staff",
+    "postseason resume",
+    "next opponent",
+    "grit and determination",
+    "experience and fundamentals",
+    "top-tier opponent",
+    "testament to",
+)
+
+
+def _player_names(payload: dict) -> list[str]:
+    names = [row["player"] for row in payload["normalized_player_stats"]]
+    for group in payload["player_stats"]:
+        columns = group["columns"]
+        player_index = next(
+            (
+                index
+                for index, column in enumerate(columns)
+                if str(column).strip().lower() == "player"
+            ),
+            None,
+        )
+        if player_index is None:
+            continue
+        for row in group["rows"]:
+            if not isinstance(row, list) or player_index >= len(row):
+                continue
+            name = re.sub(r"^\s*\d+\s*", "", str(row[player_index])).strip()
+            if name:
+                names.append(name)
+    return names
+
+
+def _coverage_quality_issues(
+    coverage: GeneratedCoverage,
+    payload: dict,
+) -> list[str]:
+    """Reject obvious unsupported filler before a legacy draft is persisted."""
+    recap = coverage.recap.lower()
+    issues: list[str] = []
+
+    if not payload["scoring_plays"]:
+        matched = [phrase for phrase in _UNSUPPORTED_WITHOUT_PLAYS if phrase in recap]
+        if matched:
+            issues.append("unsupported game-flow language: " + ", ".join(matched))
+
+    matched = [phrase for phrase in _UNSUPPORTED_FROM_BOXSCORE if phrase in recap]
+    if matched:
+        issues.append("unsupported contextual language: " + ", ".join(matched))
+
+    expected_scores = [payload["home_score"], payload["away_score"]]
+    if any(score is not None and str(score) not in recap for score in expected_scores):
+        issues.append("recap does not include the final score")
+
+    names = _player_names(payload)
+    if names and not any(name.lower() in recap for name in names):
+        issues.append("recap does not name a player from the supplied stat tables")
+
+    return issues
+
+
+async def generate_coverage(
+    game: Game,
+    normalized_player_stats: list[NormalizedPlayerGameStatRead] | None = None,
+) -> GeneratedCoverage:
     """Call Claude to produce structured coverage for this game."""
-    client = _get_client()
+    payload = _serialize_game(game, normalized_player_stats or [])
+    if not _has_detailed_evidence(payload):
+        raise InsufficientGameEvidenceError(
+            "Detailed box-score evidence is unavailable for this game. Reingest "
+            "the box score before generating coverage."
+        )
 
-    payload = _serialize_game(game)
+    client = _get_client()
+    recap_contract, chronology_rule = _evidence_rules(payload)
 
     user_message = (
         "Generate coverage for the game below. The boxscore JSON is authoritative "
-        "— every number you cite must come from it. Pick the spotlight player by "
-        "looking across all player stat categories and choosing the single most "
-        "dominant performance, regardless of team.\n\n"
-        f"{_SCHEMA_DOC}\n\n"
+        "— every factual statement and number must be directly supported by it. "
+        "Pick the spotlight player by looking across all player stat categories "
+        "and choosing the strongest performance, prioritizing the winning team.\n\n"
+        "Evidence rules:\n"
+        f"- {chronology_rule}\n"
+        "- Every recap paragraph must contain at least one concrete score or stat "
+        "from the boxscore.\n"
+        "- Do not infer crowd reaction, coaching strategy, emotion, stakes, "
+        "standings, postseason implications, or future schedule context.\n"
+        "- Omit unsupported ideas entirely; do not mention that data is missing.\n"
+        "- Avoid generic conclusions about grit, resilience, confidence, depth, "
+        "pressure, or what the result says about a team. Do not repeat the lead.\n\n"
+        f"{_schema_doc(recap_contract)}\n\n"
         f"BOXSCORE:\n{json.dumps(payload, indent=2)}"
     )
+    retry_feedback = ""
 
     for attempt in range(1, _MAX_GENERATION_ATTEMPTS + 1):
         try:
             response = await client.messages.create(
                 model=settings.CONTENT_MODEL,
                 max_tokens=4000,
+                temperature=0.2,
                 system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_message + retry_feedback,
+                    }
+                ],
             )
         except AuthenticationError as exc:
             raise RuntimeError(
@@ -169,33 +332,48 @@ async def generate_coverage(game: Game) -> GeneratedCoverage:
             None,
         )
         payload_json = _extract_json(text) if text else None
+        validation_issues: list[str] = []
         if payload_json is not None:
             try:
                 coverage = GeneratedCoverage.model_validate(payload_json)
             except ValidationError:
                 coverage = None
             if coverage is not None:
-                logger.info(
-                    "Generated coverage game_id=%s model=%s usage=%s attempt=%s",
-                    game.id,
-                    settings.CONTENT_MODEL,
-                    getattr(response, "usage", None),
-                    attempt,
-                )
-                return coverage
+                validation_issues = _coverage_quality_issues(coverage, payload)
+                if not validation_issues:
+                    logger.info(
+                        "Generated coverage game_id=%s model=%s usage=%s attempt=%s",
+                        game.id,
+                        settings.CONTENT_MODEL,
+                        getattr(response, "usage", None),
+                        attempt,
+                    )
+                    return coverage
 
         if attempt < _MAX_GENERATION_ATTEMPTS:
+            if validation_issues:
+                retry_feedback = (
+                    "\n\nYour previous response was rejected for: "
+                    + "; ".join(validation_issues)
+                    + ". Rewrite it using only the supplied evidence."
+                )
             logger.warning(
-                "Coverage response was not valid structured content; retrying "
-                "game_id=%s model=%s attempt=%s",
+                "Coverage response failed validation; retrying game_id=%s "
+                "model=%s attempt=%s issues=%s",
                 game.id,
                 settings.CONTENT_MODEL,
                 attempt,
+                validation_issues or ["invalid structured content"],
             )
             continue
 
         if text:
             logger.error("Could not validate model output: %s", text[:500])
+            if validation_issues:
+                raise RuntimeError(
+                    "Model response contained unsupported or insufficiently "
+                    "grounded coverage."
+                )
             raise RuntimeError("Model response was not valid structured content.")
         raise RuntimeError("Model returned no text block.")
 

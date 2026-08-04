@@ -14,6 +14,7 @@ from app.models.player_game_stat import PlayerGameStat
 from app.models.sport_program import SportProgram
 from app.models.stat_definition import StatDefinition
 from app.models.team import Team
+from app.schemas.content import GeneratedCoverage
 from app.services.sidearm_scraper import ParsedBoxscore, parse_boxscore
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -139,6 +140,36 @@ async def test_wbb_ingest_writes_normalized_facts_and_replays_idempotently(
     assert kyra_points_payload["source_field"] == "PTS"
     assert kyra_points_payload["source_value"] == "13"
     assert kyra_points_payload["source_snapshot_id"] is not None
+
+    generation_facts = []
+
+    async def fake_generate_coverage(game, normalized_player_stats):
+        generation_facts.extend(normalized_player_stats)
+        return GeneratedCoverage(
+            headline="Idaho wins",
+            recap="Idaho defeated Idaho State 81-68 behind Gardner, Kyra.",
+            spotlight_player="Gardner, Kyra",
+            spotlight_body="Gardner, Kyra scored 13 points.",
+            social_post="Idaho 81, Idaho State 68. Gardner scored 13 points.",
+        )
+
+    monkeypatch.setattr(
+        "app.api.v1.games.generate_coverage",
+        fake_generate_coverage,
+    )
+    generation_response = await client.post(
+        f"/api/v1/games/{first_payload['id']}/generate",
+        json={},
+    )
+
+    assert generation_response.status_code == 201
+    assert len(generation_facts) == 144
+    assert any(
+        fact.player_name == "Gardner, Kyra"
+        and fact.stat_key == "points"
+        and fact.value == 13
+        for fact in generation_facts
+    )
 
     first_snapshot = await db_session.get(
         SourceSnapshot,

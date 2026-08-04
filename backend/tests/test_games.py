@@ -8,6 +8,30 @@ from app.models.game import Game, IngestRun, SourceSnapshot
 from app.services.sidearm_scraper import ParsedBoxscore, SidearmFetchError
 
 
+async def test_generate_rejects_score_only_game(client, db_session):
+    """Return a useful conflict instead of generating unsupported filler."""
+    game = Game(
+        source_url="https://govandals.com/boxscore/9974",
+        canonical_uid="sidearm:womens-basketball:2025-26:9974",
+        sport="womens-basketball",
+        season="2025-26",
+        home_team="Idaho",
+        away_team="Montana State",
+        home_score=73,
+        away_score=70,
+    )
+    db_session.add(game)
+    await db_session.commit()
+
+    response = await client.post(f"/api/v1/games/{game.id}/generate", json={})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Detailed box-score evidence is unavailable for this game. Reingest the "
+        "box score before generating coverage."
+    )
+
+
 async def test_ingest_creates_canonical_event_metadata(
     client,
     db_session,

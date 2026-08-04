@@ -24,7 +24,10 @@ from app.schemas.game import (
     IngestRequest,
     NormalizedPlayerGameStatRead,
 )
-from app.services.content_generator import generate_coverage
+from app.services.content_generator import (
+    InsufficientGameEvidenceError,
+    generate_coverage,
+)
 from app.services.game_ingest import ingest_boxscore
 from app.services.sidearm_scraper import scrape_boxscore
 
@@ -112,6 +115,13 @@ async def list_normalized_player_game_stats(
             detail="Game not found",
         )
 
+    return await _load_normalized_player_game_stats(db, game_id)
+
+
+async def _load_normalized_player_game_stats(
+    db: AsyncSession,
+    game_id: int,
+) -> list[NormalizedPlayerGameStatRead]:
     rows = (
         await db.execute(
             select(PlayerGameStat, Player, Team, StatDefinition)
@@ -184,7 +194,13 @@ async def generate_game_content(
         )
 
     try:
-        coverage = await generate_coverage(game)
+        normalized_player_stats = await _load_normalized_player_game_stats(db, game_id)
+        coverage = await generate_coverage(game, normalized_player_stats)
+    except InsufficientGameEvidenceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
