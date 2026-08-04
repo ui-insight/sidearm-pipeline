@@ -23,9 +23,19 @@ test("post-login landing page introduces the project and opens the demo", async 
   await expect(
     page.getByRole("heading", { name: "Available in this prototype" }),
   ).toBeVisible();
+  const demoLink = page.getByRole("link", { name: "Explore the Athletics demo" });
+  await expect(demoLink).toHaveAttribute("href", "/demo");
+
+  await demoLink.click();
+
   await expect(
-    page.getByRole("link", { name: "Explore the Athletics demo" }),
-  ).toHaveAttribute("href", "/demo");
+    page.getByRole("heading", {
+      name: "Follow a fact from Sidearm to the story.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Start the featured walkthrough" }),
+  ).toHaveAttribute("href", "/demo/pregame-brief");
 });
 
 test("games desk remains available from its own route", async ({ page }) => {

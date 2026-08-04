@@ -208,7 +208,7 @@ test("season desk assembles evidence and exports it", async ({ page }) => {
   await expect(
     page.getByRole("table").getByText("Washington State", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Workspace" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "Analytics" })).toHaveAttribute(
     "aria-current",
     "page",
   );
