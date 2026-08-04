@@ -62,6 +62,9 @@ function AppShell({
             className="order-3 flex w-full min-w-0 items-center gap-3 overflow-x-auto border-t border-gray-100 sm:order-none sm:w-auto sm:gap-6 sm:border-0"
           >
             <NavLink to="/" end className={navClass}>
+              Overview
+            </NavLink>
+            <NavLink to="/games" className={navClass}>
               Games
             </NavLink>
             <NavLink to="/workspace" className={navClass}>

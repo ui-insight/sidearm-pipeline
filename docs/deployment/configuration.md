@@ -27,7 +27,9 @@ This page describes the baseline environment variables included in the template.
 | `ANTHROPIC_API_KEY` | empty | API credential for optional content generation and Achievement Suggestion ranking |
 | `ANTHROPIC_BASE_URL` | empty | Optional Anthropic-compatible gateway base URL |
 | `CONTENT_MODEL` | `claude-opus-4-7` | Model used by the existing game-content generator |
-| `ARTICLE_MODEL` | empty | Model used by the evidence-bound Article writer; defaults to `CONTENT_MODEL` |
+| `MINDROUTER_API_KEY` | empty | MindRouter credential used only by the evidence-bound Article writer |
+| `MINDROUTER_BASE_URL` | `https://mindrouter.uidaho.edu/anthropic` | MindRouter Anthropic-compatible base URL used by the Article writer |
+| `ARTICLE_MODEL` | `qwen/qwen3.6-27b` | MindRouter model used by the evidence-bound Article writer |
 | `ARTICLE_GENERATION_MAX_TOKENS` | `4000` | Maximum output tokens for one Article writer request; valid range is 256–16000 |
 | `ARTICLE_GENERATION_POLL_SECONDS` | `2` | Database polling interval for the durable Article generation worker |
 | `ARTICLE_GENERATION_LEASE_SECONDS` | `300` | Worker lease duration before an abandoned `running` Article job is reclaimable |
@@ -63,6 +65,10 @@ This page describes the baseline environment variables included in the template.
   AI ranking, Article generation, and natural-language questions do not. A missing
   or unavailable Article provider creates a visible failed job while preserving the
   retryable Article Brief.
+- Give the Article worker a MindRouter service key through `MINDROUTER_API_KEY`.
+  Keep `ARTICLE_MODEL=qwen/qwen3.6-27b` unless the authenticated MindRouter model
+  catalog assigns a replacement identifier; every generation job records the exact
+  provider and model used.
 - Keep the Article worker lease longer than the expected provider request. Queued
   jobs and expired `running` jobs are read from PostgreSQL after service restart;
   no process-local queue is authoritative.

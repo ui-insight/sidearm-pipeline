@@ -1,7 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 import AuthenticationBoundary from "./components/AuthenticationBoundary";
 import AppShell from "./components/AppShell";
-import HomePage from "./pages/HomePage";
+import ProjectOverviewPage from "./pages/ProjectOverviewPage";
+import GamesDeskPage from "./pages/GamesDeskPage";
 import GamePage from "./pages/GamePage";
 import IdentityQueuePage from "./pages/IdentityQueuePage";
 import HistoricalBackfillPage from "./pages/HistoricalBackfillPage";
@@ -29,7 +30,8 @@ function App() {
             onLogout={onLogout}
           >
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<ProjectOverviewPage />} />
+              <Route path="/games" element={<GamesDeskPage />} />
               <Route path="/games/:id" element={<GamePage />} />
               <Route path="/workspace" element={<ExploratoryWorkspacePage />} />
               <Route path="/ask" element={<AskWarehousePage />} />

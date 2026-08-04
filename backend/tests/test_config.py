@@ -95,6 +95,13 @@ def test_achievement_ai_candidate_limit_validates() -> None:
         build_settings(ACHIEVEMENT_AI_MAX_CANDIDATES=101)
 
 
+def test_article_writer_defaults_to_mindrouter_qwen_36_27b() -> None:
+    settings = build_settings()
+
+    assert settings.MINDROUTER_BASE_URL == ("https://mindrouter.uidaho.edu/anthropic")
+    assert settings.ARTICLE_MODEL == "qwen/qwen3.6-27b"
+
+
 def test_security_check_rejects_default_secret_in_production() -> None:
     settings = build_settings(DEV_MODE=False)
 

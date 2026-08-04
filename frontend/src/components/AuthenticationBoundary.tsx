@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 import { authApi } from "../api/auth";
 import { setAuthFailureHandler } from "../api/client";
 import LoginPage from "../pages/LoginPage";
@@ -17,6 +18,7 @@ interface AuthenticationBoundaryProps {
 }
 
 function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
+  const navigate = useNavigate();
   const [session, setSession] = useState<AuthSession | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
@@ -62,6 +64,7 @@ function AuthenticationBoundary({ children }: AuthenticationBoundaryProps) {
     const authenticatedSession = await authApi.login({ username, password });
     setSessionError(null);
     setSession(authenticatedSession);
+    navigate("/", { replace: true });
   }
 
   async function logout() {
