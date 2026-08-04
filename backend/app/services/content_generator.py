@@ -210,6 +210,13 @@ _UNSUPPORTED_FROM_BOXSCORE = (
     "testament to",
 )
 
+_UNSUPPORTED_COMPARATIVES = (
+    "game-high",
+    "game high",
+    "led all scorers",
+    "most in the game",
+)
+
 
 def _player_names(payload: dict) -> list[str]:
     names = [row["player"] for row in payload["normalized_player_stats"]]
@@ -240,16 +247,34 @@ def _coverage_quality_issues(
 ) -> list[str]:
     """Reject obvious unsupported filler before a legacy draft is persisted."""
     recap = coverage.recap.lower()
+    coverage_text = " ".join(
+        (
+            coverage.headline,
+            coverage.recap,
+            coverage.spotlight_body,
+            coverage.social_post,
+        )
+    ).lower()
     issues: list[str] = []
 
     if not payload["scoring_plays"]:
-        matched = [phrase for phrase in _UNSUPPORTED_WITHOUT_PLAYS if phrase in recap]
+        matched = [
+            phrase for phrase in _UNSUPPORTED_WITHOUT_PLAYS if phrase in coverage_text
+        ]
         if matched:
             issues.append("unsupported game-flow language: " + ", ".join(matched))
 
-    matched = [phrase for phrase in _UNSUPPORTED_FROM_BOXSCORE if phrase in recap]
+    matched = [
+        phrase for phrase in _UNSUPPORTED_FROM_BOXSCORE if phrase in coverage_text
+    ]
     if matched:
         issues.append("unsupported contextual language: " + ", ".join(matched))
+
+    matched = [
+        phrase for phrase in _UNSUPPORTED_COMPARATIVES if phrase in coverage_text
+    ]
+    if matched:
+        issues.append("unsupported comparative language: " + ", ".join(matched))
 
     expected_scores = [payload["home_score"], payload["away_score"]]
     if any(score is not None and str(score) not in recap for score in expected_scores):
@@ -288,6 +313,8 @@ async def generate_coverage(
         "from the boxscore.\n"
         "- Do not infer crowd reaction, coaching strategy, emotion, stakes, "
         "standings, postseason implications, or future schedule context.\n"
+        "- Do not call a performance game-high or compare across both teams; the "
+        "payload may contain resolved player facts for only one team.\n"
         "- Omit unsupported ideas entirely; do not mention that data is missing.\n"
         "- Avoid generic conclusions about grit, resilience, confidence, depth, "
         "pressure, or what the result says about a team. Do not repeat the lead.\n\n"
