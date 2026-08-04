@@ -9,6 +9,7 @@ import pytest
 from anthropic import NotFoundError
 
 from app.models.game import Game
+from app.schemas.content import GeneratedCoverage
 from app.schemas.game import NormalizedPlayerGameStatRead
 from app.services import content_generator
 
@@ -180,6 +181,25 @@ async def test_generate_coverage_retries_unsupported_game_flow(monkeypatch) -> N
 
     assert calls == 2
     assert coverage.headline == good_coverage["headline"]
+
+
+def test_coverage_quality_rejects_unprovable_game_high_claim() -> None:
+    """Do not compare against an opponent whose player facts are unresolved."""
+    coverage = GeneratedCoverage(
+        headline="Gardner leads Idaho past Montana State",
+        recap=("Idaho defeated Montana State 73-70 as Gardner, Kyra scored 18 points."),
+        spotlight_player="Gardner, Kyra",
+        spotlight_body="Gardner, Kyra scored a game-high 18 points.",
+        social_post="Idaho 73, Montana State 70. Gardner scored 18 points.",
+    )
+    payload = content_generator._serialize_game(
+        _game_with_player_evidence(),
+        _normalized_player_evidence(),
+    )
+
+    issues = content_generator._coverage_quality_issues(coverage, payload)
+
+    assert "unsupported comparative language: game-high" in issues
 
 
 async def test_generate_coverage_retries_invalid_json_once(monkeypatch) -> None:
